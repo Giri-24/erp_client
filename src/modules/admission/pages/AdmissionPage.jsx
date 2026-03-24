@@ -1,7 +1,7 @@
 import AdmissionStepper from "../../../components/AdmissionStepper";
 
-export default function AdmissionPage() {
+export default function AdmissionPage({ editData, clearEditData }) {
   return (
-      <AdmissionStepper />
+      <AdmissionStepper editData={editData} clearEditData={clearEditData} />
   );
 }

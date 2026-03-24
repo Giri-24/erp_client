@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Form, Input, Button, DatePicker, message, Card } from "antd";
 import axios from "../utils/axios";
 import { useParams } from "react-router-dom";
+import dayjs from "dayjs";
 
 const AdmissionEdit = () => {
   const { admissionNo } = useParams();
@@ -10,13 +11,13 @@ const AdmissionEdit = () => {
 
   useEffect(() => {
     // Fetch admission details
-    axios.get(`/admissions/${admissionNo}`).then((res) => {
+    axios.get(`/admission/${admissionNo}`).then((res) => {
       const data = res.data;
-      // Convert date fields to moment
+      // Convert date fields to dayjs
       form.setFieldsValue({
         ...data,
-        dob: data.dob ? window.moment(data.dob) : null,
-        admissionDate: data.admissionDate ? window.moment(data.admissionDate) : null,
+        dob: data.dob ? dayjs(data.dob) : null,
+        admissionDate: data.admissionDate ? dayjs(data.admissionDate) : null,
       });
     });
   }, [admissionNo, form]);
@@ -30,7 +31,7 @@ const AdmissionEdit = () => {
         dob: values.dob ? values.dob.format("YYYY-MM-DD") : undefined,
         admissionDate: values.admissionDate ? values.admissionDate.format("YYYY-MM-DD") : undefined,
       };
-      await axios.put(`/admissions/${admissionNo}`, payload);
+      await axios.put(`/admission/${admissionNo}`, payload);
       message.success("Admission updated successfully");
     } catch (err) {
       message.error("Update failed");

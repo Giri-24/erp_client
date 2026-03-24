@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { Table, Input, Button, Space, message, Popconfirm, Collapse, Form, DatePicker } from "antd";
 import { SearchOutlined, EditOutlined, DownloadOutlined, DeleteOutlined } from "@ant-design/icons";
-import axios from "../utils/axios";
+import instance from "../utils/axios";
+import dayjs from "dayjs";
+import AdmissionStepper from "../components/AdmissionStepper";
 
-const AdmissionView = () => {
+const AdmissionView = ({ onEdit }) => {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [sortOrder, setSortOrder] = useState(null);
-
   useEffect(() => {
     // Fetch admissions from backend
-    axios.get("/admissions").then((res) => {
+    instance.get("/admissions").then((res) => {
       setData(res.data);
       setFilteredData(res.data);
     });
@@ -33,8 +34,12 @@ const AdmissionView = () => {
     const order = sortOrder === "ascend" ? "descend" : "ascend";
     setSortOrder(order);
     const sorted = [...filteredData].sort((a, b) => {
-      if (order === "ascend") return String(a[field]).localeCompare(String(b[field]));
-      else return String(b[field]).localeCompare(String(a[field]));
+      // deeply resolve fields
+      const resolvePath = (obj, path) => path.split('.').reduce((o, p) => (o ? o[p] : ""), obj);
+      const valA = String(resolvePath(a, field));
+      const valB = String(resolvePath(b, field));
+      if (order === "ascend") return valA.localeCompare(valB);
+      else return valB.localeCompare(valA);
     });
     setFilteredData(sorted);
   };
@@ -54,67 +59,89 @@ const AdmissionView = () => {
     URL.revokeObjectURL(url);
   };
 
-  const [editingKey, setEditingKey] = useState(null);
-  const [editForm] = Form.useForm();
-
   const handleEdit = (record) => {
-    setEditingKey(record.admissionNo);
-    editForm.setFieldsValue({
-      ...record,
-      dob: record.dob ? window.moment(record.dob) : null,
-      admissionDate: record.admissionDate ? window.moment(record.admissionDate) : null,
-    });
+    if (onEdit) onEdit(record);
   };
 
-  const handleDelete = async (admissionNo) => {
+  const handleDelete = async (id) => {
     try {
-      await axios.delete(`/admissions/${admissionNo}`);
-      setData(data.filter((item) => item.admissionNo !== admissionNo));
-      setFilteredData(filteredData.filter((item) => item.admissionNo !== admissionNo));
+      await instance.delete(`/admission/${id}`);
+      setData(data.filter((item) => item.id !== id));
+      setFilteredData(filteredData.filter((item) => item.id !== id));
       message.success("Deleted successfully");
     } catch {
       message.error("Delete failed");
     }
   };
 
-  const saveEdit = async () => {
-    try {
-      const values = await editForm.validateFields();
-      const payload = {
-        ...values,
-        dob: values.dob ? values.dob.format("YYYY-MM-DD") : undefined,
-        admissionDate: values.admissionDate ? values.admissionDate.format("YYYY-MM-DD") : undefined,
-      };
-      await axios.put(`/admissions/${editingKey}`, payload);
-      message.success("Updated successfully");
-      setEditingKey(null);
-      // Refresh data
-      axios.get("/admissions").then((res) => {
-        setData(res.data);
-        setFilteredData(res.data);
-      });
-    } catch {
-      message.error("Update failed");
-    }
-  };
+  const renderBool = (val) => (val ? "Yes" : "No");
+  const renderDate = (date) => (date ? dayjs(date).format("YYYY-MM-DD") : "");
 
   const columns = [
-    { title: "Admission No", dataIndex: "admissionNo", sorter: true, onHeaderCell: () => ({ onClick: () => handleSort("admissionNo") }) },
-    { title: "Student Name", dataIndex: "name", sorter: true, onHeaderCell: () => ({ onClick: () => handleSort("name") }) },
+    // LEFT FIXED ACTIONS
+    { title: "Admission No", dataIndex: ["admission", "admissionNo"], sorter: true, fixed: "left", width: 150, onHeaderCell: () => ({ onClick: () => handleSort("admission.admissionNo") }) },
+    { title: "Student Name", dataIndex: "name", sorter: true, fixed: "left", width: 200, onHeaderCell: () => ({ onClick: () => handleSort("name") }) },
+    { title: "Standard", dataIndex: "standard", fixed: "left", width: 100 },
+    
+    // STUDENT FIELDS
     { title: "Gender", dataIndex: "gender" },
-    { title: "DOB", dataIndex: "dob" },
+    { title: "DOB", dataIndex: "dob", render: renderDate },
+    { title: "Religion", dataIndex: "religion" },
     { title: "Community", dataIndex: "community" },
-    { title: "Father Name", dataIndex: "fatherName" },
-    { title: "Mother Name", dataIndex: "motherName" },
-    { title: "Admission Date", dataIndex: "admissionDate" },
+    { title: "Caste", dataIndex: "caste" },
+    { title: "Mother Tongue", dataIndex: "motherTongue" },
+    { title: "Aadhar No", dataIndex: "aadharNo" },
+    { title: "Blood Group", dataIndex: "bloodGroup" },
+    { title: "Identification 1", dataIndex: "identification1" },
+    { title: "Identification 2", dataIndex: "identification2" },
+    { title: "Previous School", dataIndex: "previousSchool" },
+    { title: "Transport Mode", dataIndex: "transportMode" },
+    { title: "RTE", dataIndex: "rte", render: renderBool },
+    { title: "App Approved", dataIndex: "isApproved", render: renderBool },
+    { title: "Created At", dataIndex: "createdAt", render: renderDate },
+
+    // FAMILY FIELDS
+    { title: "Father Name", dataIndex: ["family", "fatherName"] },
+    { title: "Father Phone", dataIndex: ["family", "fatherPhone"] },
+    { title: "Father WhatsApp", dataIndex: ["family", "fatherWhatsapp"] },
+    { title: "Father Aadhar", dataIndex: ["family", "fatherAadhar"] },
+    { title: "Father Occupation", dataIndex: ["family", "fatherOccupation"] },
+    
+    { title: "Mother Name", dataIndex: ["family", "motherName"] },
+    { title: "Mother Phone", dataIndex: ["family", "motherPhone"] },
+    { title: "Mother WhatsApp", dataIndex: ["family", "motherWhatsapp"] },
+    { title: "Mother Aadhar", dataIndex: ["family", "motherAadhar"] },
+    { title: "Mother Occupation", dataIndex: ["family", "motherOccupation"] },
+
+    { title: "Other WhatsApp", dataIndex: ["family", "otherWhatsapp"] },
+    { title: "Family Income", dataIndex: ["family", "familyIncome"] },
+    { title: "Siblings", dataIndex: ["family", "siblings"] },
+    { title: "Hostel Required", dataIndex: ["family", "hostelRequired"], render: renderBool },
+
+    // ADDRESS FIELDS
+    { title: "Address Line 1", dataIndex: ["address", "line1"] },
+    { title: "Address Line 2", dataIndex: ["address", "line2"] },
+    { title: "Address Line 3", dataIndex: ["address", "line3"] },
+    { title: "PIN Code", dataIndex: ["address", "pin"] },
+
+    // ADMISSION INFO
+    { title: "Admission Date", dataIndex: ["admission", "admissionDate"], render: renderDate },
+    { title: "Adm Standard", dataIndex: ["admission", "standard"] },
+    { title: "Staff Signature", dataIndex: ["admission", "staffSignature"] },
+    { title: "Principal Signature", dataIndex: ["admission", "principalSignature"] },
+    { title: "Adm Approved", dataIndex: ["admission", "isApproved"], render: renderBool },
+
+    // RIGHT FIXED ACTIONS
     {
       title: "Actions",
+      fixed: "right",
+      width: 150,
       render: (_, record) => (
         <Space>
           <Button icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             Edit
           </Button>
-          <Popconfirm title="Delete this admission?" onConfirm={() => handleDelete(record.admissionNo)}>
+          <Popconfirm title="Delete this admission?" onConfirm={() => handleDelete(record.id)}>
             <Button icon={<DeleteOutlined />} danger>
               Delete
             </Button>
@@ -137,34 +164,12 @@ const AdmissionView = () => {
         <Button icon={<DownloadOutlined />} onClick={exportCSV}>Export CSV</Button>
       </Space>
       <Table
-        columns={columns}
-        dataSource={filteredData}
-        rowKey="admissionNo"
-        pagination={{ pageSize: 10 }}
-        expandable={{
-          expandedRowRender: (record) =>
-            editingKey === record.admissionNo ? (
-              <Form form={editForm} layout="vertical" style={{ maxWidth: 600 }}>
-                <Form.Item name="name" label="Student Name" rules={[{ required: true }]}><Input /></Form.Item>
-                <Form.Item name="gender" label="Gender" rules={[{ required: true }]}><Input /></Form.Item>
-                <Form.Item name="dob" label="DOB" rules={[{ required: true }]}><DatePicker style={{ width: "100%" }} /></Form.Item>
-                <Form.Item name="community" label="Community" rules={[{ required: true }]}><Input /></Form.Item>
-                <Form.Item name="fatherName" label="Father Name" rules={[{ required: true }]}><Input /></Form.Item>
-                <Form.Item name="motherName" label="Mother Name" rules={[{ required: true }]}><Input /></Form.Item>
-                <Form.Item name="admissionDate" label="Admission Date" rules={[{ required: true }]}><DatePicker style={{ width: "100%" }} /></Form.Item>
-                <Space>
-                  <Button type="primary" onClick={saveEdit}>Save</Button>
-                  <Button onClick={() => setEditingKey(null)}>Cancel</Button>
-                </Space>
-              </Form>
-            ) : null,
-          rowExpandable: (record) => true,
-          expandedRowKeys: editingKey ? [editingKey] : [],
-          onExpand: (expanded, record) => {
-            if (!expanded) setEditingKey(null);
-          },
-        }}
-      />
+            columns={columns}
+            dataSource={filteredData}
+            rowKey="id"
+            scroll={{ x: 'max-content' }}
+            pagination={{ pageSize: 10 }}
+          />
     </div>
   );
 };

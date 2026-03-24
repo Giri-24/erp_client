@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Steps,
   Button,
@@ -30,13 +30,150 @@ import {
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import logo from "../assets/logo.svg";
+import { createAdmission, updateAdmission } from "../modules/admission/admission.service";
+import dayjs from "dayjs";
 const { Title } = Typography;
 
-const AdmissionStepper = () => {
+const AdmissionStepper = ({editData, clearEditData}) => {
   const [current, setCurrent] = useState(0);
   const [form] = Form.useForm();
   const [formData, setFormData] = useState({});
   const [community, setCommunity] = useState("");
+
+  useEffect(() => {
+    if (editData) {
+      const flatData = {
+        name: editData.name,
+        standard: editData.standard,
+        gender: editData.gender,
+        dob: editData.dob ? dayjs(editData.dob) : null,
+        religion: editData.religion,
+        community: editData.community,
+        caste: editData.caste,
+        motherTongue: editData.motherTongue,
+        aadharNo: editData.aadharNo,
+        bloodGroup: editData.bloodGroup,
+        identityMark1: editData.identification1,
+        identityMark2: editData.identification2,
+        previouslyStudied: editData.previousSchool,
+        vanNeeded: editData.transportMode === "Van" ? true : false,
+        
+        fatherName: editData.family?.fatherName,
+        fatherPhone: editData.family?.fatherPhone,
+        fatherAadharNo: editData.family?.fatherAadhar,
+        fatherOccupation: editData.family?.fatherOccupation,
+        fatherWhatsAppNo: editData.family?.fatherWhatsapp,
+        motherName: editData.family?.motherName,
+        motherPhone: editData.family?.motherPhone,
+        motherAadharNo: editData.family?.motherAadhar,
+        motherOccupation: editData.family?.motherOccupation,
+        motherWhatsAppNo: editData.family?.motherWhatsapp,
+        //make this income as string
+        familyIncome:String(editData.family?.familyIncome),
+
+        sibblings: editData.family?.siblings,
+        
+        line1: editData.address?.line1,
+        line2: editData.address?.line2,
+        pin: editData.address?.pin,
+        
+        admissionNo: editData.admission?.admissionNo,
+        admissionDate: editData.admission?.admissionDate ? dayjs(editData.admission.admissionDate) : null,
+        
+        examName: editData.academics?.[0]?.examName,
+        totalPercentage: editData.academics?.[0]?.totalPercentage,
+      };
+
+      // Handle documents for checkbox group
+      const doc = editData.documents?.[0] || {};
+      const docSelection = [];
+      if (doc.birthCert) docSelection.push("birthCert");
+      if (doc.communityCert) docSelection.push("communityCert");
+      if (doc.aadharStudent) docSelection.push("aadharStudent");
+      flatData.documents = docSelection;
+
+      // Handle photo structure assuming we are getting a valid image config
+      if (doc.photo || doc.photoPath) {
+        flatData.photo = [
+          {
+            uid: "-1",
+            name: "photo.jpg",
+            status: "done",
+            url: doc.photoPath ? `http://localhost:3000/${doc.photoPath}` : "https://via.placeholder.com/150", 
+          },
+        ];
+      }
+
+      form.setFieldsValue(flatData);
+      setFormData(flatData);
+      setCommunity(editData.community);
+    }
+  }, [editData, form]);
+
+  const fillRandomData = () => {
+    const random10 = () => Math.floor(1000000000 + Math.random() * 9000000000).toString();
+    const random12 = () => Math.floor(100000000000 + Math.random() * 900000000000).toString();
+    const random6 = () => Math.floor(100000 + Math.random() * 900000).toString();
+    const firstNames = ["Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Diya", "Isha", "Ananya", "Riya", "Kavya"];
+    const lastNames = ["Sharma", "Patel", "Kumar", "Singh", "Reddy", "Verma", "Rao", "Das", "Nair", "Iyer"];
+    const randName = () => firstNames[Math.floor(Math.random() * firstNames.length)] + " " + lastNames[Math.floor(Math.random() * lastNames.length)];
+    const randGender = () => Math.random() > 0.5 ? "MALE" : "FEMALE";
+    const randCommunity = () => ["BC", "MBC", "SC", "OTHERS"][Math.floor(Math.random() * 4)];
+    const randBloodGroup = () => ["A+", "B+", "O+", "AB+", "O-"][Math.floor(Math.random() * 5)];
+    const communitySelected = randCommunity();
+    setCommunity(communitySelected);
+
+    const randomData = {
+      name: randName(),
+      gender: randGender(),
+      dob: dayjs().subtract(15, 'year'),
+      community: communitySelected,
+      communityOther: communitySelected === "OTHERS" ? "Kongu" : undefined,
+      standard: "10th",
+      religion: "Hindu",
+      caste: "Vellalar",
+      motherTongue: "Tamil",
+      aadharNo: random12(),
+      bloodGroup: randBloodGroup(),
+      identityMark1: "Mole on right cheek",
+      identityMark2: "Scar on left hand",
+      previouslyStudied: "Govt Hr Sec School",
+      vanNeeded: Math.random() > 0.5,
+      
+      fatherName: randName(),
+      fatherPhone: random10(),
+      fatherOccupation: "Agriculture",
+      fatherAadharNo: random12(),
+      fatherWhatsAppNo: random10(),
+      
+      motherName: randName(),
+      motherPhone: random10(),
+      motherOccupation: "Home Maker",
+      motherAadharNo: random12(),
+      motherWhatsAppNo: random10(),
+      
+      familyIncome: "150000",
+      sibblings: "1",
+      
+      line1: "12, Main Road",
+      line2: "Gandhi Nagar",
+      pin: random6(),
+      
+      examName: "10th Standard",
+      totalPercentage: "85",
+      
+      admissionNo: `ADM${Math.floor(1000 + Math.random() * 9000)}`,
+      admissionDate: dayjs(),
+    };
+    
+    // Clear out any previous docs/photos just natively
+    randomData.documents = [];
+    randomData.photo = [];
+    
+    form.setFieldsValue(randomData);
+    setFormData(randomData);
+    message.success("Filled with random Indian standard data!");
+  };
 
   // Validation rules
   const requiredRule = { required: true, message: "This field is required" };
@@ -75,6 +212,11 @@ const AdmissionStepper = () => {
             </Form.Item>
           </Col>
           <Col span={12}>
+            <Form.Item name="standard" label="Standard" rules={[requiredRule]}>
+              <Input />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
             <Form.Item name="gender" label="Gender" rules={[requiredRule]}>
               <Select>
                 <Select.Option value="MALE">Male</Select.Option>
@@ -93,11 +235,11 @@ const AdmissionStepper = () => {
                 <Select.Option value="BC">BC</Select.Option>
                 <Select.Option value="MBC">MBC</Select.Option>
                 <Select.Option value="SC">SC</Select.Option>
-                <Select.Option value="OTHER">Other</Select.Option>
+                <Select.Option value="OTHERS">Others</Select.Option>
               </Select>
             </Form.Item>
           </Col>
-          {community === "OTHER" && (
+          {community === "OTHERS" && (
             <Col span={12}>
               <Form.Item name="communityOther" label="Custom Community" rules={[requiredRule]}>
                 <Input />
@@ -230,12 +372,13 @@ const AdmissionStepper = () => {
           // 🔥 HANDLE PHOTO SEPARATELY
           if (k === "photo" && v?.length > 0) {
             const url =
+              v[0].url ||
               v[0].thumbUrl ||
-              URL.createObjectURL(v[0].originFileObj);
+              (v[0].originFileObj ? URL.createObjectURL(v[0].originFileObj) : "");
 
             return (
               <Descriptions.Item key={k} label="Photo">
-                <img src={url} alt="student" width={100} />
+                {url ? <img src={url} alt="student" width={100} /> : "No Photo"}
               </Descriptions.Item>
             );
           }
@@ -365,7 +508,12 @@ const generatePDF = async () => {
   return (
     <div style={{ padding: 30 }}>
       <Card>
-        <Title level={3}>Admission</Title>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <Title level={3} style={{ margin: 0 }}>Admission</Title>
+          <Button type="dashed" onClick={fillRandomData}>
+            Fill Random Indian Data
+          </Button>
+        </div>
 
         <Steps current={current} items={steps.map((s) => ({ title: s.title }))} />
 
@@ -389,18 +537,88 @@ const generatePDF = async () => {
                     await form.validateFields();
                     // Prepare data for backend
                     const values = form.getFieldsValue(true);
-                    // Convert date fields to string
+                    console.log(values)
                     const payload = {
-                      ...values,
-                      dob: values.dob ? values.dob.format("YYYY-MM-DD") : undefined,
-                      admissionDate: values.admissionDate ? values.admissionDate.format("YYYY-MM-DD") : undefined,
+                      name: values.name,
+                      standard: values.standard || "10th",
+                      gender: values.gender,
+                      dob: values.dob ? values.dob.toISOString() : undefined,
+                      religion: values.religion,
+                      community: values.community,
+                      caste: values.caste,
+                      motherTongue: values.motherTongue,
+                      aadharNo: values.aadharNo,
+                      bloodGroup: values.bloodGroup,
+                      identification1: values.identityMark1,
+                      identification2: values.identityMark2,
+                      previousSchool: values.previouslyStudied,
+                      transportMode: values.vanNeeded ? "Van" : "Local",
+                      
+                      family: {
+                        fatherName: values.fatherName,
+                        fatherPhone: values.fatherPhone,
+                        fatherAadhar: values.fatherAadharNo,
+                        fatherOccupation: values.fatherOccupation,
+                        fatherWhatsapp: values.fatherWhatsAppNo,
+                        motherName: values.motherName,
+                        motherPhone: values.motherPhone,
+                        motherAadhar: values.motherAadharNo,
+                        motherOccupation: values.motherOccupation,
+                        motherWhatsapp: values.motherWhatsAppNo,
+                        familyIncome: Number(values.familyIncome) || 0,
+                        siblings: String(values.sibblings || ""),
+                      },
+                      
+                      address: {
+                        line1: values.line1,
+                        line2: values.line2,
+                        pin: values.pin,
+                      },
+                      
+                      documents: {
+                        photo: !!(values.photo && values.photo.length > 0),
+                        birthCert: values.documents?.includes("birthCert") || false,
+                        communityCert: values.documents?.includes("communityCert") || false,
+                        aadharFather: false,
+                        aadharMother: false,
+                        aadharStudent: values.documents?.includes("aadharStudent") || false,
+                        transferCert: false,
+                      },
+                      
+                      academics: [
+                        {
+                          examName: values.examName || "10th",
+                          totalPercentage: Number(values.totalPercentage) || 0,
+                          subjects: [],
+                        }
+                      ],
+                      
+                      admission: {
+                        admissionNo: values.admissionNo,
+                        admissionDate: values.admissionDate ? values.admissionDate.toISOString() : new Date().toISOString(),
+                        standard: values.standard || "10th",
+                        principalSignature: "Pending",
+                      }
                     };
-                    // TODO: send payload to backend (e.g. axios.post)
-                    message.success("Form is ready to send to backend.");
+                    
+                    if (editData) {
+                      await updateAdmission(editData.id, payload);
+                      message.success("Admission updated successfully!");
+                      if (clearEditData) clearEditData();
+                    } else {
+                      console.log(values)
+                      await createAdmission(payload);
+                      message.success("Admission created successfully!");
+                      form.resetFields();
+                      setFormData({});
+                      setCurrent(0);
+                    }
+
                   } catch (err) {
-                    message.error("Please fill all required fields correctly.");
+                    console.error("Admission error:", err);
+                    message.error("Error creating admission. Check required fields or try again.");
                   }
-                }}>Submit</Button>
+                }}>{editData ? "Update" : "Submit"}</Button>
               </>
             )}
           </Space>
@@ -441,9 +659,9 @@ const generatePDF = async () => {
 
   {/* PHOTO */}
   <div style={{ position: "absolute", right: 40, top: 40, border: "1px solid black", width: 100, height: 120 }}>
-    {formData?.photo?.[0]?.thumbUrl && (
+    {(formData?.photo?.[0]?.url || formData?.photo?.[0]?.thumbUrl) && (
       <img
-        src={formData.photo[0].thumbUrl}
+        src={formData.photo[0].url || formData.photo[0].thumbUrl}
         alt="photo"
         style={{ width: "100%", height: "100%", objectFit: "cover" }}
       />

@@ -23,6 +23,7 @@ const { Header, Sider, Content } = Layout;
 const Dashboard = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [selectedKey, setSelectedKey] = useState("dashboard");
+  const [editData, setEditData] = useState(null);
 
   const {
     token: { colorBgContainer },
@@ -48,9 +49,16 @@ const Dashboard = () => {
       case "dashboard":
         return "Welcome to the Dashboard!";
       case "admission":
-        return <AdmissionPage />;
+        return <AdmissionPage editData={editData} clearEditData={() => setEditData(null)} />;
       case "admission-view":
-        return <AdmissionView />;
+        return (
+          <AdmissionView
+            onEdit={(record) => {
+              setEditData(record);
+              setSelectedKey("admission");
+            }}
+          />
+        );
       case "admission-edit":
         return <AdmissionEdit />;
       case "students":
@@ -87,7 +95,12 @@ const Dashboard = () => {
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
-          onClick={(e) => setSelectedKey(e.key)}
+          onClick={(e) => {
+            setSelectedKey(e.key);
+            if (e.key === "admission") {
+              setEditData(null); // Clear edit form when clicking 'Admission Form' directly
+            }
+          }}
           items={[
             {
               key: "dashboard",
