@@ -102,7 +102,8 @@ const AdmissionStepper = ({editData, clearEditData}) => {
 
       // Handle photo structure assuming we are getting a valid image config
       if (doc.photo || doc.photoPath) {
-        flatData.photo = [
+        flatData.profilePhotoChecked = true;
+        flatData.profilePhoto = [
           {
             uid: "-1",
             name: "photo.jpg",
@@ -176,7 +177,8 @@ const AdmissionStepper = ({editData, clearEditData}) => {
     
     // Clear out any previous docs/photos just natively
     randomData.documents = [];
-    randomData.photo = [];
+    randomData.profilePhoto = [];
+    randomData.profilePhotoChecked = false;
     
     form.setFieldsValue(randomData);
     setFormData(randomData);
@@ -384,7 +386,7 @@ const AdmissionStepper = ({editData, clearEditData}) => {
         {Object.entries(formData).map(([k, v]) => {
           
           // 🔥 HANDLE PHOTO SEPARATELY
-          if (k === "photo" && v?.length > 0) {
+          if (k === "profilePhoto" && v?.length > 0) {
             const url =
               v[0].url ||
               v[0].thumbUrl ||
@@ -677,9 +679,9 @@ const generatePDF = async () => {
 
   {/* PHOTO */}
   <div style={{ position: "absolute", right: 40, top: 40, border: "1px solid black", width: 100, height: 120 }}>
-    {(formData?.photo?.[0]?.url || formData?.photo?.[0]?.thumbUrl) && (
+    {(formData?.profilePhoto?.[0]?.url || formData?.profilePhoto?.[0]?.thumbUrl) && (
       <img
-        src={formData.photo[0].url || formData.photo[0].thumbUrl}
+        src={formData.profilePhoto[0].url || formData.profilePhoto[0].thumbUrl}
         alt="photo"
         style={{ width: "100%", height: "100%", objectFit: "cover" }}
       />

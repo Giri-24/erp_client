@@ -25,8 +25,8 @@ const Login = () => {
 
   return (
     <div style={styles.container}>
-        <Space direction="vertical" size="large" align="center">
-        <img src={logo} alt="PSF Logo"></img>
+        <Space direction="vertical"  align="center">
+        <img src={logo} width={300} alt="PSF Logo"></img>
 
       <Card title="School ERP Login" style={styles.card}>
         <Form layout="vertical" onFinish={onFinish}>
@@ -62,7 +62,9 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    background: '#f0f2f5',
+   background: '#a8c0ff',/* fallback for old browsers */
+  background: '-webkit-linear-gradient(to top, #3f2b96, #a8c0ff)',/* Chrome 10-25, Safari 5.1-6 */
+  background: 'linear-gradient(to top, #3f2b96, #ffffffff)', /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
   },
   card: {
     width: 350,
