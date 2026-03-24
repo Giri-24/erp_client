@@ -100,6 +100,21 @@ const AdmissionView = ({ onEdit }) => {
     { title: "App Approved", dataIndex: "isApproved", render: renderBool },
     { title: "Created At", dataIndex: "createdAt", render: renderDate },
 
+    // PHOTO COLUMN (supports documents as array)
+    { title: "Photo", 
+      render: (_, record) => {
+        let photoPath = null;
+        if (Array.isArray(record.documents) && record.documents.length > 0) {
+          photoPath = record.documents[0].photoPath;
+        } else if (record.documents && record.documents.photoPath) {
+          photoPath = record.documents.photoPath;
+        }
+        return photoPath ? (
+          <img src={`http://localhost:3000/${photoPath.replace(/\\/g, '/')}`} alt="student" style={{ width: 50, height: 60, objectFit: "cover" }} />
+        ) : "No Photo";
+      }
+    },
+
     // FAMILY FIELDS
     { title: "Father Name", dataIndex: ["family", "fatherName"] },
     { title: "Father Phone", dataIndex: ["family", "fatherPhone"] },

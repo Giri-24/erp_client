@@ -29,7 +29,7 @@ import {
 } from "@ant-design/icons";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import logo from "../assets/logo.svg";
+import logo from "../assets/logo.jpeg";
 import { createAdmission, updateAdmission } from "../modules/admission/admission.service";
 import dayjs from "dayjs";
 const { Title } = Typography;
@@ -39,6 +39,14 @@ const AdmissionStepper = ({editData, clearEditData}) => {
   const [form] = Form.useForm();
   const [formData, setFormData] = useState({});
   const [community, setCommunity] = useState("");
+
+  const [fileLists, setFileLists] = useState({
+    profilePhoto: [],
+    birthCert: [],
+    communityCert: [],
+    aadharStudent: [],
+    // ...add more as needed
+  });
 
   useEffect(() => {
     if (editData) {
@@ -322,19 +330,25 @@ const AdmissionStepper = ({editData, clearEditData}) => {
       fields: [],
       content: (
         <>
-         <Form.Item
-  name="photo"
-  label="Photo"
-  valuePropName="fileList"
-  getValueFromEvent={(e) => e?.fileList}
-  rules={[requiredRule]}
->
-  <Upload beforeUpload={() => false} listType="picture">
-    <Button icon={<UploadOutlined />}>Upload</Button>
-  </Upload>
-</Form.Item>
-
-          <Form.Item name="documents" label="Documents" rules={[requiredRule]}>
+          <Form.Item label="Profile Photo" required>
+            <Form.Item name="profilePhotoChecked" valuePropName="checked" noStyle>
+              <Checkbox>Upload Profile Photo</Checkbox>
+            </Form.Item>
+            {form.getFieldValue("profilePhotoChecked") && (
+              <Form.Item
+                name="profilePhoto"
+                valuePropName="fileList"
+                getValueFromEvent={e => e?.fileList}
+                noStyle
+                rules={[requiredRule]}
+              >
+                <Upload beforeUpload={() => false} listType="picture">
+                  <Button icon={<UploadOutlined />}>Upload</Button>
+                </Upload>
+              </Form.Item>
+            )}
+          </Form.Item>
+          <Form.Item name="documentsChecked" label="Documents" rules={[requiredRule]}>
             <Checkbox.Group>
               <Checkbox value="birthCert">Birth Certificate</Checkbox>
               <Checkbox value="communityCert">Community Certificate</Checkbox>
@@ -535,10 +549,21 @@ const generatePDF = async () => {
                 <Button type="primary" onClick={async () => {
                   try {
                     await form.validateFields();
-                    // Prepare data for backend
                     const values = form.getFieldsValue(true);
-                    console.log(values)
-                    const payload = {
+
+                    // Build the documents array
+                    const documents = [];
+                    // Profile photo
+                    if (values.profilePhotoChecked) {
+                      documents.push({ key: "profilePhoto", photoPath: "" }); // backend will set photoPath
+                    }
+                    // Other documents
+                    (values.documentsChecked || []).forEach(docKey => {
+                      documents.push({ key: docKey, photoPath: "" });
+                    });
+
+                    // Build the main data object
+                    const data = {
                       name: values.name,
                       standard: values.standard || "10th",
                       gender: values.gender,
@@ -553,7 +578,6 @@ const generatePDF = async () => {
                       identification2: values.identityMark2,
                       previousSchool: values.previouslyStudied,
                       transportMode: values.vanNeeded ? "Van" : "Local",
-                      
                       family: {
                         fatherName: values.fatherName,
                         fatherPhone: values.fatherPhone,
@@ -568,23 +592,12 @@ const generatePDF = async () => {
                         familyIncome: Number(values.familyIncome) || 0,
                         siblings: String(values.sibblings || ""),
                       },
-                      
                       address: {
                         line1: values.line1,
                         line2: values.line2,
                         pin: values.pin,
                       },
-                      
-                      documents: {
-                        photo: !!(values.photo && values.photo.length > 0),
-                        birthCert: values.documents?.includes("birthCert") || false,
-                        communityCert: values.documents?.includes("communityCert") || false,
-                        aadharFather: false,
-                        aadharMother: false,
-                        aadharStudent: values.documents?.includes("aadharStudent") || false,
-                        transferCert: false,
-                      },
-                      
+                      documents,
                       academics: [
                         {
                           examName: values.examName || "10th",
@@ -592,7 +605,6 @@ const generatePDF = async () => {
                           subjects: [],
                         }
                       ],
-                      
                       admission: {
                         admissionNo: values.admissionNo,
                         admissionDate: values.admissionDate ? values.admissionDate.toISOString() : new Date().toISOString(),
@@ -600,20 +612,26 @@ const generatePDF = async () => {
                         principalSignature: "Pending",
                       }
                     };
-                    
+
+                    // Prepare FormData for multipart/form-data
+                    const formDataToSend = new FormData();
+                    formDataToSend.append('data', JSON.stringify(data));
+                    // Attach profile photo file if present
+                    if (values.profilePhotoChecked && values.profilePhoto && values.profilePhoto.length > 0 && values.profilePhoto[0].originFileObj) {
+                      formDataToSend.append('profilePhoto', values.profilePhoto[0].originFileObj);
+                    }
+
                     if (editData) {
-                      await updateAdmission(editData.id, payload);
+                      await updateAdmission(editData.id, formDataToSend);
                       message.success("Admission updated successfully!");
                       if (clearEditData) clearEditData();
                     } else {
-                      console.log(values)
-                      await createAdmission(payload);
+                      await createAdmission(formDataToSend);
                       message.success("Admission created successfully!");
                       form.resetFields();
                       setFormData({});
                       setCurrent(0);
                     }
-
                   } catch (err) {
                     console.error("Admission error:", err);
                     message.error("Error creating admission. Check required fields or try again.");

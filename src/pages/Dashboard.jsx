@@ -11,7 +11,7 @@ import {
 } from "@ant-design/icons";
 import { Layout, Menu, Button, theme, Avatar, Dropdown } from "antd";
 
-import logo from "../assets/logo.svg";
+import logo from "../assets/logo.jpeg";
 import AdmissionPage from "../modules/admission/pages/AdmissionPage";
 import AdmissionView from "./AdmissionView";
 import AdmissionEdit from "./AdmissionEdit";

@@ -2,7 +2,7 @@ import { Form, Input, Button, Card, message, Space } from 'antd'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import { useEffect } from 'react' // ✅ FIX
-import logo from '../assets/logo.svg'
+import logo from '../assets/logo.jpeg'
 
 const Login = () => {
   const navigate = useNavigate()

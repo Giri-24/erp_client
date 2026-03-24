@@ -21,18 +21,24 @@ const objectToFormData = (obj, formData = new FormData(), parentKey = '') => {
   return formData;
 };
 
-export const createAdmission = async (data) => {
-  // const formData = objectToFormData(data);
 
-  const res = await axios.post('/admissions', data
-  
-  );
-
+// Accepts FormData for file upload
+export const createAdmission = async (formData) => {
+  const res = await axios.post('/admissions', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
   return res.data;
 };
 
 
-export const updateAdmission = async (id, data) => {
-  const res = await axios.put(`/admissions/${id}`, data);
+// Accepts FormData for file upload (if backend supports it)
+export const updateAdmission = async (id, formData) => {
+  const res = await axios.put(`/admissions/${id}`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
   return res.data;
 }
