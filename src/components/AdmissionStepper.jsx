@@ -76,18 +76,13 @@ const AdmissionStepper = ({editData, clearEditData}) => {
         motherAadharNo: editData.family?.motherAadhar,
         motherOccupation: editData.family?.motherOccupation,
         motherWhatsAppNo: editData.family?.motherWhatsapp,
-        //make this income as string
         familyIncome:String(editData.family?.familyIncome),
-
         sibblings: editData.family?.siblings,
-        
         line1: editData.address?.line1,
         line2: editData.address?.line2,
         pin: editData.address?.pin,
-        
         admissionNo: editData.admission?.admissionNo,
         admissionDate: editData.admission?.admissionDate ? dayjs(editData.admission.admissionDate) : null,
-        
         examName: editData.academics?.[0]?.examName,
         totalPercentage: editData.academics?.[0]?.totalPercentage,
       };
@@ -114,7 +109,7 @@ const AdmissionStepper = ({editData, clearEditData}) => {
       }
 
       form.setFieldsValue(flatData);
-      setFormData(flatData);
+      setFormData(form.getFieldsValue(true));
       setCommunity(editData.community);
     }
   }, [editData, form]);
@@ -207,7 +202,33 @@ const AdmissionStepper = ({editData, clearEditData}) => {
     message: "Enter valid percentage",
     pattern: /^\d{1,3}(\.\d{1,2})?$/,
   };
+const documentsChecked = Form.useWatch("documentsChecked", form);
+const profilePhotoChecked = Form.useWatch("profilePhotoChecked", form);
+useEffect(() => {
+  if (editData?.documents?.[0]) {
+    const doc = editData.documents[0];
 
+    form.setFieldsValue({
+      documentsChecked: [
+        doc.birthCert && "birthCert",
+        doc.communityCert && "communityCert",
+        doc.aadharStudent && "aadharStudent",
+      ].filter(Boolean),
+    });
+  }
+}, [editData]);
+// helper
+const getDefaultFile = (path, name = "file") => {
+  if (!path) return [];
+  return [
+    {
+      uid: "-1",
+      name,
+      status: "done",
+      url: `http://localhost:3000/${path}`,
+    },
+  ];
+};
   const steps = [
     // 🔥 STUDENT
     {
@@ -326,41 +347,214 @@ const AdmissionStepper = ({editData, clearEditData}) => {
     },
 
     // 🔥 DOCUMENTS
-    {
-      title: "Documents",
-      icon: <FileTextOutlined />,
-      fields: [],
-      content: (
-        <>
-          <Form.Item label="Profile Photo" required>
-            <Form.Item name="profilePhotoChecked" valuePropName="checked" noStyle>
-              <Checkbox>Upload Profile Photo</Checkbox>
-            </Form.Item>
-            {form.getFieldValue("profilePhotoChecked") && (
-              <Form.Item
-                name="profilePhoto"
-                valuePropName="fileList"
-                getValueFromEvent={e => e?.fileList}
-                noStyle
-                rules={[requiredRule]}
-              >
-                <Upload beforeUpload={() => false} listType="picture">
-                  <Button icon={<UploadOutlined />}>Upload</Button>
-                </Upload>
-              </Form.Item>
-            )}
-          </Form.Item>
-          <Form.Item name="documentsChecked" label="Documents" rules={[requiredRule]}>
-            <Checkbox.Group>
-              <Checkbox value="birthCert">Birth Certificate</Checkbox>
-              <Checkbox value="communityCert">Community Certificate</Checkbox>
-              <Checkbox value="aadharStudent">Aadhar</Checkbox>
-            </Checkbox.Group>
-          </Form.Item>
-        </>
-      ),
-    },
+    // {
+    //   title: "Documents",
+    //   icon: <FileTextOutlined />,
+    //   fields: [],
+    //   content: (
+    //     <>
+    //       <Form.Item label="Profile Photo" required>
+    //         <Form.Item name="profilePhotoChecked" valuePropName="checked" noStyle>
+    //           <Checkbox>Upload Profile Photo</Checkbox>
+    //         </Form.Item>
+    //         {form.getFieldValue("profilePhotoChecked") && (
+    //           <Form.Item
+    //             name="profilePhoto"
+    //             valuePropName="fileList"
+    //             getValueFromEvent={e => e?.fileList}
+    //             noStyle
+    //             rules={[requiredRule]}
+    //           >
+    //             <Upload beforeUpload={file => {
+    //               if (file.size > 1024 * 1024) {
+    //                 message.error('File too large. Maximum allowed size is 1MB.');
+    //                 return Upload.LIST_IGNORE;
+    //               }
+    //               return false;
+    //             }} listType="picture">
+    //               <Button icon={<UploadOutlined />}>Upload</Button>
+    //             </Upload>
+    //           </Form.Item>
+    //         )}
+    //       </Form.Item>
+    //       <Form.Item name="documentsChecked" label="Documents" rules={[requiredRule]}>
+    //         <Checkbox.Group>
+    //           <Checkbox value="birthCert">Birth Certificate</Checkbox>
+    //           <Checkbox value="communityCert">Community Certificate</Checkbox>
+    //           <Checkbox value="aadharStudent">Aadhar</Checkbox>
+    //         </Checkbox.Group>
+    //       </Form.Item>
+    //       {/* Document Uploads */}
+    //       {form.getFieldValue("documentsChecked")?.includes("birthCert") && (
+    //         <Form.Item
+    //             name="birthCertFile"
+    //             valuePropName="fileList"
+    //             getValueFromEvent={e => e?.fileList}
+    //             noStyle
+    //             rules={[requiredRule]}
+    //           >
+    //             <Upload beforeUpload={file => {
+    //               if (file.size > 1024 * 1024) {
+    //                 message.error('File too large. Maximum allowed size is 1MB.');
+    //                 return Upload.LIST_IGNORE;
+    //               }
+    //               return false;
+    //             }} listType="picture">
+    //               <Button icon={<UploadOutlined />}>Upload</Button>
+    //             </Upload>
+    //           </Form.Item>
+    //       )}
+    //       {form.getFieldValue("documentsChecked")?.includes("communityCert") && (
+    //         <Form.Item label="Community Certificate" required name="communityCertFile" valuePropName="fileList" getValueFromEvent={e => e?.fileList} rules={[{ required: true, message: 'Please upload Community Certificate' }]}> 
+    //           <Upload beforeUpload={file => {
+    //             if (file.size > 1024 * 1024) {
+    //               message.error('File too large. Maximum allowed size is 1MB.');
+    //               return Upload.LIST_IGNORE;
+    //             }
+    //             return false;
+    //           }} listType="picture">
+    //             <Button icon={<UploadOutlined />}>Upload</Button>
+    //           </Upload>
+    //         </Form.Item>
+    //       )}
+    //       {form.getFieldValue("documentsChecked")?.includes("aadharStudent") && (
+    //         <Form.Item label="Aadhar" required name="aadharStudentFile" valuePropName="fileList" getValueFromEvent={e => e?.fileList} rules={[{ required: true, message: 'Please upload Aadhar' }]}> 
+    //           <Upload beforeUpload={file => {
+    //             if (file.size > 1024 * 1024) {
+    //               message.error('File too large. Maximum allowed size is 1MB.');
+    //               return Upload.LIST_IGNORE;
+    //             }
+    //             return false;
+    //           }} listType="picture">
+    //             <Button icon={<UploadOutlined />}>Upload</Button>
+    //           </Upload>
+    //         </Form.Item>
+    //       )}
+    //     </>
+    //   ),
+    // },
+{
+  title: "Documents",
+  content: (
+    <>
+      {/* ✅ PROFILE PHOTO */}
+      <Form.Item label="Profile Photo" required>
+        <Form.Item
+          name="profilePhotoChecked"
+          valuePropName="checked"
+          noStyle
+        >
+          <Checkbox>Upload Profile Photo</Checkbox>
+        </Form.Item>
 
+        {profilePhotoChecked && (
+          <Form.Item
+            name="profilePhoto"
+            valuePropName="fileList"
+            getValueFromEvent={(e) => e?.fileList}
+            initialValue={getDefaultFile(
+              editData?.documents?.[0]?.photoPath,
+              "Profile Photo"
+            )}
+            rules={[{ required: true, message: "Upload photo" }]}
+          >
+            <Upload
+              listType="picture"
+              beforeUpload={(file) => {
+                if (file.size > 1024 * 1024) {
+                  message.error("Max 1MB allowed");
+                  return Upload.LIST_IGNORE;
+                }
+                return false;
+              }}
+            >
+              <Button icon={<UploadOutlined />}>Upload</Button>
+            </Upload>
+          </Form.Item>
+        )}
+      </Form.Item>
+
+      {/* ✅ DOCUMENT CHECKBOX */}
+      <Form.Item
+        name="documentsChecked"
+        label="Documents"
+        rules={[{ required: true }]}
+      >
+        <Checkbox.Group>
+          <Checkbox  value="birthCert">Birth Certificate</Checkbox>
+          <Checkbox value="communityCert">Community Certificate</Checkbox>
+          <Checkbox value="aadharStudent">Aadhar</Checkbox>
+        </Checkbox.Group>
+      </Form.Item>
+
+      {/* ✅ BIRTH CERT */}
+      {documentsChecked?.includes("birthCert") && (
+        <Form.Item
+          label="Birth Certificate"
+          name="birthCertFile"
+          valuePropName="fileList"
+          getValueFromEvent={(e) => e?.fileList}
+          initialValue={getDefaultFile(
+            editData?.documents?.[0]?.birthCertPath,
+            "Birth Certificate"
+          )}
+          rules={[{ required: true, message: "Upload Birth Certificate" }]}
+        >
+          <Upload
+            listType="picture"
+            beforeUpload={(file) => {
+              if (file.size > 1024 * 1024) {
+                message.error("Max 1MB allowed");
+                return Upload.LIST_IGNORE;
+              }
+              return false;
+            }}
+          >
+            <Button icon={<UploadOutlined />}>Upload</Button>
+          </Upload>
+        </Form.Item>
+      )}
+
+      {/* ✅ COMMUNITY */}
+      {documentsChecked?.includes("communityCert") && (
+        <Form.Item
+          label="Community Certificate"
+          name="communityCertFile"
+          valuePropName="fileList"
+          getValueFromEvent={(e) => e?.fileList}
+          initialValue={getDefaultFile(
+            editData?.documents?.[0]?.communityCertPath,
+            "Community Certificate"
+          )}
+          rules={[{ required: true }]}
+        >
+          <Upload listType="picture" beforeUpload={() => false}>
+            <Button icon={<UploadOutlined />}>Upload</Button>
+          </Upload>
+        </Form.Item>
+      )}
+
+      {/* ✅ AADHAR */}
+      {documentsChecked?.includes("aadharStudent") && (
+        <Form.Item
+          label="Aadhar"
+          name="aadharStudentFile"
+          valuePropName="fileList"
+          getValueFromEvent={(e) => e?.fileList}
+          initialValue={getDefaultFile(
+            editData?.documents?.[0]?.aadharStudentPath,
+            "Aadhar"
+          )}
+          rules={[{ required: true }]}
+        >
+          <Upload listType="picture" beforeUpload={() => false}>
+            <Button icon={<UploadOutlined />}>Upload</Button>
+          </Upload>
+        </Form.Item>
+      )}
+    </>
+  ),
+},
     // 🔥 ADMISSION
     {
       title: "Admission",
@@ -377,7 +571,7 @@ const AdmissionStepper = ({editData, clearEditData}) => {
     },
 
     // 🔥 REVIEW
-  {
+ !editData && {
   title: "Review",
   icon: <CheckCircleOutlined />,
   content: (
@@ -398,15 +592,51 @@ const AdmissionStepper = ({editData, clearEditData}) => {
               </Descriptions.Item>
             );
           }
+          else if (k === "birthCertFile" && v?.length > 0) {
+             const url =
+              v[0].url ||
+              v[0].thumbUrl ||
+              (v[0].originFileObj ? URL.createObjectURL(v[0].originFileObj) : "");
+            return (
+              
+              <Descriptions.Item key={k} label="Birth Certificate" span={2}>
+                {url ? <img src={url} alt="birth certificate" width={100} /> : "No Birth Certificate"}
+              </Descriptions.Item>
+            );
+          }
+          else if (k === "communityCertFile" && v?.length > 0) {
+              const url =
+              v[0].url ||
+              v[0].thumbUrl ||
+              (v[0].originFileObj ? URL.createObjectURL(v[0].originFileObj) : "");
+            return (
+              <Descriptions.Item key={k} label="Community Certificate" span={2}>
+                {url ? <img src={url} alt="community certificate" width={100} /> : "No Community Certificate"}
+              </Descriptions.Item>
+            );
+          }
+          else if (k === "aadharStudentFile" && v?.length > 0) {
+              const url =
+              v[0].url ||
+              v[0].thumbUrl ||
+              (v[0].originFileObj ? URL.createObjectURL(v[0].originFileObj) : "");
+            return (
+              <Descriptions.Item key={k} label="Aadhar" span={2}>
+                {url ? <img src={url} alt="aadhar" width={100} /> : "No Aadhar"}
+              </Descriptions.Item>
+            );
+          }
+        
+
 
           // 🔥 NORMAL FIELDS
           return (
             <Descriptions.Item key={k} label={k}>
-              {typeof v === "object"
+              {/* {typeof v === "object"
                 ? v?.format
                   ? v.format("DD-MM-YYYY")
                   : JSON.stringify(v)
-                : String(v)}
+                : String(v)} */}
             </Descriptions.Item>
           );
         })}
@@ -599,7 +829,7 @@ const generatePDF = async () => {
                         line2: values.line2,
                         pin: values.pin,
                       },
-                      documents,
+                      // documents:[],
                       academics: [
                         {
                           examName: values.examName || "10th",
@@ -616,12 +846,112 @@ const generatePDF = async () => {
                     };
 
                     // Prepare FormData for multipart/form-data
+
                     const formDataToSend = new FormData();
                     formDataToSend.append('data', JSON.stringify(data));
-                    // Attach profile photo file if present
-                    if (values.profilePhotoChecked && values.profilePhoto && values.profilePhoto.length > 0 && values.profilePhoto[0].originFileObj) {
-                      formDataToSend.append('profilePhoto', values.profilePhoto[0].originFileObj);
-                    }
+
+                    // Attach profile photo file if present and check size <= 1MB
+                    // if (values.profilePhotoChecked && values.profilePhoto && values.profilePhoto.length > 0 && values.profilePhoto[0].originFileObj) {
+                    //   const file = values.profilePhoto[0].originFileObj;
+                    //   if (file.size > 1024 * 1024) {
+                    //     message.error('Profile photo too large. Maximum allowed size is 1MB.');
+                    //     return;
+                    //   }
+                    //   formDataToSend.append('profilePhoto', file);
+                    // }
+                 // Profile Photo
+if (
+  values.profilePhotoChecked &&
+  values.profilePhoto?.[0]?.originFileObj
+) {
+  const file = values.profilePhoto[0].originFileObj;
+
+  if (file.size > 1024 * 1024) {
+    message.error("Profile photo too large. Max 1MB");
+    return;
+  }
+
+  formDataToSend.append("profilePhoto", file);
+
+  // 🔥 IMPORTANT: clear old path (backend will replace)
+  documents.profilePhoto.path = "";
+}
+
+// birth cert, community cert, aadhar - only append if checkbox is checked and file is present, also check file size <= 1MB
+
+if (
+  values.documentsChecked?.includes("birthCert") &&
+  values.birthCertFile?.[0]?.originFileObj
+) {
+  const file = values.birthCertFile[0].originFileObj;
+
+  if (file.size > 1024 * 1024) {
+    message.error("Birth Certificate too large");
+    return;
+  }
+
+  formDataToSend.append("birthCert", file);
+
+  documents.birthCert.path = ""; // 🔥 important
+}
+
+if (
+  values.documentsChecked?.includes("communityCert") &&
+  values.communityCertFile?.[0]?.originFileObj
+) {
+  const file = values.communityCertFile[0].originFileObj;
+
+  if (file.size > 1024 * 1024) {
+    message.error("Community Certificate too large");
+    return;
+  }
+
+  formDataToSend.append("communityCert", file);
+
+  documents.communityCert.path = ""; // 🔥 important
+}
+
+if (
+  values.documentsChecked?.includes("aadharStudent") &&
+  values.aadharStudentFile?.[0]?.originFileObj
+) {
+  const file = values.aadharStudentFile[0].originFileObj;
+  if (file.size > 1024 * 1024) {
+    message.error("Aadhar file too large");
+    return;
+  }
+  formDataToSend.append("aadharStudent", file);
+
+  documents.aadharStudent.path = ""; // 🔥 important
+}
+
+                    // Attach document files if present and check size <= 1MB
+                    //if birthcert true make birthcert checkbox active and show the file in review step, if the file is changed then send the new file to backend, if not changed then send the existing file path to backend, same for other documents
+
+                    // if (values.documentsChecked?.includes('birthCert') && values.birthCertFile && values.birthCertFile.length > 0 && values.birthCertFile[0].originFileObj) {
+                    //   const file = values.birthCertFile[0].originFileObj;
+                    //   if (file.size > 1024 * 1024) {
+                    //     message.error('Birth Certificate file too large. Maximum allowed size is 1MB.');
+                    //     return;
+                    //   }
+                    //   formDataToSend.append('birthCert', file);
+                    // }
+                    // if (values.documentsChecked?.includes('communityCert') && values.communityCertFile && values.communityCertFile.length > 0 && values.communityCertFile[0].originFileObj) {
+                    //   const file = values.communityCertFile[0].originFileObj;
+                    //   if (file.size > 1024 * 1024) {
+                    //     message.error('Community Certificate file too large. Maximum allowed size is 1MB.');
+                    //     return;
+                    //   }
+                    //   formDataToSend.append('communityCert', file);
+                    // }
+                    // if (values.documentsChecked?.includes('aadharStudent') && values.aadharStudentFile && values.aadharStudentFile.length > 0 && values.aadharStudentFile[0].originFileObj) {
+                    //   const file = values.aadharStudentFile[0].originFileObj;
+                    //   if (file.size > 1024 * 1024) {
+                    //     message.error('Aadhar file too large. Maximum allowed size is 1MB.');
+                    //     return;
+                    //   }
+                    //   formDataToSend.append('aadharStudent', file);
+                    // }
 
                     if (editData) {
                       await updateAdmission(editData.id, formDataToSend);

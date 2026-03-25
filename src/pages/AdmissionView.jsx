@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Table, Input, Button, Space, message, Popconfirm, Collapse, Form, DatePicker } from "antd";
+import { Table, Input, Button, Space, message, Popconfirm, Collapse, Form, DatePicker, Tag } from "antd";
 import { SearchOutlined, EditOutlined, DownloadOutlined, DeleteOutlined } from "@ant-design/icons";
 import instance from "../utils/axios";
 import dayjs from "dayjs";
@@ -65,7 +65,8 @@ const AdmissionView = ({ onEdit }) => {
 
   const handleDelete = async (id) => {
     try {
-      await instance.delete(`/admission/${id}`);
+      await instance.delete(`/users/${id}`);
+      console.log("Deleted ID:", id);
       setData(data.filter((item) => item.id !== id));
       setFilteredData(filteredData.filter((item) => item.id !== id));
       message.success("Deleted successfully");
@@ -145,7 +146,22 @@ const AdmissionView = ({ onEdit }) => {
     { title: "Staff Signature", dataIndex: ["admission", "staffSignature"] },
     { title: "Principal Signature", dataIndex: ["admission", "principalSignature"] },
     { title: "Adm Approved", dataIndex: ["admission", "isApproved"], render: renderBool },
+ {
+  title: "Admission Status",
+  dataIndex: ["users", "isActive"],
+  render: (status) => {
+    console.log("Rendering status:", status);
 
+    const isActive = status ?? 1; // default to active if null/undefined
+    const color = isActive ? "green" : "red";
+
+    return (
+      <Tag color={color}>
+      {isActive ? "Active" : "Inactive"}
+      </Tag>
+    );
+  },
+ },
     // RIGHT FIXED ACTIONS
     {
       title: "Actions",
@@ -156,7 +172,7 @@ const AdmissionView = ({ onEdit }) => {
           <Button icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             Edit
           </Button>
-          <Popconfirm title="Delete this admission?" onConfirm={() => handleDelete(record.id)}>
+          <Popconfirm title="Delete this admission?" onConfirm={() => handleDelete(record?.users.id)}>
             <Button icon={<DeleteOutlined />} danger>
               Delete
             </Button>

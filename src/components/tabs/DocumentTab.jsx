@@ -1,10 +1,25 @@
 export default function DocumentTab({ next, back }) {
+
+  const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
+    const photoFile = e.target.photo.files[0];
+    const aadharFile = e.target.aadhar.files[0];
+
+    if (photoFile && photoFile.size > MAX_FILE_SIZE) {
+      alert('Photo file too large. Maximum allowed size is 1MB.');
+      return;
+    }
+    if (aadharFile && aadharFile.size > MAX_FILE_SIZE) {
+      alert('Aadhar file too large. Maximum allowed size is 1MB.');
+      return;
+    }
+
     next({
-      photo: e.target.photo.files[0],
-      aadhar: e.target.aadhar.files[0],
+      photo: photoFile,
+      aadhar: aadharFile,
     });
   };
 
