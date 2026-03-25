@@ -65,6 +65,7 @@ const AdmissionView = ({ onEdit }) => {
 
   const handleDelete = async (id) => {
     try {
+      console.log("Deleting ID:", id);
       await instance.delete(`/users/${id}`);
       console.log("Deleted ID:", id);
       setData(data.filter((item) => item.id !== id));
@@ -172,7 +173,7 @@ const AdmissionView = ({ onEdit }) => {
           <Button icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             Edit
           </Button>
-          <Popconfirm title="Delete this admission?" onConfirm={() => handleDelete(record?.users.id)}>
+          <Popconfirm title="Delete this admission?" onConfirm={() => handleDelete(record?.users?.id)}>
             <Button icon={<DeleteOutlined />} danger>
               Delete
             </Button>
