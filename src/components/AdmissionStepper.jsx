@@ -850,113 +850,79 @@ const generatePDF = async () => {
                     const formDataToSend = new FormData();
                     formDataToSend.append('data', JSON.stringify(data));
 
-                    // Attach profile photo file if present and check size <= 1MB
-                    // if (values.profilePhotoChecked && values.profilePhoto && values.profilePhoto.length > 0 && values.profilePhoto[0].originFileObj) {
-                    //   const file = values.profilePhoto[0].originFileObj;
-                    //   if (file.size > 1024 * 1024) {
-                    //     message.error('Profile photo too large. Maximum allowed size is 1MB.');
-                    //     return;
-                    //   }
-                    //   formDataToSend.append('profilePhoto', file);
-                    // }
-                 // Profile Photo
-if (
-  values.profilePhotoChecked &&
-  values.profilePhoto?.[0]?.originFileObj
-) {
-  const file = values.profilePhoto[0].originFileObj;
+                    // --- Place this block here ---
+                    if (values.profilePhotoChecked) {
+                      const fileObj = values.profilePhoto?.[0];
+                      if (fileObj?.originFileObj) {
+                        const file = fileObj.originFileObj;
+                        if (file.size > 1024 * 1024) {
+                          message.error("Profile photo too large. Max 1MB");
+                          return;
+                        }
+                        formDataToSend.append("profilePhoto", file);
+                      } else if (fileObj?.url) {
+                        const path = fileObj.url.replace(/^https?:\/\/[^/]+\//, "");
+                        formDataToSend.append("profilePhotoPath", path);
+                      }
+                    }
+                    // --- End block ---
 
-  if (file.size > 1024 * 1024) {
-    message.error("Profile photo too large. Max 1MB");
-    return;
-  }
+                    // birth cert, community cert, aadhar - only append if checkbox is checked and file is present, also check file size <= 1MB
 
-  formDataToSend.append("profilePhoto", file);
+                    if (
+                      values.documentsChecked?.includes("birthCert") &&
+                      values.birthCertFile?.[0]?.originFileObj
+                    ) {
+                      const file = values.birthCertFile[0].originFileObj;
 
-  // 🔥 IMPORTANT: clear old path (backend will replace)
-  documents.profilePhoto.path = "";
-}
+                      if (file.size > 1024 * 1024) {
+                        message.error("Birth Certificate too large");
+                        return;
+                      }
 
-// birth cert, community cert, aadhar - only append if checkbox is checked and file is present, also check file size <= 1MB
+                      formDataToSend.append("birthCert", file);
 
-if (
-  values.documentsChecked?.includes("birthCert") &&
-  values.birthCertFile?.[0]?.originFileObj
-) {
-  const file = values.birthCertFile[0].originFileObj;
+                      // documents.birthCert.path = ""; // 🔥 important
+                    }
 
-  if (file.size > 1024 * 1024) {
-    message.error("Birth Certificate too large");
-    return;
-  }
+                    if (
+                      values.documentsChecked?.includes("communityCert") &&
+                      values.communityCertFile?.[0]?.originFileObj
+                    ) {
+                      const file = values.communityCertFile[0].originFileObj;
 
-  formDataToSend.append("birthCert", file);
+                      if (file.size > 1024 * 1024) {
+                        message.error("Community Certificate too large");
+                        return;
+                      }
 
-  documents.birthCert.path = ""; // 🔥 important
-}
+                      formDataToSend.append("communityCert", file);
 
-if (
-  values.documentsChecked?.includes("communityCert") &&
-  values.communityCertFile?.[0]?.originFileObj
-) {
-  const file = values.communityCertFile[0].originFileObj;
+                      // documents.communityCert.path = ""; // 🔥 important
+                    }
 
-  if (file.size > 1024 * 1024) {
-    message.error("Community Certificate too large");
-    return;
-  }
+                    if (
+                      values.documentsChecked?.includes("aadharStudent") &&
+                      values.aadharStudentFile?.[0]?.originFileObj
+                    ) {
+                      const file = values.aadharStudentFile[0].originFileObj;
+                      if (file.size > 1024 * 1024) {
+                        message.error("Aadhar file too large");
+                        return;
+                      }
+                      formDataToSend.append("aadharStudent", file);
 
-  formDataToSend.append("communityCert", file);
-
-  documents.communityCert.path = ""; // 🔥 important
-}
-
-if (
-  values.documentsChecked?.includes("aadharStudent") &&
-  values.aadharStudentFile?.[0]?.originFileObj
-) {
-  const file = values.aadharStudentFile[0].originFileObj;
-  if (file.size > 1024 * 1024) {
-    message.error("Aadhar file too large");
-    return;
-  }
-  formDataToSend.append("aadharStudent", file);
-
-  documents.aadharStudent.path = ""; // 🔥 important
-}
+                      // documents.aadharStudent.path = ""; // 🔥 important
+                    }
 
                     // Attach document files if present and check size <= 1MB
                     //if birthcert true make birthcert checkbox active and show the file in review step, if the file is changed then send the new file to backend, if not changed then send the existing file path to backend, same for other documents
 
-                    // if (values.documentsChecked?.includes('birthCert') && values.birthCertFile && values.birthCertFile.length > 0 && values.birthCertFile[0].originFileObj) {
-                    //   const file = values.birthCertFile[0].originFileObj;
-                    //   if (file.size > 1024 * 1024) {
-                    //     message.error('Birth Certificate file too large. Maximum allowed size is 1MB.');
-                    //     return;
-                    //   }
-                    //   formDataToSend.append('birthCert', file);
-                    // }
-                    // if (values.documentsChecked?.includes('communityCert') && values.communityCertFile && values.communityCertFile.length > 0 && values.communityCertFile[0].originFileObj) {
-                    //   const file = values.communityCertFile[0].originFileObj;
-                    //   if (file.size > 1024 * 1024) {
-                    //     message.error('Community Certificate file too large. Maximum allowed size is 1MB.');
-                    //     return;
-                    //   }
-                    //   formDataToSend.append('communityCert', file);
-                    // }
-                    // if (values.documentsChecked?.includes('aadharStudent') && values.aadharStudentFile && values.aadharStudentFile.length > 0 && values.aadharStudentFile[0].originFileObj) {
-                    //   const file = values.aadharStudentFile[0].originFileObj;
-                    //   if (file.size > 1024 * 1024) {
-                    //     message.error('Aadhar file too large. Maximum allowed size is 1MB.');
-                    //     return;
-                    //   }
-                    //   formDataToSend.append('aadharStudent', file);
-                    // }
-
                     if (editData) {
+                      console.log("Updating with data:", formDataToSend);
                       await updateAdmission(editData.id, formDataToSend);
                       message.success("Admission updated successfully!");
-                      if (clearEditData) clearEditData();
+                      // if (clearEditData) clearEditData();
                     } else {
                       await createAdmission(formDataToSend);
                       message.success("Admission created successfully!");
