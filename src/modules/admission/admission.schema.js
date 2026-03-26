@@ -12,4 +12,7 @@ export const admissionSchema = yup.object({
 
   address: yup.string().required('Address required'),
   pin: yup.string().required('PIN required'),
+
+  admissionFrom: yup.date().nullable(),
+  admissionTo: yup.date().nullable(),
 });

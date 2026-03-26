@@ -63,6 +63,15 @@ export default function AdmissionForm() {
                 {...register('community')}
                 className="input"
               />
+                      {/* New fields for admissionFrom and admissionTo */}
+                      <div>
+                        <label className="label">Admission From</label>
+                        <input type="date" {...register('admissionFrom')} className="input" />
+                      </div>
+                      <div>
+                        <label className="label">Admission To</label>
+                        <input type="date" {...register('admissionTo')} className="input" />
+                      </div>
             </div>
 
             <p className="error">{errors.name?.message}</p>

@@ -15,6 +15,7 @@ import logo from "../assets/logo.jpeg";
 import AdmissionPage from "../modules/admission/pages/AdmissionPage";
 import AdmissionView from "./AdmissionView";
 import AdmissionEdit from "./AdmissionEdit";
+import StudentView from "./StudentView";
 
 
 
@@ -62,7 +63,7 @@ const Dashboard = () => {
       case "admission-edit":
         return <AdmissionEdit />;
       case "students":
-        return <div>Students Page (placeholder)</div>;
+        return <StudentView />;
       case "approval":
         return <div>Approvals Page (placeholder)</div>;
       default:

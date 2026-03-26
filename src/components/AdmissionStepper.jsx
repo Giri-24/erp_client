@@ -566,6 +566,12 @@ const getDefaultFile = (path, name = "file") => {
           <Form.Item name="admissionDate" label="Admission Date" rules={[requiredRule]}>
             <DatePicker style={{ width: "100%" }} />
           </Form.Item>
+          <Form.Item name="admissionFrom" label="Admission From">
+            <DatePicker style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="admissionTo" label="Admission To">
+            <DatePicker style={{ width: "100%" }} />
+          </Form.Item>
         </>
       ),
     },
