@@ -1,21 +1,19 @@
-import { Form, Input, Button, Card, message, Space } from 'antd'
-import axios from 'axios'
+import { Form, Input, Button, message, Typography } from 'antd'
+import { LockOutlined, MailOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useEffect } from 'react' // ✅ FIX
 import logo from '../assets/logo.jpeg'
+import instance from '../utils/axios'
+
+const { Title, Text } = Typography
 
 const Login = () => {
   const navigate = useNavigate()
 
- 
-
   const onFinish = async (values) => {
     try {
-      const res = await axios.post('http://localhost:3000/auth/login', values)
-
+      const res = await instance.post('/auth/login', values)
       localStorage.setItem('token', res.data.access_token)
       localStorage.setItem('user', JSON.stringify(res.data.user))
-
       message.success('Login successful!')
       navigate('/dashboard')
     } catch (err) {
@@ -24,50 +22,174 @@ const Login = () => {
   }
 
   return (
-    <div style={styles.container}>
-        <Space direction="vertical"  align="center">
-        <img src={logo} width={300} alt="PSF Logo"></img>
+    <div style={styles.wrapper}>
+      {/* Left branding panel */}
+      <div style={styles.leftPanel}>
+        <div style={styles.brandContent}>
+          <div style={styles.logoWrapper}>
+            <img src={logo} alt="School Logo" style={styles.logo} />
+          </div>
+          <h1 style={styles.brandTitle}>School ERP</h1>
+          <p style={styles.brandSubtitle}>ADMIN DASHBOARD</p>
+          <p style={styles.brandDesc}>
+            A sophisticated workspace for academic success. Manage admissions, 
+            fees, transport, and staff with clarity and precision.
+          </p>
+        </div>
+        <div style={styles.leftGradient} />
+      </div>
 
-      <Card title="School ERP Login" style={styles.card}>
-        <Form layout="vertical" onFinish={onFinish}>
-          <Form.Item
-            label="Email"
-            name="email"
-            rules={[{ required: true, message: 'Enter email' }]}
-          >
-            <Input placeholder="admin@school.com" />
-          </Form.Item>
+      {/* Right login form */}
+      <div style={styles.rightPanel}>
+        <div style={styles.formContainer}>
+          <div style={{ marginBottom: 40 }}>
+            <h2 style={styles.formTitle}>Welcome back</h2>
+            <p style={styles.formSubtitle}>Sign in to continue to your dashboard</p>
+          </div>
 
-          <Form.Item
-            label="Password"
-            name="password"
-            rules={[{ required: true, message: 'Enter password' }]}
-          >
-            <Input.Password placeholder="Enter password" />
-          </Form.Item>
+          <Form layout="vertical" onFinish={onFinish} size="large">
+            <Form.Item
+              name="email"
+              rules={[{ required: true, message: 'Please enter your email' }]}
+            >
+              <Input
+                prefix={<MailOutlined style={{ color: '#43474d' }} />}
+                placeholder="Email address"
+                style={styles.input}
+              />
+            </Form.Item>
 
-          <Button type="primary" htmlType="submit" block>
-            Login
-          </Button>
-        </Form>
-      </Card>
-      </Space>
+            <Form.Item
+              name="password"
+              rules={[{ required: true, message: 'Please enter your password' }]}
+            >
+              <Input.Password
+                prefix={<LockOutlined style={{ color: '#43474d' }} />}
+                placeholder="Password"
+                style={styles.input}
+              />
+            </Form.Item>
+
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
+              className="gradient-btn"
+              style={{ height: 48, fontSize: 14, marginTop: 8 }}
+            >
+              Sign In
+            </Button>
+          </Form>
+
+          <div style={{ textAlign: 'center', marginTop: 40 }}>
+            <p style={{ color: '#43474d', fontSize: 12, fontFamily: "'Public Sans', sans-serif" }}>
+              &copy; {new Date().getFullYear()} School ERP. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
 const styles = {
-  container: {
-    height: '100vh',
+  wrapper: {
     display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-   background: '#a8c0ff',/* fallback for old browsers */
-  background: '-webkit-linear-gradient(to top, #3f2b96, #a8c0ff)',/* Chrome 10-25, Safari 5.1-6 */
-  background: 'linear-gradient(to top, #3f2b96, #ffffffff)', /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+    minHeight: '100vh',
+    fontFamily: "'Public Sans', sans-serif",
   },
-  card: {
-    width: 350,
+  leftPanel: {
+    flex: '0 0 45%',
+    background: 'linear-gradient(135deg, #00152a 0%, #102a43 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  leftGradient: {
+    position: 'absolute',
+    inset: 0,
+    background: 'radial-gradient(circle at 30% 70%, rgba(68, 221, 193, 0.15) 0%, transparent 60%)',
+    pointerEvents: 'none',
+  },
+  brandContent: {
+    position: 'relative',
+    zIndex: 1,
+    textAlign: 'center',
+    padding: 48,
+    maxWidth: 360,
+  },
+  logoWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    background: 'rgba(255,255,255,0.1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 24px',
+    backdropFilter: 'blur(10px)',
+  },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    objectFit: 'cover',
+  },
+  brandTitle: {
+    fontFamily: "'Manrope', sans-serif",
+    fontSize: 28,
+    fontWeight: 800,
+    color: '#fff',
+    margin: '0 0 4px',
+    letterSpacing: '-0.02em',
+  },
+  brandSubtitle: {
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: 700,
+    margin: '0 0 24px',
+  },
+  brandDesc: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    lineHeight: 1.6,
+    margin: 0,
+  },
+  rightPanel: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#f6fafe',
+    padding: '48px 24px',
+  },
+  formContainer: {
+    width: '100%',
+    maxWidth: 380,
+  },
+  formTitle: {
+    fontFamily: "'Manrope', sans-serif",
+    fontSize: 28,
+    fontWeight: 800,
+    color: '#00152a',
+    margin: '0 0 4px',
+    letterSpacing: '-0.02em',
+  },
+  formSubtitle: {
+    color: '#43474d',
+    fontSize: 14,
+    margin: 0,
+  },
+  input: {
+    borderRadius: 12,
+    padding: '10px 14px',
+    background: '#e4e9ed',
+    border: 'none',
+    fontFamily: "'Public Sans', sans-serif",
   },
 }
 

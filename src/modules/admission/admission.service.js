@@ -42,3 +42,69 @@ export const updateAdmission = async (id, formData) => {
   });
   return res.data;
 }
+
+export const getPendingAdmissions = async () => {
+  const res = await axios.get('/admissions/pending');
+  return res.data;
+};
+
+export const setAdmissionApproval = async (studentId, approved, reason) => {
+  const res = await axios.patch(`/admissions/${studentId}/approval`, {
+    approved,
+    reason,
+  });
+  return res.data;
+};
+
+export const getAdmissionDashboardSummary = async (academicYear) => {
+  const res = await axios.get('/admissions/dashboard/summary', {
+    params: { academicYear },
+  });
+  return res.data;
+};
+
+export const exportAdmissionsCsv = async (academicYear) => {
+  const res = await axios.get('/admissions/export/csv', {
+    params: { academicYear },
+  });
+  return res.data;
+};
+
+export const getStandardSeats = async () => {
+  const res = await axios.get('/admissions/seats');
+  return res.data;
+};
+
+export const updateStandardSeats = async (seats) => {
+  const res = await axios.put('/admissions/seats', { seats });
+  return res.data;
+};
+
+export const promoteStudents = async (payload) => {
+  const res = await axios.post('/admissions/promote', payload);
+  return res.data;
+};
+
+export const linkSiblings = async (payload) => {
+  const res = await axios.post('/admissions/siblings/link', payload);
+  return res.data;
+};
+
+export const getNextAdmissionNo = async () => {
+  const res = await axios.get('/admissions/next-admission-no');
+  return res.data;
+};
+
+export const bulkApproval = async (studentIds, approved, reason) => {
+  const res = await axios.post('/admissions/bulk-approval', {
+    studentIds,
+    approved,
+    reason,
+  });
+  return res.data;
+};
+
+export const bulkUploadCsv = async (rows) => {
+  const res = await axios.post('/admissions/bulk-upload', { rows });
+  return res.data;
+};

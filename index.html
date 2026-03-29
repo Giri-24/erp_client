@@ -4,7 +4,81 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/jpeg" href="/logo.jpeg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PSF - ERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Public+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-high": "#e4e9ed",
+                        "error": "#ba1a1a",
+                        "surface-container-low": "#f0f4f8",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed-variant": "#314863",
+                        "outline": "#74777e",
+                        "on-tertiary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#44ddc1",
+                        "surface-variant": "#dfe3e7",
+                        "on-surface-variant": "#43474d",
+                        "surface": "#f6fafe",
+                        "inverse-primary": "#b0c9e8",
+                        "on-background": "#171c1f",
+                        "tertiary-container": "#002f27",
+                        "on-error-container": "#93000a",
+                        "inverse-surface": "#2c3134",
+                        "on-secondary-fixed-variant": "#2c4964",
+                        "secondary-fixed-dim": "#accaea",
+                        "surface-container-lowest": "#ffffff",
+                        "outline-variant": "#c3c6ce",
+                        "on-tertiary-container": "#00a28c",
+                        "on-primary-container": "#7a92b0",
+                        "inverse-on-surface": "#edf1f5",
+                        "secondary-container": "#bfddfe",
+                        "on-secondary-container": "#45627e",
+                        "surface-bright": "#f6fafe",
+                        "tertiary-fixed": "#68fadd",
+                        "primary": "#00152a",
+                        "on-tertiary-fixed": "#00201a",
+                        "surface-dim": "#d6dade",
+                        "tertiary": "#001813",
+                        "secondary": "#44617d",
+                        "on-surface": "#171c1f",
+                        "primary-fixed": "#d1e4ff",
+                        "background": "#f6fafe",
+                        "primary-container": "#102a43",
+                        "surface-container-highest": "#dfe3e7",
+                        "surface-container": "#eaeef2",
+                        "on-secondary-fixed": "#001d33",
+                        "on-primary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-tint": "#49607c",
+                        "secondary-fixed": "#cee5ff",
+                        "primary-fixed-dim": "#b0c9e8",
+                        "on-tertiary-fixed-variant": "#005145",
+                        "on-primary-fixed": "#011d35"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Public Sans"],
+                        "label": ["Public Sans"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+    <title>Academic Architect - School ERP</title>
   </head>
   <body>
     <div id="root"></div>

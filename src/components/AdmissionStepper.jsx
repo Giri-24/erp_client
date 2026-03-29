@@ -4,6 +4,7 @@ import {
   Button,
   Form,
   Input,
+  InputNumber,
   Select,
   Upload,
   message,
@@ -16,6 +17,7 @@ import {
   Col,
   DatePicker,
   Checkbox,
+  Divider,
 } from "antd";
 import {
   UploadOutlined,
@@ -26,13 +28,49 @@ import {
   FileTextOutlined,
   CheckCircleOutlined,
   DownloadOutlined,
+  PlusOutlined,
+  MinusCircleOutlined,
 } from "@ant-design/icons";
+
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import logo from "../assets/logo.jpeg";
-import { createAdmission, updateAdmission } from "../modules/admission/admission.service";
+import { createAdmission, updateAdmission, getNextAdmissionNo } from "../modules/admission/admission.service";
 import dayjs from "dayjs";
 const { Title } = Typography;
+
+const normalizeStandardValue = (value) => {
+  if (value === null || value === undefined) return value;
+  const raw = String(value).trim();
+  const lower = raw.toLowerCase();
+
+  if (lower === "lkg") return "LKG";
+  if (lower === "ukg") return "UKG";
+
+  const stdCodeMatch = lower.match(/^std[_\-\s]?(\d{1,2})$/);
+  if (stdCodeMatch) return stdCodeMatch[1];
+
+  const numberMatch = lower.match(/^(\d{1,2})(st|nd|rd|th)?(\s*standard)?$/);
+  if (numberMatch) return numberMatch[1];
+
+  return raw;
+};
+
+const normalizeSubjectRow = (subject) => ({
+  subjectName: subject?.subjectName || subject?.subject || subject?.name || "",
+  maxMarks:
+    subject?.maxMarks ??
+    subject?.maxMark ??
+    subject?.maxMarksPrescribed ??
+    subject?.maximumMarksPrescribed ??
+    null,
+  obtainedMarks:
+    subject?.obtainedMarks ??
+    subject?.markObtained ??
+    subject?.marksObtained ??
+    subject?.score ??
+    null,
+});
 
 const AdmissionStepper = ({editData, clearEditData}) => {
   const [current, setCurrent] = useState(0);
@@ -50,9 +88,10 @@ const AdmissionStepper = ({editData, clearEditData}) => {
 
   useEffect(() => {
     if (editData) {
+      const primaryAcademic = editData.academics?.[0] || {};
       const flatData = {
         name: editData.name,
-        standard: editData.standard,
+        standard: normalizeStandardValue(editData.standard || editData.admission?.standard),
         gender: editData.gender,
         dob: editData.dob ? dayjs(editData.dob) : null,
         religion: editData.religion,
@@ -60,6 +99,7 @@ const AdmissionStepper = ({editData, clearEditData}) => {
         caste: editData.caste,
         motherTongue: editData.motherTongue,
         aadharNo: editData.aadharNo,
+        customCommunity: editData.community === "OTHERS" ? editData.communityOther : undefined, 
         bloodGroup: editData.bloodGroup,
         identityMark1: editData.identification1,
         identityMark2: editData.identification2,
@@ -82,9 +122,15 @@ const AdmissionStepper = ({editData, clearEditData}) => {
         line2: editData.address?.line2,
         pin: editData.address?.pin,
         admissionNo: editData.admission?.admissionNo,
+        admissionFrom: editData.admission?.admissionFrom ? dayjs(editData.admission.admissionFrom) : null,
+        admissionTo: editData.admission?.admissionTo ? dayjs(editData.admission.admissionTo) : null,
         admissionDate: editData.admission?.admissionDate ? dayjs(editData.admission.admissionDate) : null,
-        examName: editData.academics?.[0]?.examName,
-        totalPercentage: editData.academics?.[0]?.totalPercentage,
+        examName: primaryAcademic.examName,
+        academicStream: primaryAcademic.stream || editData.academicStream,
+        registerNo: primaryAcademic.registerNo,
+        monthYear: primaryAcademic.monthYear,
+        totalPercentage: primaryAcademic.totalPercentage,
+        subjects: (primaryAcademic.subjects || []).map(normalizeSubjectRow),
       };
 
       // Handle documents for checkbox group
@@ -103,13 +149,13 @@ const AdmissionStepper = ({editData, clearEditData}) => {
             uid: "-1",
             name: "photo.jpg",
             status: "done",
-            url: doc.photoPath ? `http://localhost:3000/${doc.photoPath}` : "https://via.placeholder.com/150", 
+            url: doc.photoPath ? ` http://192.168.0.100:3000/${doc.photoPath}` : "https://via.placeholder.com/150", 
           },
         ];
       }
 
       form.setFieldsValue(flatData);
-      setFormData(form.getFieldsValue(true));
+      setFormData(flatData);
       setCommunity(editData.community);
     }
   }, [editData, form]);
@@ -136,6 +182,7 @@ const AdmissionStepper = ({editData, clearEditData}) => {
       standard: "10th",
       religion: "Hindu",
       caste: "Vellalar",
+      customeCommunity: communitySelected === "OTHERS" ? "Kongu" : undefined,
       motherTongue: "Tamil",
       aadharNo: random12(),
       bloodGroup: randBloodGroup(),
@@ -164,10 +211,21 @@ const AdmissionStepper = ({editData, clearEditData}) => {
       pin: random6(),
       
       examName: "10th Standard",
-      totalPercentage: "85",
+      registerNo: "2025001234",
+      monthYear: "March 2025",
+      totalPercentage: 85,
+      subjects: [
+        { subjectName: 'Tamil',         maxMarks: 150, obtainedMarks: 130 },
+        { subjectName: 'English',        maxMarks: 150, obtainedMarks: 120 },
+        { subjectName: 'Mathematics',    maxMarks: 100, obtainedMarks: 88  },
+        { subjectName: 'Science',        maxMarks: 100, obtainedMarks: 90  },
+        { subjectName: 'Social Science', maxMarks: 100, obtainedMarks: 85  },
+      ],
       
       admissionNo: `ADM${Math.floor(1000 + Math.random() * 9000)}`,
       admissionDate: dayjs(),
+      admissionFrom: dayjs(),
+      admissionTo: dayjs().add(3, 'year'),
     };
     
     // Clear out any previous docs/photos just natively
@@ -197,13 +255,11 @@ const AdmissionStepper = ({editData, clearEditData}) => {
     message: "PIN must be 6 digits",
     pattern: /^\d{6}$/,
   };
-  const percentageRule = {
-    required: true,
-    message: "Enter valid percentage",
-    pattern: /^\d{1,3}(\.\d{1,2})?$/,
-  };
 const documentsChecked = Form.useWatch("documentsChecked", form);
 const profilePhotoChecked = Form.useWatch("profilePhotoChecked", form);
+const watchedStandard = Form.useWatch("standard", form);
+const watchedSubjects = Form.useWatch("subjects", form) || [];
+const isHigherSecondary = watchedStandard === '11' || watchedStandard === '12';
 useEffect(() => {
   if (editData?.documents?.[0]) {
     const doc = editData.documents[0];
@@ -217,6 +273,24 @@ useEffect(() => {
     });
   }
 }, [editData]);
+
+// Re-sync subjects to Form.List after it mounts when navigating to the Academic step.
+// Form.List may not receive values set via setFieldsValue while it was unmounted,
+// so we push the stored formData.subjects back after the step renders.
+useEffect(() => {
+  if (current === 3) {
+    const subjects = formData?.subjects;
+    if (subjects !== undefined) {
+      form.setFieldsValue({
+        subjects:
+          subjects.length > 0
+            ? subjects
+            : [{ subjectName: '', maxMarks: null, obtainedMarks: null }],
+      });
+    }
+  }
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [current]);
 // helper
 const getDefaultFile = (path, name = "file") => {
   if (!path) return [];
@@ -225,7 +299,7 @@ const getDefaultFile = (path, name = "file") => {
       uid: "-1",
       name,
       status: "done",
-      url: `http://localhost:3000/${path}`,
+      url: ` http://192.168.0.100:3000/${path}`,
     },
   ];
 };
@@ -243,10 +317,28 @@ const getDefaultFile = (path, name = "file") => {
             </Form.Item>
           </Col>
           <Col span={12}>
-            <Form.Item name="standard" label="Standard" rules={[requiredRule]}>
-              <Input />
-            </Form.Item>
-          </Col>
+  <Form.Item name="standard" label="Standard" rules={[requiredRule]}>
+    <Select
+      placeholder="Select standard"
+      options={[
+        { value: 'LKG', label: 'LKG' },
+        { value: 'UKG', label: 'UKG' },
+        { value: '1', label: '1st Standard' },
+        { value: '2', label: '2nd Standard' },
+        { value: '3', label: '3rd Standard' },
+        { value: '4', label: '4th Standard' },
+        { value: '5', label: '5th Standard' },
+        { value: '6', label: '6th Standard' },
+        { value: '7', label: '7th Standard' },
+        { value: '8', label: '8th Standard' },
+        { value: '9', label: '9th Standard' },
+        { value: '10', label: '10th Standard' },
+        { value: '11', label: '11th Standard' },
+        { value: '12', label: '12th Standard' },
+      ]}
+    />
+  </Form.Item>
+</Col>
           <Col span={12}>
             <Form.Item name="gender" label="Gender" rules={[requiredRule]}>
               <Select>
@@ -338,13 +430,184 @@ const getDefaultFile = (path, name = "file") => {
       title: "Academic",
       icon: <BookOutlined />,
       fields: [],
-      content: (
-        <Row gutter={16}>
-          <Col span={12}><Form.Item name="examName" label="Exam" rules={[requiredRule]}><Input /></Form.Item></Col>
-          <Col span={12}><Form.Item name="totalPercentage" label="Percentage" rules={[percentageRule]}><Input /></Form.Item></Col>
-        </Row>
-      ),
-    },
+        content: (
+          <>
+            {/* ── Qualifying Exam header ── */}
+            <Divider orientation="left">Qualifying Examination Passed and Percentage of Mark Obtained</Divider>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item name="examName" label="Name of Examination" rules={[requiredRule]}>
+                  <Input placeholder="SSLC / MATRIC / CBSE" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="monthYear" label="Month and Year of Appearance">
+                  <Input placeholder="e.g. March 2025" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="registerNo" label="Register No">
+                  <Input />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {/* ── Per-subject marks table ── */}
+            <Card
+              size="small"
+              title="Subject-wise Marks"
+              extra={<span style={{ color: '#888', fontSize: 12 }}>Totals are auto-calculated from rows</span>}
+              style={{ marginBottom: 16 }}
+            >
+              <Form.List name="subjects" initialValue={[{ subjectName: '', maxMarks: null, obtainedMarks: null }]}>
+                {(fields, { add, remove }) => (
+                  <>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+                      <thead>
+                        <tr style={{ background: '#fafafa' }}>
+                          <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'left' }}>Subject</th>
+                          <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center', width: 140 }}>Maximum Marks Prescribed</th>
+                          <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center', width: 140 }}>Marks Obtained</th>
+                          <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center', width: 100 }}>% in Subject</th>
+                          <th style={{ border: '1px solid #d9d9d9', padding: '8px', width: 40 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fields.map(({ key, name }) => {
+                          const s = watchedSubjects[name] || {};
+                          const pct =
+                            Number(s.maxMarks) > 0 && s.obtainedMarks != null
+                              ? ((Number(s.obtainedMarks) / Number(s.maxMarks)) * 100).toFixed(1)
+                              : '-';
+                          return (
+                            <tr key={key}>
+                              <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px' }}>
+                                <Form.Item name={[name, 'subjectName']} rules={[requiredRule]} noStyle>
+                                  <Input placeholder="Subject name" />
+                                </Form.Item>
+                              </td>
+                              <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px' }}>
+                                <Form.Item name={[name, 'maxMarks']} rules={[requiredRule]} noStyle>
+                                  <InputNumber min={0} max={999} style={{ width: '100%' }} placeholder="Max" />
+                                </Form.Item>
+                              </td>
+                              <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px' }}>
+                                <Form.Item name={[name, 'obtainedMarks']} rules={[requiredRule]} noStyle>
+                                  <InputNumber min={0} max={999} style={{ width: '100%' }} placeholder="Obtained" />
+                                </Form.Item>
+                              </td>
+                              <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>
+                                {pct !== '-' ? `${pct}%` : '-'}
+                              </td>
+                              <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px', textAlign: 'center' }}>
+                                <MinusCircleOutlined
+                                  style={{ color: '#ff4d4f', cursor: 'pointer' }}
+                                  onClick={() => remove(name)}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {/* TOTAL row */}
+                        {(() => {
+                          const totalMax = watchedSubjects.reduce((sum, s) => sum + (Number(s?.maxMarks) || 0), 0);
+                          const totalObtained = watchedSubjects.reduce((sum, s) => sum + (Number(s?.obtainedMarks) || 0), 0);
+                          const totalPct = totalMax > 0 ? ((totalObtained / totalMax) * 100).toFixed(1) : '-';
+                          return (
+                            <tr style={{ background: '#f0f5ff', fontWeight: 700 }}>
+                              <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'right' }}>TOTAL</td>
+                              <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center' }}>{totalMax || '-'}</td>
+                              <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center' }}>{totalObtained || '-'}</td>
+                              <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center' }}>
+                                {totalPct !== '-' ? `${totalPct}%` : '-'}
+                              </td>
+                              <td style={{ border: '1px solid #d9d9d9' }}></td>
+                            </tr>
+                          );
+                        })()}
+                      </tbody>
+                    </table>
+                    <Button
+                      type="dashed"
+                      onClick={() => add({ subjectName: '', maxMarks: null, obtainedMarks: null })}
+                      icon={<PlusOutlined />}
+                      style={{ width: '100%' }}
+                    >
+                      Add Subject
+                    </Button>
+                  </>
+                )}
+              </Form.List>
+            </Card>
+
+            {/* Overall % — can be left blank for auto-calculation on the backend */}
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item name="totalPercentage" label="Overall % (leave blank to auto-calculate)">
+                  <InputNumber min={0} max={100} step={0.01} style={{ width: '100%' }} placeholder="e.g. 87.50" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {/* ── Higher Secondary stream selector (11th / 12th only) ── */}
+            {isHigherSecondary && (
+              <>
+                <Divider orientation="left">Higher Secondary — Subjects Offered (Part III)</Divider>
+                <Row gutter={16}>
+                  <Col span={14}>
+                    <Form.Item name="academicStream" label="Academic Stream / Group" rules={[requiredRule]}>
+                      <Select placeholder="Select stream">
+                        <Select.Option value="BIO_MATHS">Physics, Chemistry, Biology, Mathematics</Select.Option>
+                        <Select.Option value="CS_MATHS">Physics, Chemistry, Computer Science, Mathematics</Select.Option>
+                        <Select.Option value="BIO_CS">Physics, Chemistry, Biology, Computer Science</Select.Option>
+                        <Select.Option value="COMMERCE">Commerce, Economics, Accountancy, Computer Application</Select.Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Card size="small" title="Subjects Offered" style={{ marginBottom: 16 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f5f5f5' }}>
+                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>Academic Stream</th>
+                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>Part</th>
+                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>Subject</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td rowSpan={3} style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>
+                          {form.getFieldValue('academicStream') === 'BIO_MATHS' && 'Phy, Chem, Bio, Maths'}
+                          {form.getFieldValue('academicStream') === 'CS_MATHS' && 'Phy, Chem, CS, Maths'}
+                          {form.getFieldValue('academicStream') === 'BIO_CS' && 'Phy, Chem, Bio, CS'}
+                          {form.getFieldValue('academicStream') === 'COMMERCE' && 'Commerce Group'}
+                          {!form.getFieldValue('academicStream') && <em>—</em>}
+                        </td>
+                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>Part I (Compulsory)</td>
+                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>Tamil</td>
+                      </tr>
+                      <tr>
+                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>Part II (Compulsory)</td>
+                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>English</td>
+                      </tr>
+                      <tr>
+                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>Part III (Choose)</td>
+                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                          {form.getFieldValue('academicStream') === 'BIO_MATHS' && 'Physics, Chemistry, Biology, Mathematics'}
+                          {form.getFieldValue('academicStream') === 'CS_MATHS' && 'Physics, Chemistry, Computer Science, Mathematics'}
+                          {form.getFieldValue('academicStream') === 'BIO_CS' && 'Physics, Chemistry, Biology, Computer Science'}
+                          {form.getFieldValue('academicStream') === 'COMMERCE' && 'Commerce, Economics, Accountancy, Computer Application'}
+                          {!form.getFieldValue('academicStream') && <em>Select a stream above</em>}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </Card>
+              </>
+            )}
+          </>
+        ),
+      },
 
     // 🔥 DOCUMENTS
     // {
@@ -562,7 +825,25 @@ const getDefaultFile = (path, name = "file") => {
       fields: [],
       content: (
         <>
-          <Form.Item name="admissionNo" label="Admission No" rules={[requiredRule]}><Input /></Form.Item>
+          <Form.Item name="admissionNo" label="Admission No">
+            <Input disabled placeholder="Auto-generated" />
+          </Form.Item>
+          <Button
+            type="link"
+            style={{ marginBottom: 16 }}
+            onClick={async () => {
+              try {
+                const res = await getNextAdmissionNo();
+                form.setFieldsValue({ admissionNo: res.admissionNo });
+                setFormData(prev => ({ ...prev, admissionNo: res.admissionNo }));
+                message.success(`Admission No: ${res.admissionNo}`);
+              } catch {
+                message.error('Failed to generate admission number');
+              }
+            }}
+          >
+            Generate Admission No
+          </Button>
           <Form.Item name="admissionDate" label="Admission Date" rules={[requiredRule]}>
             <DatePicker style={{ width: "100%" }} />
           </Form.Item>
@@ -577,7 +858,7 @@ const getDefaultFile = (path, name = "file") => {
     },
 
     // 🔥 REVIEW
- !editData && {
+ {
   title: "Review",
   icon: <CheckCircleOutlined />,
   content: (
@@ -635,14 +916,27 @@ const getDefaultFile = (path, name = "file") => {
         
 
 
-          // 🔥 NORMAL FIELDS
+          // 🔥 NORMAL FIELDS — skip file-upload keys (already handled above)
+          if (['profilePhoto', 'birthCertFile', 'communityCertFile', 'aadharStudentFile', 'profilePhotoChecked'].includes(k)) {
+            return null;
+          }
+          // Skip null / undefined / empty values
+          if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) {
+            return null;
+          }
           return (
             <Descriptions.Item key={k} label={k}>
-              {/* {typeof v === "object"
+              {typeof v === "object"
                 ? v?.format
                   ? v.format("DD-MM-YYYY")
-                  : JSON.stringify(v)
-                : String(v)} */}
+                  : Array.isArray(v)
+                    ? v.map((item) =>
+                        typeof item === 'object'
+                          ? item.subjectName || JSON.stringify(item)
+                          : String(item)
+                      ).join(', ')
+                    : JSON.stringify(v)
+                : String(v)}
             </Descriptions.Item>
           );
         })}
@@ -751,6 +1045,19 @@ const generatePDF = async () => {
   const safeAdmissionNo = formData.admissionNo
     ? String(formData.admissionNo).replace(/[^a-zA-Z0-9]/g, "_")
     : "admission";
+  const admissionDate = formData.admissionDate
+    ? dayjs(formData.admissionDate).format("YYYYMMDD")
+    : dayjs().format("YYYYMMDD");
+  // const admissionFrom = formData.admissionFrom
+  //   ? dayjs(formData.admissionFrom).format("YYYYMMDD")
+  //   : "from";
+  // const admissionTo = formData.admissionTo
+  //   ? dayjs(formData.admissionTo).format("YYYYMMDD")
+  //   : "to";
+
+  //   doc.setProperties({
+  //     title: `Admission_${safeAdmissionNo}_${admissionDate}_${admissionFrom}_${admissionTo}`,
+  //   });
 
   doc.save(`${safeAdmissionNo}.pdf`);
 };
@@ -758,11 +1065,13 @@ const generatePDF = async () => {
 
 
   return (
-    <div style={{ padding: 30 }}>
-      <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <div style={{ padding: 30 ,  backgroundColor:"#F7F9FB",}}>
+      <div style={{
+     
+      }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
           <Title level={3} style={{ margin: 0 }}>Admission</Title>
-          <Button type="dashed" onClick={fillRandomData}>
+          <Button  style={{ background: "linear-gradient(90deg, #032658, #1365bd)", color: "white" }} className="gradient-btn" onClick={fillRandomData}>
             Fill Random Indian Data
           </Button>
         </div>
@@ -779,12 +1088,18 @@ const generatePDF = async () => {
 
         <div style={{ marginTop: 20, textAlign: "right" }}>
           <Space>
-            {current > 0 && <Button onClick={prev}>Prev</Button>}
-            {current < steps.length - 1 && <Button onClick={next}>Next</Button>}
+            {current > 0 && <Button  style={{ background: "linear-gradient(90deg, #032658, #1365bd)", color: "white" }} className="gradient-btn" onClick={prev}>Prev</Button>}
+            {current < steps.length - 1 && <Button  style={{ background: "linear-gradient(90deg, #032658, #1365bd)", color: "white" }} className="gradient-btn" onClick={next}>Next</Button>}
             {current === steps.length - 1 && (
               <>
-                <Button onClick={generatePDF}>PDF</Button>
-                <Button type="primary" onClick={async () => {
+                <Button className="gradient-btn" style={{
+                   background: "linear-gradient(90deg, #032658, #1365bd)",
+                   color:"white"
+                }} onClick={generatePDF}>PDF</Button>
+                <Button type="primary" style={{
+                   background: "linear-gradient(90deg, #032658, #1365bd)",
+                   color:"white"
+                }} onClick={async () => {
                   try {
                     await form.validateFields();
                     const values = form.getFieldsValue(true);
@@ -809,6 +1124,7 @@ const generatePDF = async () => {
                       religion: values.religion,
                       community: values.community,
                       caste: values.caste,
+                      customCommunity: values.community === "OTHERS" ? values.communityOther : undefined,
                       motherTongue: values.motherTongue,
                       aadharNo: values.aadharNo,
                       bloodGroup: values.bloodGroup,
@@ -836,15 +1152,26 @@ const generatePDF = async () => {
                         pin: values.pin,
                       },
                       // documents:[],
-                      academics: [
-                        {
-                          examName: values.examName || "10th",
-                          totalPercentage: Number(values.totalPercentage) || 0,
-                          subjects: [],
-                        }
-                      ],
+                        academics: [
+                          {
+                            examName: values.examName || "SSLC",
+                            registerNo: values.registerNo,
+                            monthYear: values.monthYear,
+                            totalPercentage: values.totalPercentage ? Number(values.totalPercentage) : undefined,
+                            subjects: (values.subjects || [])
+                              .filter(s => s?.subjectName)
+                              .map(s => ({
+                                subjectName: s.subjectName,
+                                maxMarks: Number(s.maxMarks) || 0,
+                                obtainedMarks: Number(s.obtainedMarks) || 0,
+                              })),
+                            stream: values.academicStream || undefined,
+                          }
+                        ],
                       admission: {
-                        admissionNo: values.admissionNo,
+                        admissionNo: values.admissionNo || 'AUTO',
+                        admissionFrom: values.admissionFrom ? values.admissionFrom.toISOString() : undefined,
+                        admissionTo: values.admissionTo ? values.admissionTo.toISOString() : undefined,
                         admissionDate: values.admissionDate ? values.admissionDate.toISOString() : new Date().toISOString(),
                         standard: values.standard || "10th",
                         principalSignature: "Pending",
@@ -945,7 +1272,7 @@ const generatePDF = async () => {
             )}
           </Space>
         </div>
-      </Card>
+      </div>
       <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
   <div id="pdfContent">
     {/* your full PDF layout here */}
@@ -1103,6 +1430,69 @@ const generatePDF = async () => {
       </tr>
     </tbody>
   </table>
+
+  {/* ACADEMIC */}
+  <h4 style={{ marginTop: 20, marginBottom: 10 }}>
+    III. Qualifying Examination Passed and Percentage of Mark Obtained
+  </h4>
+  <div style={{ marginBottom: 10 }}>
+    <b>Exam:</b> {formData.examName || "-"} &nbsp;&nbsp;
+    <b>Month/Year:</b> {formData.monthYear || "-"} &nbsp;&nbsp;
+    <b>Register No:</b> {formData.registerNo || "-"}
+  </div>
+  <table border="1" width="100%" cellPadding="5" style={{ marginBottom: 8 }}>
+    <thead>
+      <tr>
+        <th style={{ width: "35%" }}>Subject</th>
+        <th style={{ width: "20%" }}>Maximum Marks</th>
+        <th style={{ width: "20%" }}>Marks Obtained</th>
+        <th style={{ width: "25%" }}>Percentage</th>
+      </tr>
+    </thead>
+    <tbody>
+      {(formData.subjects || []).map((s, idx) => {
+        const max = Number(s?.maxMarks) || 0;
+        const obtained = Number(s?.obtainedMarks) || 0;
+        const pct = max > 0 ? ((obtained / max) * 100).toFixed(1) : "-";
+        return (
+          <tr key={`pdf-sub-${idx}`}>
+            <td>{s?.subjectName || "-"}</td>
+            <td style={{ textAlign: "center" }}>{max || "-"}</td>
+            <td style={{ textAlign: "center" }}>{obtained || "-"}</td>
+            <td style={{ textAlign: "center" }}>{pct !== "-" ? `${pct}%` : "-"}</td>
+          </tr>
+        );
+      })}
+      {(() => {
+        const totalMax = (formData.subjects || []).reduce((sum, s) => sum + (Number(s?.maxMarks) || 0), 0);
+        const totalObtained = (formData.subjects || []).reduce((sum, s) => sum + (Number(s?.obtainedMarks) || 0), 0);
+        const totalPct = formData.totalPercentage != null && formData.totalPercentage !== ""
+          ? Number(formData.totalPercentage).toFixed(1)
+          : totalMax > 0
+            ? ((totalObtained / totalMax) * 100).toFixed(1)
+            : "-";
+        return (
+          <tr style={{ fontWeight: "bold" }}>
+            <td style={{ textAlign: "right" }}>TOTAL</td>
+            <td style={{ textAlign: "center" }}>{totalMax || "-"}</td>
+            <td style={{ textAlign: "center" }}>{totalObtained || "-"}</td>
+            <td style={{ textAlign: "center" }}>{totalPct !== "-" ? `${totalPct}%` : "-"}</td>
+          </tr>
+        );
+      })()}
+    </tbody>
+  </table>
+
+  {(formData.standard === "11" || formData.standard === "12") && (
+    <div style={{ marginBottom: 15 }}>
+      <b>Higher Secondary Stream:</b>{" "}
+      {formData.academicStream === "BIO_MATHS" && "Physics, Chemistry, Biology, Mathematics"}
+      {formData.academicStream === "CS_MATHS" && "Physics, Chemistry, Computer Science, Mathematics"}
+      {formData.academicStream === "BIO_CS" && "Physics, Chemistry, Biology, Computer Science"}
+      {formData.academicStream === "COMMERCE" && "Commerce, Economics, Accountancy, Computer Application"}
+      {!formData.academicStream && "-"}
+    </div>
+  )}
 
   {/* SIGNATURE */}
   <div style={{ marginTop: 50, display: "flex", justifyContent: "space-between" }}>

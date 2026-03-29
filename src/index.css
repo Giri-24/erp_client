@@ -1,7 +1,438 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
-h1{
-  color: rgb(219, 220, 221);
+/* ═══════════════════════════════════════════════════════
+   Academic Architect — Design System
+   "The Digital Curator" — Editorial, premium ERP aesthetic
+   ═══════════════════════════════════════════════════════ */
+
+:root {
+  /* Core palette */
+  --primary: #00152a;
+  --primary-container: #102a43;
+  --on-primary: #ffffff;
+  --surface: #f6fafe;
+  --surface-container: #eaeef2;
+  --surface-container-low: #f0f4f8;
+  --surface-container-high: #e4e9ed;
+  --surface-container-lowest: #ffffff;
+  --on-surface: #171c1f;
+  --on-surface-variant: #43474d;
+  --outline-variant: #c3c6ce;
+  --tertiary-accent: #44ddc1;
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --secondary: #44617d;
+  --secondary-container: #bfddfe;
+  --primary-fixed: #d1e4ff;
+  /* Shadows */
+  --shadow-ambient: 0 20px 40px rgba(1, 29, 53, 0.06);
+  --shadow-ambient-sm: 0 10px 20px rgba(1, 29, 53, 0.04);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--surface);
+  color: var(--on-surface);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Manrope', sans-serif;
+  color: var(--primary);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ── Sidebar: Light editorial style ── */
+.erp-sidebar {
+  background: var(--surface-container-low) !important;
+  border-right: none !important;
+  box-shadow: none;
+}
+
+.erp-sidebar .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+}
+
+.erp-sidebar .ant-menu {
+  background: transparent !important;
+  border-inline-end: none !important;
+  font-family: 'Manrope', sans-serif;
+}
+
+.erp-sidebar .ant-menu-item,
+.erp-sidebar .ant-menu-submenu-title {
+  color: var(--on-surface-variant) !important;
+  border-radius: 12px !important;
+  margin: 2px 8px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+  transition: all 0.2s ease;
+  height: 44px !important;
+  line-height: 44px !important;
+}
+
+.erp-sidebar .ant-menu-item:hover,
+.erp-sidebar .ant-menu-submenu-title:hover {
+  background: var(--surface-container-high) !important;
+  color: var(--on-surface) !important;
+}
+
+/* Active item: white bg + left accent border (matches design) */
+.erp-sidebar .ant-menu-item-selected {
+  background: var(--surface-container-lowest) !important;
+  color: var(--primary) !important;
+  font-weight: 700 !important;
+  border-left: 4px solid var(--primary) !important;
+  border-radius: 0 12px 12px 0 !important;
+  margin-left: 0 !important;
+  padding-left: 20px !important;
+}
+
+.erp-sidebar .ant-menu-item-selected::after {
+  display: none !important;
+}
+
+.erp-sidebar .ant-menu-sub {
+  background: transparent !important;
+}
+
+.erp-sidebar .ant-menu-sub .ant-menu-item {
+  padding-left: 48px !important;
+  font-size: 13px !important;
+  height: 40px !important;
+  line-height: 40px !important;
+}
+
+.erp-sidebar .ant-menu-submenu-arrow {
+  color: var(--on-surface-variant) !important;
+}
+
+/* ── Sidebar Logo Area ── */
+.sidebar-logo {
+  padding: 24px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sidebar-logo img {
+  border-radius: 14px;
+  transition: all 0.3s ease;
+  object-fit: cover;
+}
+
+.sidebar-logo-text {
+  font-family: 'Manrope', sans-serif;
+  color: var(--primary);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.sidebar-logo-subtitle {
+  font-family: 'Public Sans', sans-serif;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--on-surface-variant);
+  font-weight: 700;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+/* ── Header: Glass morphism ── */
+.erp-header {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--surface-container-low);
+  box-shadow: var(--shadow-ambient);
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px !important;
+}
+
+/* ── Content Area ── */
+.erp-content {
+  margin: 0;
+  padding: 32px;
+  background: var(--surface);
+  min-height: calc(100vh - 64px);
+  border: none;
+  border-radius: 0;
+}
+
+/* ── Cards: No-line rule, tonal layering ── */
+.erp-card {
+  background: var(--surface-container-lowest);
+  border-radius: 16px;
+  border: none !important;
+  box-shadow: var(--shadow-ambient-sm);
+  transition: box-shadow 0.2s ease;
+}
+
+.erp-card:hover {
+  box-shadow: var(--shadow-ambient);
+}
+
+/* ── Stat Cards: Fully rounded metric style ── */
+.erp-stat-card {
+  background: var(--surface-container-lowest);
+  border-radius: 9999px;
+  border: none;
+  padding: 28px 32px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-ambient-sm);
+}
+
+.erp-stat-card:hover {
+  box-shadow: var(--shadow-ambient);
+  transform: translateY(-2px);
+}
+
+/* Stat accent — left border replaced with a subtle tonal distinction */
+.stat-blue .erp-stat-icon { background: rgba(0, 21, 42, 0.06); color: var(--primary); }
+.stat-green .erp-stat-icon { background: rgba(68, 221, 193, 0.12); color: #005145; }
+.stat-orange .erp-stat-icon { background: rgba(186, 26, 26, 0.08); color: var(--error); }
+.stat-red .erp-stat-icon { background: var(--primary); color: #fff; }
+
+/* Special dark stat card (Collection Rate style) */
+.erp-stat-card.stat-dark {
+  background: var(--primary);
+  color: #fff;
+}
+
+.erp-stat-card.stat-dark::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--primary-container), var(--primary));
+  opacity: 0.5;
+}
+
+/* ── Tables: No-line approach with background shifts ── */
+.ant-table-thead > tr > th {
+  background: transparent !important;
+  font-family: 'Public Sans', sans-serif !important;
+  font-weight: 700 !important;
+  color: var(--on-surface-variant) !important;
+  border-bottom: 1px solid var(--surface-container-high) !important;
+  font-size: 11px !important;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 16px 8px !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(240, 244, 248, 0.5) !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--surface-container-low) !important;
+  font-family: 'Public Sans', sans-serif;
+  font-size: 13px;
+  padding: 14px 8px !important;
+}
+
+/* ── Buttons: Gradient primary CTA ── */
+.gradient-btn {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%) !important;
+  border: none !important;
+  color: white !important;
+  border-radius: 9999px !important;
+  font-family: 'Manrope', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0, 21, 42, 0.2);
+  padding: 0 24px !important;
+  height: 44px !important;
+}
+
+.gradient-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 21, 42, 0.3);
+  color: white !important;
+}
+
+/* Secondary ghost button */
+.ghost-btn {
+  background: transparent !important;
+  border: 1px solid var(--outline-variant) !important;
+  color: var(--primary) !important;
+  border-radius: 9999px !important;
+  font-family: 'Manrope', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 13px;
+}
+
+.ghost-btn:hover {
+  background: var(--surface-container-low) !important;
+  border-color: var(--primary) !important;
+}
+
+/* ── Tags / Status badges ── */
+.ant-tag {
+  border-radius: 9999px !important;
+  font-weight: 600;
+  font-size: 11px;
+  border: none !important;
+  padding: 2px 12px;
+  font-family: 'Public Sans', sans-serif;
+}
+
+/* ── Form inputs: Filled style ── */
+.ant-input,
+.ant-select-selector,
+.ant-picker {
+  border-radius: 12px !important;
+  background: var(--surface-container-high) !important;
+  border: none !important;
+  font-family: 'Public Sans', sans-serif;
+}
+
+.ant-input:focus,
+.ant-input-focused,
+.ant-select-focused .ant-select-selector {
+  background: var(--surface-container-highest, #dfe3e7) !important;
+  box-shadow: none !important;
+  border-left: 2px solid var(--primary) !important;
+}
+
+/* ── Steps ── */
+.ant-steps .ant-steps-item-process .ant-steps-item-icon {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+/* ── Page Header ── */
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-header h2 {
+  font-family: 'Manrope', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.page-header p {
+  font-family: 'Public Sans', sans-serif;
+  color: var(--on-surface-variant);
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+/* ── Breadcrumb ── */
+.page-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-family: 'Public Sans', sans-serif;
+}
+
+/* ── Glass card for modals/dropdowns ── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Scrollbar: Minimal ── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-container-highest, #dfe3e7);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--outline-variant);
+}
+
+/* ── Ant Design global overrides ── */
+.ant-card {
+  border-radius: 16px !important;
+  border: none !important;
+  box-shadow: var(--shadow-ambient-sm);
+}
+
+.ant-card-head {
+  border-bottom: none !important;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800 !important;
+}
+
+.ant-btn {
+  border-radius: 12px;
+  font-weight: 600;
+  font-family: 'Public Sans', sans-serif;
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 2px 8px rgba(0, 21, 42, 0.15);
+}
+
+.ant-btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 21, 42, 0.2);
+}
+
+/* ── Modal ── */
+.ant-modal-content {
+  border-radius: 20px !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-ambient) !important;
+}
+
+.ant-modal-header {
+  border-bottom: none !important;
+  padding: 24px 24px 0 !important;
+}
+
+/* ── Sidebar bottom divider ── */
+.sidebar-bottom-divider {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(195, 198, 206, 0.2);
+}
+
+/* ── Selection ── */
+::selection {
+  background: var(--primary-fixed);
+  color: var(--primary);
 }

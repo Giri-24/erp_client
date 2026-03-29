@@ -1,0 +1,165 @@
+.custom-ant-table-header .ant-table-thead>tr>th {
+  background: transparent !important;
+  color: #43474d !important;
+  font-family: 'Public Sans', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  border-bottom: 2px solid #e4e9ed !important;
+  padding: 14px 16px !important;
+}
+
+.custom-ant-table-header .ant-table-thead > tr > th {
+  white-space: nowrap;        /* prevent breaking */
+  overflow: hidden;           /* hide overflow */
+  text-overflow: ellipsis;    /* show ... */
+}
+.custom-ant-table-header .ant-table-tbody>tr:hover>td {
+  background: #f6fafe !important;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'Manrope', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.approved {
+  background: rgba(68, 221, 193, 0.12);
+  color: #005145;
+}
+
+.status-badge.pending {
+  background: rgba(0, 21, 42, 0.08);
+  color: #43474d;
+}
+
+.status-badge.active {
+  background: rgba(68, 221, 193, 0.12);
+  color: #005145;
+}
+
+.status-badge.inactive {
+  background: rgba(186, 26, 26, 0.1);
+  color: #ba1a1a;
+}
+
+/* Avatar initials */
+.avatar-initials {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #00152a, #102a43);
+  color: #fff;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.5px;
+}
+
+/* Filter bar */
+.admission-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 16px 20px;
+  background: #fff;
+  border-radius: 14px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(1, 29, 53, 0.03);
+}
+
+/* ── Expanded Row Details ── */
+.expanded-row-container {
+  padding: 32px;
+  background: var(--surface-container-low);
+  border-radius: 20px;
+  margin: 12px 24px 24px 64px;
+}
+
+.expand-detail-group {
+  margin-bottom: 32px;
+}
+
+.expand-detail-title {
+  font-family: 'Manrope', sans-serif;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--secondary);
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--outline-variant);
+  padding-bottom: 8px;
+  font-weight: 800;
+}
+
+.expand-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px 32px;
+}
+
+.expand-detail-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.expand-detail-label {
+  font-family: 'Public Sans', sans-serif;
+  font-size: 10px;
+  color: var(--on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  opacity: 0.8;
+}
+
+.expand-detail-value {
+  font-family: 'Public Sans', sans-serif;
+  font-size: 14px;
+  color: var(--on-surface);
+  font-weight: 600;
+}
+
+/* Ant Design Table Expansion Overrides */
+.ant-table-row-expand-icon {
+  width: 28px !important;
+  height: 28px !important;
+  line-height: 24px !important;
+  border-radius: 50% !important;
+  border-color: var(--outline-variant) !important;
+  color: var(--on-surface-variant) !important;
+  background: white !important;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 21, 42, 0.05);
+}
+
+.ant-table-row-expand-icon:hover {
+  background: var(--primary) !important;
+  color: white !important;
+  border-color: var(--primary) !important;
+  transform: scale(1.1);
+}
+
+.ant-table-expanded-row > td {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.ant-table-expanded-row:hover > td {
+  background: transparent !important;
+}
