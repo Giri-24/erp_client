@@ -9,10 +9,9 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      '/api': {
+      '/erp/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

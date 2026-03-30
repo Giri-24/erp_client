@@ -1,21 +1,7 @@
 import axios from 'axios'
 
-const resolveDefaultApiBaseUrl = () => {
-  if (typeof window === 'undefined') {
-    return 'http://127.0.0.1:3000'
-  }
-
-  const host = window.location.hostname || '127.0.0.1'
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return 'http://127.0.0.1:3000'  
-  }
-
-  // When UI is opened from another device on LAN, target backend on same host.
-  return `http://${host}:3000`
-}
-
 const instance = axios.create({
-  baseURL: (import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBaseUrl()) + '/erp/api',
+  baseURL: import.meta.env.VITE_API_URL || '/erp/api',
 })
 
 instance.interceptors.request.use((config) => {
