@@ -15,7 +15,7 @@ const resolveDefaultApiBaseUrl = () => {
 }
 
 const instance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBaseUrl(),
+  baseURL: (import.meta.env.VITE_API_BASE_URL || resolveDefaultApiBaseUrl()) + '/erp/api',
 })
 
 instance.interceptors.request.use((config) => {
