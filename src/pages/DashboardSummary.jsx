@@ -120,8 +120,12 @@ const DashboardSummary = ({ onNavigate }) => {
             Export List
           </button>
           <button 
-            onClick={() => onNavigate("admission")}
-            className="px-6 py-2.5 bg-gradient-to-br from-primary to-primary-container text-white font-bold rounded-xl flex items-center gap-2 scale-[0.98] active:scale-95 transition-transform shadow-lg shadow-primary/10 hover:opacity-90"
+         style={{
+  background: 'linear-gradient(to right, #00152a, #102a43)'
+}}
+           className="px-6 py-2.5 bg from-primary to-primary-container text-white font-bold rounded-xl flex items-center gap-2 scale-[0.98] active:scale-95 transition-transform shadow-lg shadow-primary/10 hover:opacity-90"
+           onClick={() => onNavigate("admission")}
+            // className="px-6 py-2.5 bg-linear-to-br from-primary to-primary-container text-black font-bold rounded-xl flex items-center gap-2 scale-[0.98] active:scale-95 transition-transform shadow-lg shadow-primary/10 hover:opacity-90"
           >
             <span className="material-symbols-outlined text-lg">add_circle</span>
             New Application
