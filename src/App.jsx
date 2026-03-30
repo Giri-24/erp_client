@@ -6,7 +6,7 @@ import ServerDown from './pages/ServerDown'
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/erp">
       <Routes>
         {/* Public Route */}
         <Route path="/" element={<Login />} />
