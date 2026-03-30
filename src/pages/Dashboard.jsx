@@ -32,6 +32,15 @@ import ApprovalsView from "./ApprovalsView";
 import AdminSettings from "./AdminSettings";
 import BulkUploadPage from "../modules/admission/pages/BulkUploadPage";
 import PromotionPage from "../modules/admission/pages/PromotionPage";
+
+import HRDashboardPage from "../modules/hr/pages/HRDashboardPage";
+import AttendancePage from "../modules/hr/pages/AttendancePage";
+import LeaveManagementPage from "../modules/hr/pages/LeaveManagementPage";
+import PermissionPage from "../modules/hr/pages/PermissionPage";
+import PFESIPage from "../modules/hr/pages/PFESIPage";
+import ESSLSyncPage from "../modules/hr/pages/ESSLSyncPage";
+import PayrollPage from "../modules/hr/pages/PayrollPage";
+
 import { hasPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions";
 
 const Dashboard = () => {
@@ -57,6 +66,14 @@ const Dashboard = () => {
   const canLocationRead = hasPermission(PERMISSIONS.LOCATION_READ);
   const canStaffAccess = hasPermission(PERMISSIONS.STAFF_READ);
   const canReadSettings = hasPermission(PERMISSIONS.SETTINGS_READ);
+
+  const canHRDashboard = hasPermission(PERMISSIONS.HR_DASHBOARD);
+  const canHRAttendance = hasPermission(PERMISSIONS.HR_ATTENDANCE_READ);
+  const canHRLeave = hasPermission(PERMISSIONS.HR_LEAVE_READ);
+  const canHRPermission = hasPermission(PERMISSIONS.HR_PERMISSION_READ);
+  const canHRStatutory = hasPermission(PERMISSIONS.HR_STATUTORY_READ);
+  const canHRESSL = hasPermission(PERMISSIONS.HR_ESSL_READ);
+  const canHRPayroll = hasPermission(PERMISSIONS.HR_PAYROLL_READ);
 
   const onLogout = () => {
     Modal.confirm({
@@ -116,6 +133,21 @@ const Dashboard = () => {
       ],
     },
     { key: "staff-management", label: "Staff", icon: "badge", permission: canStaffAccess },
+    {
+      key: "hr-group",
+      label: "HR",
+      icon: "work",
+      permission: canHRDashboard,
+      children: [
+        { key: "hr-dashboard", label: "Dashboard", icon: "space_dashboard", permission: canHRDashboard },
+        { key: "hr-attendance", label: "Attendance", icon: "schedule", permission: canHRAttendance },
+        { key: "hr-leaves", label: "Leaves", icon: "event_busy", permission: canHRLeave },
+        { key: "hr-permission", label: "Permission", icon: "timer", permission: canHRPermission },
+        { key: "hr-pf-esi", label: "PF & ESI", icon: "account_balance", permission: canHRStatutory },
+        { key: "hr-essl", label: "ESSL Sync", icon: "fingerprint", permission: canHRESSL },
+        { key: "hr-payroll", label: "Payroll", icon: "payments", permission: canHRPayroll },
+      ],
+    },
   ];
 
   const isChildSelected = (children) => children?.some((c) => c.key === selectedKey);
@@ -147,6 +179,13 @@ const Dashboard = () => {
       case "transport-view":      return <TransportViewPage />;
       case "transport-live":      return <LiveTrackingPage />;
       case "staff-management":    return <StaffManagementPage />;
+      case "hr-dashboard":        return <HRDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
+      case "hr-attendance":       return <AttendancePage />;
+      case "hr-leaves":           return <LeaveManagementPage />;
+      case "hr-permission":       return <PermissionPage />;
+      case "hr-pf-esi":           return <PFESIPage />;
+      case "hr-essl":             return <ESSLSyncPage />;
+      case "hr-payroll":          return <PayrollPage />;
       default:                    return <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
     }
   };
