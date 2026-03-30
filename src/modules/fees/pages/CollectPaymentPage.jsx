@@ -549,6 +549,9 @@ const CollectPaymentPage = () => {
               type="button"
               disabled={loading || !canCollectFee || !selectedFee || Number(selectedFee?.pending || 0) <= 0}
               onClick={handleCollect}
+                  style={{
+  background: 'linear-gradient(to right, #00152a, #102a43)'
+}}
               className="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold text-lg shadow-[0_10px_20px_rgba(0,21,42,0.2)] hover:shadow-[0_15px_30px_rgba(0,21,42,0.3)] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
             >
               {loading ? (

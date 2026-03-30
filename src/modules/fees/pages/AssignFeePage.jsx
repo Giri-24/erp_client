@@ -549,6 +549,9 @@ const AssignFeePage = () => {
               type="button"
               disabled={loading || !canAssignFee}
               onClick={handleSubmit}
+                  style={{
+  background: 'linear-gradient(to right, #00152a, #102a43)'
+}}
               className="w-full bg-gradient-to-br from-primary to-primary-container text-white py-4 px-6 rounded-xl font-headline font-extrabold tracking-tight text-base shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (

@@ -180,7 +180,9 @@ const RefundCancellationReportPage = () => {
         </div>
 
         {/* Refunded amount (dark) */}
-        <div className="bg-gradient-to-br from-primary to-primary-container p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.15)] text-white">
+        <div     style={{
+  background: 'linear-gradient(to right, #00152a, #102a43)'
+}} className="bg-gradient-to-br from-primary to-primary-container p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.15)] text-white">
           <p className="text-primary-fixed text-[10px] font-bold uppercase tracking-widest mb-1">Refunded Amount</p>
           <h3 className="text-4xl  font-headline text-[#44ddc1] font-extrabold">
             {loading ? "—" : fmt(summary.refundedAmount)}

@@ -459,7 +459,9 @@ const FeesViewPage = () => {
         </div>
 
         {/* Dark AI insight card */}
-        <div className="bg-gradient-to-br from-primary to-primary-container text-white p-8 rounded-[2rem] shadow-[0_20px_40px_rgba(1,29,53,0.15)] relative overflow-hidden">
+        <div     style={{
+  background: 'linear-gradient(to right, #00152a, #102a43)'
+}} className="bg-gradient-to-br from-primary to-primary-container text-white p-8 rounded-[2rem] shadow-[0_20px_40px_rgba(1,29,53,0.15)] relative overflow-hidden">
           <div className="relative z-10 flex flex-col h-full justify-between">
             <div>
               <div className="flex items-center gap-2 mb-4">

@@ -121,7 +121,9 @@ const AssignTransportPage = () => {
         {/* ── LEFT: assignment form (7 cols) ── */}
         <div className="lg:col-span-7 bg-white rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] overflow-hidden">
           {/* top accent stripe */}
-          <div className="h-1 w-full bg-gradient-to-r from-primary to-primary-container" />
+          <div     style={{
+  background: 'linear-gradient(to right, #00152a, #102a43)'
+}} className="h-1 w-full bg-gradient-to-r from-primary to-primary-container" />
 
           <div className="p-8 lg:p-10">
             {/* form header */}
@@ -299,6 +301,9 @@ const AssignTransportPage = () => {
               <button
                 onClick={handleSubmit}
                 disabled={loading || !canAssign}
+                    style={{
+  background: 'linear-gradient(to right, #00152a, #102a43)'
+}}
                 className="w-full py-4 px-6 bg-gradient-to-br from-primary to-primary-container text-white font-headline font-bold text-lg rounded-xl shadow-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-60"
               >
                 {loading && <span className="material-symbols-outlined text-lg animate-spin">refresh</span>}

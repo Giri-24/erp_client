@@ -178,13 +178,18 @@ const RouteManagementPage = () => {
               <span className="material-symbols-outlined text-[120px]">add_road</span>
             </div>
             <div className="flex items-center gap-3 mb-7">
-              <div className="h-10 w-10 bg-gradient-to-br from-primary to-primary-container rounded-xl flex items-center justify-center shadow-lg">
+              <div     style={{
+  background: 'linear-gradient(to right, #00152a, #102a43)'
+}} className="h-10 w-10 bg-gradient-to-br from-primary to-primary-container rounded-xl flex items-center justify-center shadow-lg">
                 <span className="material-symbols-outlined text-white">edit_note</span>
               </div>
               <h3 className="font-headline text-xl font-bold text-primary">Route Configuration</h3>
               {!showInlineForm && canCreate && (
                 <button
                   onClick={openCreate}
+                      style={{
+  background: 'linear-gradient(to right, #00152a, #102a43)'
+}}
                   className="ml-auto flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-primary to-primary-container text-white rounded-full text-xs font-bold shadow-md hover:opacity-90 transition-opacity active:scale-95"
                 >
                   <span className="material-symbols-outlined text-sm">add</span>
@@ -338,6 +343,9 @@ const RouteManagementPage = () => {
                 <button
                   disabled={savingRoute}
                   onClick={handlePublish}
+                      style={{
+  background: 'linear-gradient(to right, #00152a, #102a43)'
+}}
                   className="px-8 py-3 text-sm font-bold text-white bg-gradient-to-br from-primary to-primary-container rounded-full shadow-lg active:scale-95 transition-all disabled:opacity-60 flex items-center gap-2"
                 >
                   {savingRoute && <span className="material-symbols-outlined text-sm animate-spin">refresh</span>}
