@@ -5,6 +5,11 @@ export const createStaff = async (data) => {
   return res.data;
 };
 
+export const getNextEmployeeId = async () => {
+  const res = await axios.get('/staff/next-employee-id');
+  return res.data;
+};
+
 export const getAllStaff = async () => {
   const res = await axios.get('/staff');
   return res.data;

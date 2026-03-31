@@ -24,6 +24,7 @@ import {
 } from "@ant-design/icons";
 import {
   getAllStaff,
+  getNextEmployeeId,
   createStaff,
   updateStaff,
   deleteStaff,
@@ -35,6 +36,14 @@ import dayjs from "dayjs";
 import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
 
 const { Option } = Select;
+
+const formatStandardLabel = (standard) => {
+  if (!standard) return "-";
+  if (!String(standard).startsWith("STD_")) return standard;
+  const value = Number(String(standard).replace("STD_", ""));
+  const suffix = value === 1 ? "st" : value === 2 ? "nd" : value === 3 ? "rd" : "th";
+  return `${value}${suffix} Standard`;
+};
 
 const StaffManagementPage = () => {
   const [staff, setStaff] = useState([]);
@@ -75,13 +84,19 @@ const StaffManagementPage = () => {
     fetchStaff();
   }, []);
 
-  const openCreate = () => {
+  const openCreate = async () => {
     if (!canCreateStaff) {
       message.error("You are not authorized to create staff");
       return;
     }
     setEditingStaff(null);
     form.resetFields();
+    try {
+      const response = await getNextEmployeeId();
+      form.setFieldsValue({ employeeId: response?.employeeId || "" });
+    } catch {
+      form.setFieldsValue({ employeeId: "" });
+    }
     setModalOpen(true);
   };
 
@@ -118,6 +133,7 @@ const StaffManagementPage = () => {
       const values = await form.validateFields();
       const payload = {
         ...values,
+        ...(values.employeeId ? { employeeId: values.employeeId } : {}),
         joiningDate: values.joiningDate
           ? values.joiningDate.toISOString()
           : null,
@@ -282,7 +298,7 @@ const StaffManagementPage = () => {
         <Form form={form} layout="vertical">
           <Space size="large" wrap style={{ width: "100%" }}>
             <Form.Item name="employeeId" label="Employee ID" rules={[{ required: true }]}>
-              <Input placeholder="e.g. EMP-001" />
+              <Input placeholder="Auto-generated employee ID" disabled={!editingStaff} />
             </Form.Item>
             <Form.Item name="name" label="Name" rules={[{ required: true }]}>
               <Input placeholder="Full name" />
@@ -427,7 +443,7 @@ const StaffManagementPage = () => {
         >
           {students.map((s) => (
             <Option key={s.id} value={s.id}>
-              {s.name} — {s.standard}
+              {s.name} — {formatStandardLabel(s.standard)}
             </Option>
           ))}
         </Select>

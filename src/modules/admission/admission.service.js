@@ -85,6 +85,11 @@ export const promoteStudents = async (payload) => {
   return res.data;
 };
 
+export const demoteStudents = async (payload) => {
+  const res = await axios.post('/admissions/demote', payload);
+  return res.data;
+};
+
 export const linkSiblings = async (payload) => {
   const res = await axios.post('/admissions/siblings/link', payload);
   return res.data;

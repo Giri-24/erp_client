@@ -134,7 +134,7 @@ const RouteManagementPage = () => {
       resetInlineForm();
       setShowInlineForm(false);
       fetchData();
-    } catch { message.error("Failed to save route"); }
+    } catch (err) { message.error(err?.response?.data?.message || "Failed to save route"); }
     setSavingRoute(false);
   };
 
@@ -144,7 +144,7 @@ const RouteManagementPage = () => {
       await deleteTransportRoute(id);
       message.success("Route deleted");
       fetchData();
-    } catch { message.error("Failed to delete route"); }
+    } catch (err) { message.error(err?.response?.data?.message || "Failed to delete route"); }
   };
 
   const openDetail = (route) => {

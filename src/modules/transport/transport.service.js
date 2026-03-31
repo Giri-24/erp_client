@@ -17,6 +17,11 @@ export const getAllTransportRoutes = async () => {
   return res.data;
 };
 
+export const getTransportAcademicYears = async () => {
+  const res = await axios.get('/transport/academic-years');
+  return res.data;
+};
+
 export const getTransportRoute = async (id) => {
   const res = await axios.get(`/transport/routes/${id}`);
   return res.data;
@@ -46,6 +51,11 @@ export const removeStudentTransport = async (studentId) => {
 
 export const getAllTransportAssignments = async (academicYear) => {
   const res = await axios.get('/transport/assignments', { params: { academicYear } });
+  return res.data;
+};
+
+export const getPendingTransportStudents = async (academicYear) => {
+  const res = await axios.get('/transport/students/pending', { params: { academicYear } });
   return res.data;
 };
 

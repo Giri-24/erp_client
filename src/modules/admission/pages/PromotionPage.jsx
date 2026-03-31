@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Select, Button, message, Table, Row, Col, Input, Modal, Alert, Space } from 'antd';
 import { SwapOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { promoteStudents, getAdmissionDashboardSummary } from '../admission.service';
+import { promoteStudents, demoteStudents, getAdmissionDashboardSummary } from '../admission.service';
 
 const { confirm } = Modal;
 
@@ -14,11 +14,32 @@ const STANDARDS = [
   })),
 ];
 
+const formatStandardLabel = (standard) => {
+  const match = String(standard || '').match(/^STD_(\d{1,2})$/);
+  if (!match) return standard;
+  const value = Number(match[1]);
+  const suffix = value === 1 ? 'st' : value === 2 ? 'nd' : value === 3 ? 'rd' : 'th';
+  return `${value}${suffix} Standard`;
+};
+
+const getNextAcademicYear = (academicYear) => {
+  const match = String(academicYear || '').match(/(\d{4})\s*[-/]\s*(\d{2,4})/);
+  if (!match) return '';
+  const startYear = Number(match[1]);
+  let endYear = Number(match[2]);
+  if (endYear < 100) {
+    endYear = Math.floor(startYear / 100) * 100 + endYear;
+  }
+  return `${endYear}-${endYear + 1}`;
+};
+
 const PromotionPage = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [academicYear, setAcademicYear] = useState('2025-26');
+  const [mode, setMode] = useState('promote');
+  const [academicYear, setAcademicYear] = useState('2025-2026');
+  const [newAcademicYear, setNewAcademicYear] = useState('2026-2027');
   const [summary, setSummary] = useState(null);
 
   const loadSummary = async () => {
@@ -34,38 +55,53 @@ const PromotionPage = () => {
     loadSummary();
   }, [academicYear]);
 
+  useEffect(() => {
+    setNewAcademicYear(getNextAcademicYear(academicYear));
+  }, [academicYear]);
+
+  useEffect(() => {
+    setResult(null);
+  }, [mode]);
+
   const onPromote = async () => {
     try {
       const values = await form.validateFields();
       const fromLabel = STANDARDS.find(s => s.value === values.fromStandard)?.label;
       const toLabel = STANDARDS.find(s => s.value === values.toStandard)?.label;
+      const isDemotion = mode === 'demote';
+      const actionLabel = isDemotion ? 'Demotion' : 'Promotion';
 
       confirm({
-        title: 'Confirm Promotion',
+        title: `Confirm ${actionLabel}`,
         icon: <ExclamationCircleOutlined />,
         content: (
           <div>
-            <p>Are you sure you want to promote all approved students from <strong>{fromLabel}</strong> to <strong>{toLabel}</strong>?</p>
+            <p>Are you sure you want to {isDemotion ? 'demote' : 'promote'} all approved students from <strong>{fromLabel}</strong> to <strong>{toLabel}</strong>?</p>
             <p>Academic Year: <strong>{academicYear}</strong></p>
             <Alert type="warning" message="This action cannot be easily undone." style={{ marginTop: 8 }} />
+            <p style={{ marginTop: 8 }}>New Academic Year will be set to <strong>{newAcademicYear || 'Auto'}</strong>.</p>
           </div>
         ),
-        okText: 'Yes, Promote',
+        okText: `Yes, ${isDemotion ? 'Demote' : 'Promote'}`,
         okType: 'primary',
         cancelText: 'Cancel',
         onOk: async () => {
           try {
             setLoading(true);
-            const res = await promoteStudents({
+            const payload = {
               fromStandard: values.fromStandard,
               toStandard: values.toStandard,
               academicYear,
-            });
+              newAcademicYear,
+            };
+            const res = isDemotion
+              ? await demoteStudents(payload)
+              : await promoteStudents(payload);
             setResult(res);
-            message.success(`${res.updatedCount} students promoted successfully!`);
+            message.success(`${res.updatedCount} students ${isDemotion ? 'demoted' : 'promoted'} successfully${res.newAcademicYear ? ` and academic year set to ${res.newAcademicYear}` : ''}!`);
             await loadSummary();
           } catch (err) {
-            message.error(err?.response?.data?.message || 'Promotion failed');
+            message.error(err?.response?.data?.message || `${actionLabel} failed`);
           } finally {
             setLoading(false);
           }
@@ -85,13 +121,15 @@ const PromotionPage = () => {
         <div className="page-breadcrumb">
           <span>Admissions</span>
           <span style={{ fontSize: 14 }}>›</span>
-          <span style={{ color: '#00152a', fontWeight: 700 }}>Promotion</span>
+          <span style={{ color: '#00152a', fontWeight: 700 }}>{mode === 'demote' ? 'Demotion' : 'Promotion'}</span>
         </div>
         <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 28, fontWeight: 800, color: '#00152a', margin: '0 0 4px', letterSpacing: '-0.02em' }}>
-          Student Promotion
+          Student {mode === 'demote' ? 'Demotion' : 'Promotion'}
         </h2>
         <p style={{ color: '#43474d', fontSize: 13, margin: 0, fontFamily: "'Public Sans', sans-serif" }}>
-          Promote approved students from one standard to the next.
+          {mode === 'demote'
+            ? 'Demote approved students from one standard to a lower standard.'
+            : 'Promote approved students from one standard to the next.'}
         </p>
       </div>
 
@@ -102,8 +140,25 @@ const PromotionPage = () => {
             <div style={{ background: '#fff', borderRadius: 14, padding: 28 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
                 <span style={{ width: 3, height: 28, background: '#00152a', borderRadius: 9999, display: 'inline-block' }} />
-                <h4 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 800, color: '#00152a', margin: 0 }}>Promote Students</h4>
+                <h4 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 800, color: '#00152a', margin: 0 }}>{mode === 'demote' ? 'Demote Students' : 'Promote Students'}</h4>
               </div>
+
+              <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                <Button
+                  type={mode === 'promote' ? 'primary' : 'default'}
+                  onClick={() => setMode('promote')}
+                >
+                  Promote Mode
+                </Button>
+                <Button
+                  type={mode === 'demote' ? 'primary' : 'default'}
+                  danger={mode === 'demote'}
+                  onClick={() => setMode('demote')}
+                >
+                  Demote Mode
+                </Button>
+              </div>
+
               <Form form={form} layout="vertical">
                 <Row gutter={16}>
                   <Col span={8}>
@@ -111,7 +166,16 @@ const PromotionPage = () => {
                       <Input
                         value={academicYear}
                         onChange={(e) => setAcademicYear(e.target.value)}
-                        placeholder="2025-26"
+                        placeholder="2025-2026"
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item label={<span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: '#43474d' }}>New Academic Year</span>}>
+                      <Input
+                        value={newAcademicYear}
+                        onChange={(e) => setNewAcademicYear(e.target.value)}
+                        placeholder="2026-2027"
                       />
                     </Form.Item>
                   </Col>
@@ -127,24 +191,25 @@ const PromotionPage = () => {
                   </Col>
                 </Row>
                 <Button type="primary" icon={<SwapOutlined />} onClick={onPromote} loading={loading} size="large">
-                  Promote Students
+                  {mode === 'demote' ? 'Demote Students' : 'Promote Students'}
                 </Button>
               </Form>
 
               {result && (
                 <div style={{ marginTop: 24, padding: 20, background: '#f6fafe', borderRadius: 12 }}>
                   <Space direction="vertical" style={{ width: '100%' }}>
-                    <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 700, color: '#00152a', fontSize: 15 }}>Promotion Result</span>
+                    <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 700, color: '#00152a', fontSize: 15 }}>{mode === 'demote' ? 'Demotion Result' : 'Promotion Result'}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ background: 'rgba(0, 21, 42, 0.08)', color: '#00152a', padding: '4px 14px', borderRadius: 9999, fontSize: 12, fontWeight: 700 }}>{result.fromStandard}</span>
                       <SwapOutlined style={{ color: '#43474d' }} />
                       <span style={{ background: 'rgba(68, 221, 193, 0.12)', color: '#005145', padding: '4px 14px', borderRadius: 9999, fontSize: 12, fontWeight: 700 }}>{result.toStandard}</span>
                     </div>
-                    <span style={{ color: '#171c1f', fontSize: 14 }}>Students promoted: <strong>{result.updatedCount}</strong></span>
-                    {result.promotedStudents?.length > 0 && (
+                    <span style={{ color: '#171c1f', fontSize: 14 }}>Students {mode === 'demote' ? 'demoted' : 'promoted'}: <strong>{result.updatedCount}</strong></span>
+                    <span style={{ color: '#171c1f', fontSize: 14 }}>New academic year: <strong>{result.newAcademicYear || newAcademicYear || '-'}</strong></span>
+                    {(result.promotedStudents?.length > 0 || result.demotedStudents?.length > 0) && (
                       <Table
                         size="small"
-                        dataSource={result.promotedStudents}
+                        dataSource={result.promotedStudents || result.demotedStudents || []}
                         rowKey="id"
                         pagination={false}
                         columns={[
@@ -172,7 +237,7 @@ const PromotionPage = () => {
                 size="small"
                 dataSource={byStandard.map((item, idx) => ({ ...item, key: idx }))}
                 columns={[
-                  { title: 'Standard', dataIndex: 'standard', render: (v) => <span style={{ fontWeight: 700, color: '#00152a', fontFamily: "'Manrope', sans-serif" }}>{v}</span> },
+                  { title: 'Standard', dataIndex: 'standard', render: (v) => <span style={{ fontWeight: 700, color: '#00152a', fontFamily: "'Manrope', sans-serif" }}>{formatStandardLabel(v)}</span> },
                   { title: 'Count', dataIndex: 'count', render: (v) => <span style={{ fontWeight: 600 }}>{v}</span> },
                 ]}
                 pagination={false}

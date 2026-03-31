@@ -1,13 +1,22 @@
 import React, { useEffect, useState } from "react";
-import { Table, Input, Form, message, Spin, Avatar, Select } from "antd";
+import { Form, message, Spin, Avatar, Select } from "antd";
 import {
   getAdmissionDashboardSummary,
   exportAdmissionsCsv,
-  updateStandardSeats,
-  linkSiblings,
   getPendingAdmissions,
 } from "../modules/admission/admission.service";
-import { getAcademicYears, getAcademicYear as fetchCurrentYear } from "../modules/fees/fees.service";
+import { getAcademicYears } from "../modules/fees/fees.service";
+
+const formatSignedPercent = (value) => {
+  const numeric = Number(value || 0);
+  const rounded = Math.abs(numeric).toFixed(2).replace(/\.00$/, "");
+  return `${numeric >= 0 ? "+" : "-"}${rounded}%`;
+};
+
+const formatMilestoneTitle = (milestone) => {
+  if (!milestone) return "No milestone pending";
+  return milestone.label || `${milestone.threshold}% milestone`;
+};
 
 const DashboardSummary = ({ onNavigate }) => {
   const [summary, setSummary] = useState(null);
@@ -37,18 +46,14 @@ const DashboardSummary = ({ onNavigate }) => {
 
   const loadInitialData = async () => {
     try {
-      const [years, currentYearObj] = await Promise.all([
-        getAcademicYears(),
-        fetchCurrentYear()
-      ]);
+      const years = await getAcademicYears();
       setAvailableYears(years || []);
-      
-      // Use current year from API, or first from list, or fallback
-      const initialYear = currentYearObj?.year || currentYearObj || (years?.length > 0 ? years[0] : "2024-25");
+
+      const initialYear = years?.length > 0 ? years[0] : "2026-2027";
       setAcademicYear(initialYear);
     } catch {
       message.error("Failed to load academic years");
-      setAcademicYear("2024-25");
+      setAcademicYear("2026-2027");
     }
   };
 
@@ -87,6 +92,16 @@ const DashboardSummary = ({ onNavigate }) => {
 
   const { total, approved, pending } = summary;
   const approvalRate = total ? Math.round((approved / total) * 100) : 0;
+  const yearComparison = summary.yearComparison || {};
+  const admissionProgress = summary.admissionProgress || {};
+  const milestoneItems = (summary.upcomingMilestones?.length ? summary.upcomingMilestones : summary.milestones || []).slice(0, 3);
+  const nextMilestone = milestoneItems[0] || null;
+  const comparisonText = yearComparison.previousAcademicYear
+    ? `vs ${yearComparison.previousAcademicYear}`
+    : "vs previous year";
+  const progressText = admissionProgress.totalTarget
+    ? `${admissionProgress.currentCount || 0}/${admissionProgress.totalTarget} target`
+    : `${admissionProgress.currentCount || 0} admissions`;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -146,10 +161,11 @@ const DashboardSummary = ({ onNavigate }) => {
             <span className="p-3 bg-primary-fixed rounded-full text-primary material-symbols-outlined">group</span>
           </div>
           <div className="mt-4 flex items-center gap-2">
-            <span className="text-tertiary-fixed-dim font-bold flex items-center text-xs">
-              <span className="material-symbols-outlined text-sm">trending_up</span> +12%
+            <span className={`font-bold flex items-center text-xs ${yearComparison.trend === "down" ? "text-error" : "text-tertiary-fixed-dim"}`}>
+              <span className="material-symbols-outlined text-sm">{yearComparison.trend === "down" ? "trending_down" : "trending_up"}</span>
+              {formatSignedPercent(yearComparison.percentageChange)}
             </span>
-            <span className="text-on-surface-variant text-[10px]">vs. last semester</span>
+            <span className="text-on-surface-variant text-[10px]">{comparisonText}</span>
           </div>
         </div>
 
@@ -183,9 +199,11 @@ const DashboardSummary = ({ onNavigate }) => {
           </div>
           <div className="mt-4 flex items-center gap-2">
             <div className="flex -space-x-2">
-              <div className="w-6 h-6 rounded-full bg-surface-container-high border-2 border-white flex items-center justify-center text-[8px] font-bold text-primary">+{pending}</div>
+              <div className="w-6 h-6 rounded-full bg-surface-container-high border-2 border-white flex items-center justify-center text-[8px] font-bold text-primary">+{nextMilestone?.remainingCount || pending}</div>
             </div>
-            <span className="text-on-surface-variant text-[10px]">Require immediate action</span>
+            <span className="text-on-surface-variant text-[10px]">
+              {nextMilestone ? `${nextMilestone.remainingCount} more for ${nextMilestone.threshold}% milestone` : "Require immediate action"}
+            </span>
           </div>
         </div>
       </div>
@@ -194,15 +212,15 @@ const DashboardSummary = ({ onNavigate }) => {
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-ambient-sm border border-outline-variant/10 text-xs font-medium">
           <span className="material-symbols-outlined text-sm text-tertiary-fixed-dim">auto_awesome</span>
-          <span>AI Insight: 12% increase in Engineering applicants</span>
+          <span>{progressText} tracked for this cycle</span>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-ambient-sm border border-outline-variant/10 text-xs font-medium text-error">
           <span className="material-symbols-outlined text-sm">warning</span>
-          <span>3 Verifications overdue</span>
+          <span>{pending} applications still pending review</span>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-ambient-sm border border-outline-variant/10 text-xs font-medium">
           <span className="material-symbols-outlined text-sm text-primary">schedule</span>
-          <span>Interview window: Nov 15 - Nov 20</span>
+          <span>{nextMilestone ? `${formatMilestoneTitle(nextMilestone)} needs ${nextMilestone.remainingCount} more admissions` : `Progress at ${admissionProgress.progressPercent || 0}%`}</span>
         </div>
       </div>
 
@@ -291,24 +309,26 @@ const DashboardSummary = ({ onNavigate }) => {
         <div className="bg-surface-container-lowest p-8 rounded-xl shadow-ambient relative overflow-hidden">
           <h4 className="text-lg font-bold font-headline mb-6">Upcoming Milestones</h4>
           <div className="relative pl-8 space-y-8 before:content-[''] before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gradient-to-b before:from-primary before:via-tertiary-fixed-dim before:to-surface-container-high">
-            <div className="relative">
-              <div className="absolute -left-[28px] top-1 w-5 h-5 bg-primary rounded-full ring-4 ring-white"></div>
-              <p className="text-xs font-bold text-primary">NOV 01 - NOV 10</p>
-              <p className="font-bold text-sm">Application Initial Screening</p>
-              <p className="text-xs text-on-surface-variant">Reviewing all document submissions for completeness.</p>
-            </div>
-            <div className="relative">
-              <div className="absolute -left-[28px] top-1 w-5 h-5 bg-tertiary-fixed-dim rounded-full ring-4 ring-white"></div>
-              <p className="text-xs font-bold text-tertiary-fixed-dim">NOV 15 - NOV 30</p>
-              <p className="font-bold text-sm">Faculty Interview Rounds</p>
-              <p className="text-xs text-on-surface-variant">Scheduling Zoom interviews with departmental heads.</p>
-            </div>
-            <div className="relative opacity-60">
-              <div className="absolute -left-[28px] top-1 w-5 h-5 bg-surface-container-high rounded-full ring-4 ring-white"></div>
-              <p className="text-xs font-bold text-on-surface-variant">DEC 05</p>
-              <p className="font-bold text-sm">Final Merit List Publication</p>
-              <p className="text-xs text-on-surface-variant">Batch generation of admission offers.</p>
-            </div>
+            {milestoneItems.length > 0 ? milestoneItems.map((milestone, index) => {
+              const colorClass = index === 0 ? "bg-primary text-primary" : index === 1 ? "bg-tertiary-fixed-dim text-tertiary-fixed-dim" : "bg-surface-container-high text-on-surface-variant";
+              return (
+                <div key={`${milestone.threshold}-${index}`} className={`relative ${milestone.achieved ? "opacity-60" : ""}`}>
+                  <div className={`absolute -left-[28px] top-1 w-5 h-5 rounded-full ring-4 ring-white ${colorClass.split(" ")[0]}`}></div>
+                  <p className={`text-xs font-bold ${colorClass.split(" ")[1]}`}>{milestone.threshold}% TARGET</p>
+                  <p className="font-bold text-sm">{formatMilestoneTitle(milestone)}</p>
+                  <p className="text-xs text-on-surface-variant">
+                    {milestone.currentCount} reached out of {milestone.targetCount}. {milestone.remainingCount > 0 ? `${milestone.remainingCount} more admissions needed.` : "Milestone achieved."}
+                  </p>
+                </div>
+              );
+            }) : (
+              <div className="relative">
+                <div className="absolute -left-[28px] top-1 w-5 h-5 bg-surface-container-high rounded-full ring-4 ring-white"></div>
+                <p className="text-xs font-bold text-on-surface-variant">ALL CLEAR</p>
+                <p className="font-bold text-sm">No upcoming milestones pending</p>
+                <p className="text-xs text-on-surface-variant">Current admission cycle has no pending milestone threshold.</p>
+              </div>
+            )}
           </div>
         </div>
 

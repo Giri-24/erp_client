@@ -3,7 +3,9 @@ import { Select, message } from "antd";
 import {
   assignStudentTransport,
   getAllTransportRoutes,
+  getPendingTransportStudents,
   getStudentTransport,
+  getTransportAcademicYears,
   getTransportFee,
 } from "../transport.service";
 import instance from "../../../utils/axios";
@@ -11,15 +13,24 @@ import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN");
+const formatStandardLabel = (standard) => {
+  if (!standard) return "-";
+  if (!String(standard).startsWith("STD_")) return standard;
+  const value = Number(String(standard).replace("STD_", ""));
+  const suffix = value === 1 ? "st" : value === 2 ? "nd" : value === 3 ? "rd" : "th";
+  return `${value}${suffix} Standard`;
+};
 
 // ── component ─────────────────────────────────────────────────────────────
 const AssignTransportPage = () => {
   const [students, setStudents] = useState([]);
+  const [pendingStudents, setPendingStudents] = useState([]);
   const [routes, setRoutes] = useState([]);
+  const [availableYears, setAvailableYears] = useState([]);
 
   // form state
   const [studentId, setStudentId] = useState(null);
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState("");
   const [routeId, setRouteId] = useState(null);
   const [stopId, setStopId] = useState(null);
   const [isSplClass, setIsSplClass] = useState(false);
@@ -35,14 +46,38 @@ const AssignTransportPage = () => {
 
   // ── data ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    instance.get("/admissions").then((res) => {
-      const active = (res.data || []).filter(
-        (s) => s.users?.isActive !== false && s.admission?.isApproved
-      );
-      setStudents(active);
-    });
-    getAllTransportRoutes().then(setRoutes).catch(() => {});
+    const loadInitialData = async () => {
+      try {
+        const [years, routeData, admissionsResponse] = await Promise.all([
+          getTransportAcademicYears(),
+          getAllTransportRoutes(),
+          instance.get("/admissions"),
+        ]);
+
+        const normalizedYears = years || [];
+        setAvailableYears(normalizedYears);
+        setAcademicYear((current) => current || normalizedYears[0] || "2026-2027");
+        setRoutes(routeData || []);
+
+        const active = (admissionsResponse.data || []).filter(
+          (student) => student.users?.isActive !== false && student.admission?.isApproved,
+        );
+        setStudents(active);
+      } catch {
+        message.error("Failed to load transport form data");
+      }
+    };
+
+    loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (!academicYear) return;
+
+    getPendingTransportStudents(academicYear)
+      .then((res) => setPendingStudents(res?.students || []))
+      .catch(() => setPendingStudents([]));
+  }, [academicYear]);
 
   const onStudentChange = async (id) => {
     setStudentId(id);
@@ -54,7 +89,7 @@ const AssignTransportPage = () => {
       setRouteId(assignment.routeId);
       setStopId(assignment.stopId);
       setIsSplClass(!!assignment.isSplClass);
-      setAcademicYear(assignment.academicYear || "2025-26");
+      setAcademicYear(assignment.academicYear || academicYear || availableYears[0] || "2026-2027");
       const route = routes.find((r) => r.id === assignment.routeId);
       setSelectedRoute(route || null);
       const fee = await getTransportFee(id);
@@ -76,12 +111,14 @@ const AssignTransportPage = () => {
     if (!routeId) { message.error("Please select a route"); return; }
     setLoading(true);
     try {
-      await assignStudentTransport({ studentId, academicYear, routeId, stopId, isSplClass });
-      message.success(currentAssignment ? "Assignment updated!" : "Transport assigned successfully!");
+      const response = await assignStudentTransport({ studentId, academicYear, routeId, stopId, isSplClass });
+      message.success(response?.message || (currentAssignment ? "Assignment updated!" : "Transport assigned successfully!"));
       const fee = await getTransportFee(studentId);
       setFeePreview(fee);
       const assignment = await getStudentTransport(studentId);
       setCurrentAssignment(assignment);
+      const pendingResponse = await getPendingTransportStudents(academicYear);
+      setPendingStudents(pendingResponse?.students || []);
     } catch (err) {
       message.error(err?.response?.data?.message || "Failed to assign transport");
     }
@@ -91,10 +128,11 @@ const AssignTransportPage = () => {
   // student options for antd Select
   const studentOptions = students.map((s) => {
     const admNo = s.admission?.admissionNo || "-";
+    const standardLabel = s.standardLabel || formatStandardLabel(s.standard);
     return {
       value: s.id,
-      label: `${s.name} — ${s.standard || ""} — ${admNo}`,
-      searchText: `${s.name} ${s.standard} ${admNo}`.toLowerCase(),
+      label: `${s.name} — ${standardLabel} — ${admNo}`,
+      searchText: `${s.name} ${standardLabel} ${s.standard} ${admNo}`.toLowerCase(),
     };
   });
 
@@ -185,12 +223,13 @@ const AssignTransportPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-primary ml-1">Academic Year</label>
-                  <input
-                    type="text"
-                    value={academicYear}
-                    onChange={(e) => setAcademicYear(e.target.value)}
-                    placeholder="e.g. 2025-26"
-                    className="w-full px-4 py-3.5 bg-surface-container-high border-none rounded-xl font-body text-on-surface focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+                  <Select
+                    value={academicYear || undefined}
+                    onChange={setAcademicYear}
+                    options={availableYears.map((year) => ({ label: year, value: year }))}
+                    placeholder="Select academic year"
+                    size="large"
+                    className="w-full"
                   />
                 </div>
 
@@ -361,9 +400,39 @@ const AssignTransportPage = () => {
               <div>
                 <h5 className="text-sm font-bold text-primary">Intelligent Routing Insight</h5>
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                  Select a student to auto-populate their existing transport assignment. Route fee is calculated automatically based on the selected stop.
+                  Students who requested transport but are not yet mapped for {academicYear || "the selected year"} appear below. Route fee is calculated automatically based on the selected stop.
                 </p>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-xs font-bold text-primary uppercase tracking-widest">Students Awaiting Mapping</h4>
+              <span className="text-xs font-semibold text-on-surface-variant">{pendingStudents.length} pending</span>
+            </div>
+            <div className="space-y-3">
+              {pendingStudents.slice(0, 5).map((student) => (
+                <button
+                  key={student.id}
+                  onClick={() => onStudentChange(student.id)}
+                  className="w-full text-left flex items-center gap-4 cursor-pointer hover:bg-surface rounded-xl px-3 py-2 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center font-bold text-primary text-xs flex-shrink-0">
+                    {student.name?.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-primary truncate">{student.name}</p>
+                    <p className="text-xs text-on-surface-variant">
+                      {student.standardLabel || formatStandardLabel(student.standard)} · {student.admissionNo || "No Admission No"}
+                    </p>
+                  </div>
+                  <span className="material-symbols-outlined text-[#44ddc1] flex-shrink-0">arrow_forward</span>
+                </button>
+              ))}
+              {pendingStudents.length === 0 && (
+                <p className="text-xs text-on-surface-variant italic text-center py-4">No pending transport mapping for this academic year.</p>
+              )}
             </div>
           </div>
 
@@ -418,8 +487,8 @@ const AssignTransportPage = () => {
             </div>
             <div className="h-6 w-px bg-outline-variant/30" />
             <div className="pr-1">
-              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Active Students</p>
-              <p className="text-xs font-bold text-primary">{students.length} Ready to Assign</p>
+              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-tight">Pending Mapping</p>
+              <p className="text-xs font-bold text-primary">{pendingStudents.length} Students Awaiting Assignment</p>
             </div>
             <button
               onClick={() => setShowTip(false)}

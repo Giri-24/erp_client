@@ -470,7 +470,7 @@ const FeesViewPage = () => {
                 </div>
                 <span className="text-[10px] font-bold uppercase tracking-widest text-primary-fixed">Financial Insights</span>
               </div>
-              <h3 className="font-headline text-2xl font-bold leading-tight mb-4">
+              <h3 className="font-headline text-2xl text-white font-bold leading-tight mb-4">
                 {collectionPct}% of total fees collected for the {academicYear} academic year.
               </h3>
               <p className="text-primary-fixed text-sm font-medium opacity-80 max-w-sm">

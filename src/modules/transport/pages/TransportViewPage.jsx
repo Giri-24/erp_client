@@ -18,6 +18,7 @@ import {
   getAllTransportAssignments,
   removeStudentTransport,
   getAllTransportRoutes,
+  getTransportAcademicYears,
   assignStudentTransport,
 } from "../transport.service";
 
@@ -25,8 +26,9 @@ const TransportViewPage = () => {
   const [editForm] = Form.useForm();
   const [assignments, setAssignments] = useState([]);
   const [routes, setRoutes] = useState([]);
+  const [availableYears, setAvailableYears] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState("");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -43,11 +45,22 @@ const TransportViewPage = () => {
   };
 
   useEffect(() => {
-    fetchData();
+    if (academicYear) {
+      fetchData();
+    }
   }, [academicYear]);
 
   useEffect(() => {
-    getAllTransportRoutes().then(setRoutes).catch(() => setRoutes([]));
+    Promise.all([getAllTransportRoutes(), getTransportAcademicYears()])
+      .then(([routeData, years]) => {
+        setRoutes(routeData || []);
+        setAvailableYears(years || []);
+        setAcademicYear((current) => current || years?.[0] || "2026-2027");
+      })
+      .catch(() => {
+        setRoutes([]);
+        setAvailableYears([]);
+      });
   }, []);
 
   const openEdit = (record) => {
@@ -97,7 +110,7 @@ const TransportViewPage = () => {
     const q = search.toLowerCase();
     return (
       (a.student?.name || "").toLowerCase().includes(q) ||
-      (a.student?.standard || "").toLowerCase().includes(q) ||
+      (a.student?.standardLabel || a.student?.standard || "").toLowerCase().includes(q) ||
       (a.route?.routeName || "").toLowerCase().includes(q) ||
       (a.route?.routeNo || "").toLowerCase().includes(q)
     );
@@ -111,7 +124,7 @@ const TransportViewPage = () => {
     },
     {
       title: "Standard",
-      render: (_, r) => r.student?.standard || "-",
+      render: (_, r) => r.student?.standardLabel || r.student?.standard || "-",
     },
     {
       title: "Route",
@@ -174,11 +187,15 @@ const TransportViewPage = () => {
       extra={
         <Space>
           <Input
-            value={academicYear}
-            onChange={(e) => setAcademicYear(e.target.value)}
-            style={{ width: 110 }}
-            onPressEnter={fetchData}
-            placeholder="Year"
+            prefix={null}
+            style={{ display: "none" }}
+          />
+          <Select
+            value={academicYear || undefined}
+            onChange={setAcademicYear}
+            options={availableYears.map((year) => ({ label: year, value: year }))}
+            style={{ width: 150 }}
+            placeholder="Academic Year"
           />
           <Button onClick={fetchData}>Load</Button>
           <Input
@@ -209,7 +226,7 @@ const TransportViewPage = () => {
       >
         <Form form={editForm} layout="vertical">
           <Form.Item name="academicYear" label="Academic Year" rules={[{ required: true }]}>
-            <Input />
+            <Select options={availableYears.map((year) => ({ label: year, value: year }))} />
           </Form.Item>
           <Form.Item name="routeId" label="Route" rules={[{ required: true }]}>
             <Select

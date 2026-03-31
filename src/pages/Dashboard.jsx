@@ -104,7 +104,19 @@ const Dashboard = () => {
 
   const sidebarLinks = [
     { key: "dashboard", label: "Dashboard", icon: "dashboard", permission: true },
-    { key: "admission-view", label: "Admissions", icon: "person_add", permission: canAdmissionRead },
+    {
+      key: "admission-group",
+      label: "Admissions",
+      icon: "person_add",
+      permission: canAdmissionRead,
+      children: [
+        { key: "admission-view", label: "All Admissions", icon: "list_alt", permission: canAdmissionRead },
+        { key: "admission", label: "New Application", icon: "add_circle", permission: canAdmissionRead },
+        { key: "approval", label: "Approvals Queue", icon: "rule", permission: canAdmissionRead },
+        { key: "bulk-upload", label: "Bulk Upload", icon: "upload", permission: canAdmissionRead },
+        { key: "promotion", label: "Student Promotion", icon: "swap_horiz", permission: canAdmissionRead },
+      ],
+    },
     { key: "students", label: "Students", icon: "group", permission: canStudentRead },
     {
       key: "fees-group",
@@ -228,7 +240,10 @@ const Dashboard = () => {
                 return (
                   <button
                     key={child.key}
-                    onClick={() => setSelectedKey(child.key)}
+                    onClick={() => {
+                      if (child.key === "admission") setEditData(null);
+                      setSelectedKey(child.key);
+                    }}
                     className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2.5 transition-all text-sm ${
                       isActive
                         ? "bg-white dark:bg-primary-container text-primary dark:text-surface font-semibold shadow-sm"
