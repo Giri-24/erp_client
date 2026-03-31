@@ -418,7 +418,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
                 photoPath = record.documents.photoPath;
               }
               if (photoPath) {
-                return <img src={` http://192.168.0.100:3000/${photoPath.replace(/\\/g, '/')}`} alt="student" className="w-24 h-24 rounded-2xl object-cover border-2 border-white shadow-md" />;
+                return <img src={`/erp/api/${photoPath.replace(/\\/g, '/')}`} alt="student" className="w-24 h-24 rounded-2xl object-cover border-2 border-white shadow-md" />;
               }
               const initials = (record.name || '').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
               return <div className="avatar-initials w-24 h-24 text-2xl rounded-2xl">{initials || '?'}</div>;

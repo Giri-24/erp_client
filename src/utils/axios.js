@@ -18,8 +18,8 @@ instance.interceptors.response.use(
     if (error?.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      if (window.location.pathname !== '/') {
-        window.location.href = '/'
+      if (window.location.pathname !== '/erp/') {
+        window.location.href = '/erp/'
       }
       return Promise.reject(error)
     }
@@ -32,8 +32,8 @@ instance.interceptors.response.use(
       !error.response;
 
     if (isNetworkError) {
-      if (window.location.pathname !== '/server-down') {
-        window.location.href = '/server-down';
+      if (window.location.pathname !== '/erp/server-down') {
+        window.location.href = '/erp/server-down';
       }
     }
     return Promise.reject(error);

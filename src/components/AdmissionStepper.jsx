@@ -149,7 +149,7 @@ const AdmissionStepper = ({editData, clearEditData}) => {
             uid: "-1",
             name: "photo.jpg",
             status: "done",
-            url: doc.photoPath ? ` http://192.168.0.100:3000/${doc.photoPath}` : "https://via.placeholder.com/150", 
+            url: doc.photoPath ? `/erp/api/${doc.photoPath.replace(/\\/g, '/')}` : "https://via.placeholder.com/150", 
           },
         ];
       }
@@ -299,7 +299,7 @@ const getDefaultFile = (path, name = "file") => {
       uid: "-1",
       name,
       status: "done",
-      url: ` http://192.168.0.100:3000/${path}`,
+      url: `/erp/api/${path.replace(/\\/g, '/')}`,
     },
   ];
 };
