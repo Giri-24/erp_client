@@ -43,6 +43,11 @@ const ApprovalsView = () => {
   const [loading, setLoading] = useState(false);
   const [approvalLoading, setApprovalLoading] = useState({});
   const [statusFilter, setStatusFilter] = useState("pending");
+  const [standardFilter, setStandardFilter] = useState(undefined);
+  const [sectionFilter, setSectionFilter] = useState(undefined);
+  const [academicYearFilter, setAcademicYearFilter] = useState(undefined);
+  const [fatherNameFilter, setFatherNameFilter] = useState("");
+  const [siblingFilter, setSiblingFilter] = useState(undefined);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectRecord, setRejectRecord] = useState(null);
@@ -66,10 +71,33 @@ const ApprovalsView = () => {
   }, []);
 
   const filteredRows = useMemo(() => {
-    if (statusFilter === "all") return rows;
-    if (statusFilter === "approved") return rows.filter((r) => Boolean(r.admission?.isApproved));
-    return rows.filter((r) => !Boolean(r.admission?.isApproved));
-  }, [rows, statusFilter]);
+    let result = rows;
+    if (statusFilter === "approved") result = result.filter((r) => Boolean(r.admission?.isApproved));
+    else if (statusFilter === "pending") result = result.filter((r) => !Boolean(r.admission?.isApproved));
+    if (standardFilter) result = result.filter((r) => normalizeStandardValue(r.standard || r.admission?.standard) === normalizeStandardValue(standardFilter));
+    if (sectionFilter) result = result.filter((r) => r.section === sectionFilter);
+    if (academicYearFilter) result = result.filter((r) => r.academicYear === academicYearFilter);
+    if (fatherNameFilter) {
+      const q = fatherNameFilter.toLowerCase();
+      result = result.filter((r) => (r.family?.fatherName || "").toLowerCase().includes(q));
+    }
+    if (siblingFilter === "has") result = result.filter((r) => !!r.siblingGroupId);
+    else if (siblingFilter === "none") result = result.filter((r) => !r.siblingGroupId);
+    return result;
+  }, [rows, statusFilter, standardFilter, sectionFilter, academicYearFilter, fatherNameFilter, siblingFilter]);
+
+  const standardOptions = useMemo(() =>
+    Array.from(new Set(rows.map((r) => r.standard || r.admission?.standard).filter(Boolean))).sort(),
+    [rows]
+  );
+  const sectionOptions = useMemo(() =>
+    Array.from(new Set(rows.map((r) => r.section).filter(Boolean))).sort(),
+    [rows]
+  );
+  const academicYearOptions = useMemo(() =>
+    Array.from(new Set(rows.map((r) => r.academicYear).filter(Boolean))).sort(),
+    [rows]
+  );
 
   const handleApprove = async (record) => {
     try {
@@ -126,6 +154,26 @@ const ApprovalsView = () => {
       title: "Standard",
       width: 120,
       render: (_, record) => formatStandardLabel(record.standard || record.admission?.standard),
+    },
+    {
+      title: "Section",
+      width: 90,
+      render: (_, record) => record.section || "—",
+    },
+    {
+      title: "Academic Year",
+      width: 130,
+      render: (_, record) => record.academicYear || "—",
+    },
+    {
+      title: "Father Name",
+      width: 150,
+      render: (_, record) => record.family?.fatherName || "—",
+    },
+    {
+      title: "Sibling",
+      width: 90,
+      render: (_, record) => record.siblingGroupId ? <Tag color="blue">Yes</Tag> : "No",
     },
     {
       title: "Gender",
@@ -192,15 +240,57 @@ const ApprovalsView = () => {
       <Card
         title="Admission Approvals"
         extra={(
-          <Space>
+          <Space wrap>
             <Select
               value={statusFilter}
               onChange={setStatusFilter}
-              style={{ width: 140 }}
+              style={{ width: 120 }}
               options={[
                 { value: "pending", label: "Pending" },
                 { value: "approved", label: "Approved" },
                 { value: "all", label: "All" },
+              ]}
+            />
+            <Select
+              allowClear
+              placeholder="Standard"
+              style={{ width: 130 }}
+              value={standardFilter}
+              onChange={setStandardFilter}
+              options={standardOptions.map((v) => ({ label: formatStandardLabel(v), value: v }))}
+            />
+            <Select
+              allowClear
+              placeholder="Section"
+              style={{ width: 100 }}
+              value={sectionFilter}
+              onChange={setSectionFilter}
+              options={sectionOptions.map((v) => ({ label: v, value: v }))}
+            />
+            <Select
+              allowClear
+              placeholder="Academic Year"
+              style={{ width: 130 }}
+              value={academicYearFilter}
+              onChange={setAcademicYearFilter}
+              options={academicYearOptions.map((v) => ({ label: v, value: v }))}
+            />
+            <Input
+              allowClear
+              placeholder="Father name..."
+              style={{ width: 150 }}
+              value={fatherNameFilter}
+              onChange={(e) => setFatherNameFilter(e.target.value)}
+            />
+            <Select
+              allowClear
+              placeholder="Sibling"
+              style={{ width: 120 }}
+              value={siblingFilter}
+              onChange={setSiblingFilter}
+              options={[
+                { label: "Has Sibling", value: "has" },
+                { label: "No Sibling", value: "none" },
               ]}
             />
             <Button icon={<ReloadOutlined />} onClick={fetchAdmissions}>

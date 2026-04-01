@@ -41,6 +41,9 @@ const FeesViewPage = () => {
   const [academicYearOptions, setAcademicYearOptions] = useState([]);
   const [search, setSearch] = useState("");
   const [standardFilter, setStandardFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [fatherNameFilter, setFatherNameFilter] = useState("");
+  const [siblingFilter, setSiblingFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
 
@@ -88,14 +91,23 @@ const FeesViewPage = () => {
     [fees]
   );
 
+  const sectionOptions = useMemo(() =>
+    Array.from(new Set(fees.map((f) => f.student?.section).filter(Boolean))).sort(),
+    [fees]
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return fees.filter((f) => {
       if (standardFilter && f.student?.standard !== standardFilter) return false;
+      if (sectionFilter && f.student?.section !== sectionFilter) return false;
+      if (fatherNameFilter && !(f.student?.family?.fatherName || "").toLowerCase().includes(fatherNameFilter.toLowerCase())) return false;
+      if (siblingFilter === "has" && !f.student?.siblingGroupId) return false;
+      if (siblingFilter === "none" && f.student?.siblingGroupId) return false;
       if (q && !(f.student?.name || "").toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [fees, search, standardFilter]);
+  }, [fees, search, standardFilter, sectionFilter, fatherNameFilter, siblingFilter]);
 
   // ── summary stats ─────────────────────────────────────────────────────
   const summary = useMemo(() => ({
@@ -261,6 +273,54 @@ const FeesViewPage = () => {
                 </div>
               </div>
 
+              {/* Section */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-on-surface-variant px-1 uppercase tracking-tight">Section</label>
+                <div className="relative">
+                  <select
+                    value={sectionFilter}
+                    onChange={(e) => { setSectionFilter(e.target.value); setPage(1); }}
+                    className="appearance-none bg-surface-container-low border-none rounded-xl px-4 py-2.5 pr-10 text-sm font-bold text-primary focus:ring-2 focus:ring-primary outline-none min-w-[120px]"
+                  >
+                    <option value="">All Sections</option>
+                    {sectionOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant pointer-events-none text-base">filter_list</span>
+                </div>
+              </div>
+
+              {/* Father Name */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-on-surface-variant px-1 uppercase tracking-tight">Father Name</label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-base">person</span>
+                  <input
+                    type="text"
+                    value={fatherNameFilter}
+                    onChange={(e) => { setFatherNameFilter(e.target.value); setPage(1); }}
+                    placeholder="Father name..."
+                    className="bg-surface-container-low border-none rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium text-primary focus:ring-2 focus:ring-primary outline-none min-w-[160px]"
+                  />
+                </div>
+              </div>
+
+              {/* Sibling */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-on-surface-variant px-1 uppercase tracking-tight">Sibling</label>
+                <div className="relative">
+                  <select
+                    value={siblingFilter}
+                    onChange={(e) => { setSiblingFilter(e.target.value); setPage(1); }}
+                    className="appearance-none bg-surface-container-low border-none rounded-xl px-4 py-2.5 pr-10 text-sm font-bold text-primary focus:ring-2 focus:ring-primary outline-none min-w-[130px]"
+                  >
+                    <option value="">All</option>
+                    <option value="has">Has Sibling</option>
+                    <option value="none">No Sibling</option>
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant pointer-events-none text-base">expand_more</span>
+                </div>
+              </div>
+
               {/* Search */}
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-on-surface-variant px-1 uppercase tracking-tight">Search</label>
@@ -289,8 +349,8 @@ const FeesViewPage = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low">
-                  {["Student Name", "Standard", "Total Fee", "Discount", "Net Fee", "Paid", "Status", ""].map((h, i) => (
-                    <th key={h || i} className={`px-6 py-4 text-[10px] font-extrabold text-on-surface-variant uppercase tracking-wider ${i === 7 ? "text-right" : ""}`}>
+                  {["Student Name", "Standard", "Section", "Father Name", "Sibling", "Total Fee", "Discount", "Net Fee", "Paid", "Status", ""].map((h, i) => (
+                    <th key={h || i} className={`px-6 py-4 text-[10px] font-extrabold text-on-surface-variant uppercase tracking-wider ${i === 10 ? "text-right" : ""}`}>
                       {h}
                     </th>
                   ))}
@@ -299,7 +359,7 @@ const FeesViewPage = () => {
               <tbody className="divide-y divide-surface-container">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-16 text-center text-on-surface-variant">
+                    <td colSpan={11} className="px-6 py-16 text-center text-on-surface-variant">
                       <div className="flex flex-col items-center gap-3">
                         <span className="material-symbols-outlined text-4xl animate-spin opacity-30">refresh</span>
                         <p className="text-sm">Loading fee data...</p>
@@ -308,7 +368,7 @@ const FeesViewPage = () => {
                   </tr>
                 ) : pagedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-16 text-center text-on-surface-variant">
+                    <td colSpan={11} className="px-6 py-16 text-center text-on-surface-variant">
                       <span className="material-symbols-outlined text-4xl block mb-2 opacity-25">payments</span>
                       <p className="text-sm font-medium">No records found</p>
                     </td>
@@ -341,6 +401,19 @@ const FeesViewPage = () => {
 
                         {/* Standard */}
                         <td className="px-6 py-5 font-bold text-sm text-on-surface">{std}</td>
+
+                        {/* Section */}
+                        <td className="px-6 py-5 text-sm font-medium text-on-surface">{f.student?.section || "—"}</td>
+
+                        {/* Father Name */}
+                        <td className="px-6 py-5 text-sm font-medium text-on-surface">{f.student?.family?.fatherName || "—"}</td>
+
+                        {/* Sibling */}
+                        <td className="px-6 py-5 text-sm">
+                          {f.student?.siblingGroupId
+                            ? <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">Yes</span>
+                            : <span className="text-on-surface-variant">—</span>}
+                        </td>
 
                         {/* Total */}
                         <td className="px-6 py-5 text-sm font-medium">{fmt(f.totalFee)}</td>

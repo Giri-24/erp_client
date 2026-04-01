@@ -41,6 +41,15 @@ import PFESIPage from "../modules/hr/pages/PFESIPage";
 import ESSLSyncPage from "../modules/hr/pages/ESSLSyncPage";
 import PayrollPage from "../modules/hr/pages/PayrollPage";
 
+import POSDashboardPage from "../modules/pos/pages/POSDashboardPage";
+import StoreItemsPage from "../modules/pos/pages/StoreItemsPage";
+import SalesPage from "../modules/pos/pages/SalesPage";
+import PurchasesPage from "../modules/pos/pages/PurchasesPage";
+import StockTransferPage from "../modules/pos/pages/StockTransferPage";
+import StaffAllowancePage from "../modules/pos/pages/StaffAllowancePage";
+import IncomeExpensePage from "../modules/pos/pages/IncomeExpensePage";
+import DocRequestPage from "../modules/doc-request/pages/DocRequestPage";
+
 import { hasPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions";
 
 const Dashboard = () => {
@@ -74,6 +83,13 @@ const Dashboard = () => {
   const canHRStatutory = hasPermission(PERMISSIONS.HR_STATUTORY_READ);
   const canHRESSL = hasPermission(PERMISSIONS.HR_ESSL_READ);
   const canHRPayroll = hasPermission(PERMISSIONS.HR_PAYROLL_READ);
+
+  const canPOSDashboard = hasPermission(PERMISSIONS.POS_DASHBOARD);
+  const canPOSRead = hasPermission(PERMISSIONS.POS_READ);
+  const canPOSManage = hasPermission(PERMISSIONS.POS_MANAGE);
+  const canPOSSell = hasPermission(PERMISSIONS.POS_SELL);
+  const canPOSPurchase = hasPermission(PERMISSIONS.POS_PURCHASE);
+  const canDocRequest = hasPermission(PERMISSIONS.DOC_REQUEST_READ);
 
   const onLogout = () => {
     Modal.confirm({
@@ -160,6 +176,30 @@ const Dashboard = () => {
         { key: "hr-payroll", label: "Payroll", icon: "payments", permission: canHRPayroll },
       ],
     },
+    {
+      key: "pos-group",
+      label: "Store / POS",
+      icon: "storefront",
+      permission: canPOSDashboard || canPOSRead,
+      children: [
+        { key: "pos-dashboard", label: "Dashboard", icon: "space_dashboard", permission: canPOSDashboard || canPOSRead },
+        { key: "pos-items", label: "Items & Stores", icon: "inventory_2", permission: canPOSRead },
+        { key: "pos-sales", label: "Sales (POS)", icon: "point_of_sale", permission: canPOSSell },
+        { key: "pos-purchases", label: "Purchases", icon: "add_shopping_cart", permission: canPOSPurchase },
+        { key: "pos-transfers", label: "Stock & Transfer", icon: "swap_horiz", permission: canPOSManage },
+        { key: "pos-teacher-allowance", label: "Staff Allowance", icon: "redeem", permission: canPOSManage },
+        { key: "pos-transactions", label: "Income / Expense", icon: "receipt_long", permission: canPOSManage },
+      ],
+    },
+    {
+      key: "doc-group",
+      label: "Documents",
+      icon: "description",
+      permission: canDocRequest,
+      children: [
+        { key: "doc-requests", label: "Issue Desk", icon: "assignment", permission: canDocRequest },
+      ],
+    },
   ];
 
   const isChildSelected = (children) => children?.some((c) => c.key === selectedKey);
@@ -198,6 +238,14 @@ const Dashboard = () => {
       case "hr-pf-esi":           return <PFESIPage />;
       case "hr-essl":             return <ESSLSyncPage />;
       case "hr-payroll":          return <PayrollPage />;
+      case "pos-dashboard":       return <POSDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
+      case "pos-items":           return <StoreItemsPage />;
+      case "pos-sales":           return <SalesPage />;
+      case "pos-purchases":       return <PurchasesPage />;
+      case "pos-transfers":       return <StockTransferPage />;
+      case "pos-teacher-allowance": return <StaffAllowancePage />;
+      case "pos-transactions":    return <IncomeExpensePage />;
+      case "doc-requests":        return <DocRequestPage />;
       default:                    return <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
     }
   };

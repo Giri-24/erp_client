@@ -27,6 +27,7 @@ const initials = (name = "") => {
 const StudentView = () => {
   const [students, setStudents] = useState([]);
   const [classFilter, setClassFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(1);
@@ -57,10 +58,16 @@ const StudentView = () => {
     [students]
   );
 
+  const sectionOptions = useMemo(() =>
+    Array.from(new Set(students.map((s) => s.section).filter(Boolean))).sort(),
+    [students]
+  );
+
   const filtered = useMemo(() => {
     const q = searchText.trim().toLowerCase();
     return students.filter((s) => {
       if (classFilter && (s.standard || s.admission?.standard) !== classFilter) return false;
+      if (sectionFilter && (s.section || "") !== sectionFilter) return false;
       if (genderFilter && (s.gender || "").toLowerCase() !== genderFilter) return false;
       if (q) {
         const blob = [
@@ -71,7 +78,7 @@ const StudentView = () => {
       }
       return true;
     });
-  }, [students, classFilter, genderFilter, searchText]);
+  }, [students, classFilter, sectionFilter, genderFilter, searchText]);
 
   // ── summary stats ─────────────────────────────────────────────────────────
   const totalEnrollment = students.length;
@@ -202,6 +209,21 @@ const StudentView = () => {
               <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">expand_more</span>
             </div>
 
+            {/* Section select */}
+            <div className="relative">
+              <select
+                value={sectionFilter}
+                onChange={(e) => { setSectionFilter(e.target.value); setPage(1); }}
+                className="bg-white border-none rounded-xl py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm cursor-pointer appearance-none min-w-[120px]"
+              >
+                <option value="">All Sections</option>
+                {sectionOptions.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">expand_more</span>
+            </div>
+
             {/* Gender select */}
             <div className="relative">
               <select
@@ -218,9 +240,9 @@ const StudentView = () => {
             </div>
 
             {/* Clear */}
-            {(classFilter || genderFilter || searchText) && (
+            {(classFilter || sectionFilter || genderFilter || searchText) && (
               <button
-                onClick={() => { setClassFilter(""); setGenderFilter(""); setSearchText(""); setPage(1); }}
+                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setSearchText(""); setPage(1); }}
                 className="h-[46px] px-4 flex items-center gap-1 bg-surface-container-highest rounded-xl text-on-surface-variant hover:text-error hover:bg-error-container transition-all text-sm font-medium"
               >
                 <span className="material-symbols-outlined text-base">close</span>
@@ -239,6 +261,8 @@ const StudentView = () => {
                 <th className="py-4 px-5">Admission No</th>
                 <th className="py-4 px-5">Student Name</th>
                 <th className="py-4 px-5">Standard</th>
+                <th className="py-4 px-5">Section</th>
+                <th className="py-4 px-5">Academic Year</th>
                 <th className="py-4 px-5">Gender</th>
                 <th className="py-4 px-5">DOB</th>
                 <th className="py-4 px-5">Father Name</th>
@@ -249,7 +273,7 @@ const StudentView = () => {
             <tbody className="divide-y divide-surface-variant/10">
               {pagedRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-16 text-center text-on-surface-variant">
+                  <td colSpan={11} className="py-16 text-center text-on-surface-variant">
                     <span className="material-symbols-outlined text-4xl block mb-2 opacity-25">group</span>
                     <p className="text-sm font-medium">No students found</p>
                     <p className="text-xs mt-1 opacity-60">Try adjusting the filters above</p>
@@ -299,6 +323,12 @@ const StudentView = () => {
                         <td className="py-5 px-5">
                           <span className="bg-surface-container-high px-2.5 py-1 rounded-full text-[11px] font-bold">{std}</span>
                         </td>
+
+                        {/* Section */}
+                        <td className="py-5 px-5 text-sm text-on-surface-variant">{s.section || "—"}</td>
+
+                        {/* Academic Year */}
+                        <td className="py-5 px-5 text-sm text-on-surface-variant">{s.academicYear || "—"}</td>
 
                         {/* Gender */}
                         <td className="py-5 px-5 text-sm text-on-surface-variant capitalize">{s.gender || "—"}</td>
