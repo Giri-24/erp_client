@@ -155,6 +155,7 @@ const ApprovalsView = () => {
     {
       title: "Note",
       dataIndex: ["admission", "approvalNote"],
+      width: 200,
       render: (v) => v || "-",
     },
     {
@@ -213,7 +214,7 @@ const ApprovalsView = () => {
           loading={loading}
           columns={columns}
           dataSource={filteredRows}
-          scroll={{ x: 1200 }}
+          // scroll={{ x: 1200 }}
           pagination={{ pageSize: 10 }}
         />
       </Card>

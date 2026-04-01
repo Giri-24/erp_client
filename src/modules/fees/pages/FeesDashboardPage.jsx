@@ -12,6 +12,7 @@ import {
 } from "antd";
 import {
   PrinterOutlined,
+  DownloadOutlined,
 } from "@ant-design/icons";
 import { getFeesDashboard, getDailyCollection, getAcademicYears } from "../fees.service";
 import dayjs from "dayjs";
@@ -66,6 +67,52 @@ const FeesDashboardPage = () => {
   useEffect(() => {
     if (academicYear) fetchDashboard();
   }, [academicYear]);
+
+  const exportByStandardCSV = () => {
+    if (!dashboard?.byStandard) return;
+    const headers = ["Standard", "Students", "Assigned", "Collected", "Pending"];
+    const rows = Object.entries(dashboard.byStandard).map(([standard, vals]) => [
+      standard,
+      vals.count,
+      vals.assigned,
+      vals.collected,
+      vals.pending,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `fees_by_standard_${academicYear}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportDailyCSV = () => {
+    if (!dailyData?.payments) return;
+    const headers = ["Student", "Admission No", "Standard", "Amount", "Mode", "Receipt", "Time"];
+    const rows = dailyData.payments.map(p => [
+      p.studentFee?.student?.name || "-",
+      p.studentFee?.student?.admissions?.[0]?.admissionNo || "-",
+      p.studentFee?.student?.standard || "-",
+      p.amount,
+      p.paymentMode,
+      p.receiptNo || "-",
+      new Date(p.paymentDate).toLocaleTimeString(),
+    ]);
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `daily_collection_${dailyData.date}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const standardColumns = [
     { title: "Standard", dataIndex: "standard", key: "standard", render: (v) => <span style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 700, color: '#00152a' }}>{v}</span> },
@@ -235,9 +282,18 @@ const FeesDashboardPage = () => {
           {/* By Standard Table */}
           <div style={{ background: '#f0f4f8', borderRadius: 16, padding: 4, marginBottom: 24 }}>
             <div style={{ background: '#fff', borderRadius: 14, padding: 28 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <span style={{ width: 3, height: 28, background: '#00152a', borderRadius: 9999, display: 'inline-block' }} />
-                <h4 style={{ fontFamily: "'Manrope',sans-serif", fontSize: 18, fontWeight: 800, color: '#00152a', margin: 0 }}>Fee Collection by Standard</h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ width: 3, height: 28, background: '#00152a', borderRadius: 9999, display: 'inline-block' }} />
+                  <h4 style={{ fontFamily: "'Manrope',sans-serif", fontSize: 18, fontWeight: 800, color: '#00152a', margin: 0 }}>Fee Collection by Standard</h4>
+                </div>
+                <Button 
+                  icon={<DownloadOutlined />} 
+                  onClick={exportByStandardCSV}
+                  style={{ borderRadius: 10, fontWeight: 600 }}
+                >
+                  Export CSV
+                </Button>
               </div>
               <Table
                 columns={standardColumns}
@@ -259,7 +315,16 @@ const FeesDashboardPage = () => {
               <span style={{ width: 3, height: 28, background: '#44ddc1', borderRadius: 9999, display: 'inline-block' }} />
               <h4 style={{ fontFamily: "'Manrope',sans-serif", fontSize: 18, fontWeight: 800, color: '#00152a', margin: 0 }}>Daily Collection</h4>
             </div>
-            <DatePicker defaultValue={dayjs()} onChange={(date) => fetchDaily(date)} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <Button 
+                icon={<DownloadOutlined />} 
+                onClick={exportDailyCSV}
+                style={{ borderRadius: 10, fontWeight: 600 }}
+              >
+                Export CSV
+              </Button>
+              <DatePicker defaultValue={dayjs()} onChange={(date) => fetchDaily(date)} />
+            </div>
           </div>
           {dailyData && (
             <>

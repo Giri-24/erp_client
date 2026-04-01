@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { message, Modal, Form, Input, InputNumber, Select, Radio, Alert, Space } from "antd";
+import { message, Modal, Form, Input, InputNumber, Select, Radio, Alert, Space, Checkbox, Table } from "antd";
 import { WhatsAppOutlined, MessageOutlined, LinkOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import {
   cancelPayment,
@@ -16,7 +16,7 @@ import {
 import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
 
 // ── helpers ────────────────────────────────────────────────────────────────
-const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN");
+const fmt = (v) => "₹" + Math.round(Number(v || 0)).toLocaleString("en-IN");
 
 const PAYMENT_MODES = [
   { value: "CASH", label: "Cash", icon: "payments" },
@@ -98,6 +98,8 @@ const CollectPaymentPage = () => {
   const [termNumber, setTermNumber] = useState(null);
   const [receiptComponents, setReceiptComponents] = useState([]);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitPayments, setSplitPayments] = useState([]);
 
   const canCollectFee = hasPermission(PERMISSIONS.FEES_COLLECT);
 
@@ -159,23 +161,72 @@ const CollectPaymentPage = () => {
     } catch { setPaymentLinks([]); }
   };
 
+  // When a fee is selected, pre-fill splitPayments with pending terms
+  useEffect(() => {
+    if (splitMode && selectedFee?.terms?.length > 0) {
+      setSplitPayments(
+        selectedFee.terms
+          .filter((t) => t.status !== "PAID")
+          .map((t) => ({
+            termNumber: t.termNumber,
+            amount: "",
+            termName: t.termName,
+            pending: Math.round(t.amount - (payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0)),
+          }))
+      );
+    }
+  }, [splitMode, selectedFee, payments]);
+
   const handleCollect = async () => {
     if (!canCollectFee) { message.error("You are not authorized to collect payments"); return; }
     if (!selectedFee) { message.error("Please select a student"); return; }
-    if (!amount || Number(amount) <= 0) { message.error("Please enter an amount"); return; }
-    if (selectedFee.terms?.length > 0 && !termNumber) { message.error("Please select a term"); return; }
+    
+    if (!splitMode) {
+      if (!amount || Number(amount) <= 0) { message.error("Please enter an amount"); return; }
+      if (selectedFee.terms?.length > 0 && !termNumber) { message.error("Please select a term"); return; }
+    }
 
     setLoading(true);
     try {
-      const payload = {
-        studentFeeId: selectedFee.id,
-        amount: Number(amount),
-        paymentMode,
-        receiptNo,
-        remarks,
-        termNumber: termNumber || undefined,
-        receiptComponents,
-      };
+      let payload;
+      if (splitMode) {
+        const paymentsArr = splitPayments
+          .filter((p) => Number(p.amount) > 0)
+          .map((p) => ({ termNumber: p.termNumber, amount: Number(p.amount) }));
+        const total = paymentsArr.reduce((s, p) => s + p.amount, 0);
+        
+        if (!paymentsArr.length) { 
+          message.error("Enter at least one term payment"); 
+          setLoading(false);
+          return; 
+        }
+        if (total <= 0) { 
+          message.error("Total amount must be positive"); 
+          setLoading(false);
+          return; 
+        }
+        
+        payload = {
+          studentFeeId: selectedFee.id,
+          amount: total,
+          paymentMode,
+          receiptNo,
+          remarks,
+          payments: paymentsArr,
+          receiptComponents,
+        };
+      } else {
+        payload = {
+          studentFeeId: selectedFee.id,
+          amount: Math.round(Number(amount)),
+          paymentMode,
+          receiptNo,
+          remarks,
+          termNumber: termNumber || undefined,
+          receiptComponents,
+        };
+      }
+
       const result = await collectPayment(payload);
       message.success("Payment collected successfully!");
 
@@ -205,6 +256,8 @@ const CollectPaymentPage = () => {
       setAmount("");
       setRemarks("");
       setTermNumber(null);
+      setSplitMode(false);
+      setSplitPayments([]);
       await fetchReceiptNo();
 
       // refresh
@@ -413,30 +466,6 @@ const CollectPaymentPage = () => {
                 </div>
               </div>
             </div>
-
-            {/* Term selector (if applicable) */}
-            {selectedFee?.terms?.length > 0 && (
-              <div className="mt-4 space-y-1.5">
-                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Term</label>
-                <div className="flex gap-2 flex-wrap">
-                  {selectedFee.terms.map((t) => (
-                    <button
-                      key={t.termNumber}
-                      type="button"
-                      onClick={() => setTermNumber(t.termNumber)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                        termNumber === t.termNumber
-                          ? "bg-primary text-white"
-                          : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-                      }`}
-                    >
-                      {t.termName} — {fmt(t.amount)}
-                      {t.status && <span className="ml-1 opacity-60">({t.status})</span>}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </section>
 
           {/* Section 2: Payment transaction */}
@@ -452,21 +481,130 @@ const CollectPaymentPage = () => {
               </div>
             </div>
 
+            {/* Term selection moved from Section 1 for better flow */}
+            {selectedFee?.terms?.length > 0 && (
+              <div className="mb-8 p-6 bg-surface-container-low rounded-2xl border border-outline-variant/30">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm text-primary">account_tree</span>
+                    <label className="text-[11px] font-extrabold text-primary uppercase tracking-widest">Term Distribution</label>
+                  </div>
+                  <Checkbox 
+                    checked={splitMode} 
+                    onChange={e => {
+                      setSplitMode(e.target.checked);
+                      if (e.target.checked) setTermNumber(null);
+                    }}
+                    className="text-primary font-bold text-xs"
+                  >
+                    Split Payment Across Terms
+                  </Checkbox>
+                </div>
+
+                {!splitMode ? (
+                  <div className="flex gap-2 flex-wrap">
+                    {selectedFee.terms.map((t) => {
+                      const paid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                      const balance = Math.round(t.amount - paid);
+                      const isPaid = t.status === "PAID" || balance <= 0;
+                      
+                      return (
+                        <button
+                          key={t.termNumber}
+                          type="button"
+                          onClick={() => {
+                            setTermNumber(t.termNumber);
+                            setAmount(balance.toString());
+                          }}
+                          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${
+                            termNumber === t.termNumber
+                              ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-[1.02]"
+                              : isPaid
+                              ? "bg-green-50 text-green-700 border-green-100 cursor-not-allowed opacity-60"
+                              : "bg-white text-on-surface-variant border-surface-container-highest hover:border-primary/30 hover:bg-surface-bright"
+                          }`}
+                          disabled={isPaid}
+                        >
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span>{t.termName}</span>
+                            <span className={`text-[10px] opacity-70 ${termNumber === t.termNumber ? "text-white/80" : ""}`}>
+                              {isPaid ? "Paid" : `Bal: ${fmt(balance)}`}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl border border-outline-variant/50 overflow-hidden shadow-sm">
+                    <Table
+                      dataSource={splitPayments}
+                      columns={[
+                        { 
+                          title: "Term", 
+                          dataIndex: "termName",
+                          render: (v) => <span className="font-bold text-primary text-xs">{v}</span>
+                        },
+                        { 
+                          title: "Pending", 
+                          dataIndex: "pending", 
+                          render: v => <span className="text-xs font-medium text-on-surface-variant">{fmt(v)}</span> 
+                        },
+                        {
+                          title: "Amount",
+                          dataIndex: "amount",
+                          width: 140,
+                          render: (v, row, idx) => (
+                            <InputNumber
+                              min={0}
+                              max={row.pending}
+                              value={v}
+                              placeholder="0.00"
+                              variant="filled"
+                              style={{ width: '100%' }}
+                              className="text-xs font-bold"
+                              onChange={val => {
+                                const next = [...splitPayments];
+                                next[idx].amount = val;
+                                setSplitPayments(next);
+                              }}
+                            />
+                          ),
+                        },
+                      ]}
+                      pagination={false}
+                      rowKey="termNumber"
+                      size="small"
+                      className="split-payment-table"
+                    />
+                    <div className="p-3 bg-surface-container-highest/30 flex justify-between items-center border-t border-outline-variant/50">
+                      <span className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">Distributed Total</span>
+                      <p className="text-sm font-black text-primary">
+                        {fmt(splitPayments.reduce((s, p) => s + Number(p.amount || 0), 0))}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-5 mb-6">
               {/* Amount */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
-                  Amount to Collect (₹)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-xl font-headline font-bold text-primary focus:bg-surface-container-highest transition-colors outline-none"
-                />
-              </div>
+              {!splitMode && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                    Amount to Collect (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-xl font-headline font-bold text-primary focus:bg-surface-container-highest transition-colors outline-none"
+                  />
+                </div>
+              )}
 
               {/* Payment mode */}
               <div className="space-y-1.5">
@@ -589,7 +727,7 @@ const CollectPaymentPage = () => {
             </h3>
 
             {selectedFee ? (
-              <div className="space-y-3">
+              <div className="space-y-3 text-white">
                 {[
                   { label: "Total Fee", val: selectedFee.totalFee },
                   { label: "Discount", val: selectedFee.discount, negative: true },
@@ -599,8 +737,8 @@ const CollectPaymentPage = () => {
                   <React.Fragment key={label}>
                     {divider && <div className="h-px bg-white/10 my-1" />}
                     <div className="flex justify-between items-center text-on-primary-container/80">
-                      <span className="text-sm">{label}</span>
-                      <span className="font-bold">{negative ? "− " : ""}{fmt(val)}</span>
+                      <span className="text-sm text-white-dim">{label}</span>
+                      <span className="font-bold text-white">{negative ? "− " : ""}{fmt(val)}</span>
                     </div>
                   </React.Fragment>
                 ))}

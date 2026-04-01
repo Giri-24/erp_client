@@ -49,6 +49,7 @@ const emptyForm = {
 };
 
 // ── component ─────────────────────────────────────────────────────────────
+
 const FeeStructurePage = () => {
   const [structures, setStructures] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -64,6 +65,9 @@ const FeeStructurePage = () => {
 
   // delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // Ref for form scroll
+  const formRef = React.useRef(null);
 
   const canCreate = hasPermission(PERMISSIONS.FEES_STRUCTURE_CREATE);
   const canUpdate = hasPermission(PERMISSIONS.FEES_STRUCTURE_UPDATE);
@@ -106,6 +110,12 @@ const FeeStructurePage = () => {
       })),
     });
     setViewStructure(null);
+    // Scroll to form
+    setTimeout(() => {
+      if (formRef.current) {
+        formRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 100);
   };
 
   const resetForm = () => {
@@ -288,7 +298,7 @@ const FeeStructurePage = () => {
           )}
 
           {/* ── CREATE / EDIT form ── */}
-          <div className="bg-surface-container-low rounded-2xl p-8 relative overflow-hidden">
+          <div ref={formRef} className="bg-surface-container-low rounded-2xl p-8 relative overflow-hidden">
             <div className="relative z-10">
               {/* Header */}
               <div className="flex items-center gap-4 mb-8">
