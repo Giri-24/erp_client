@@ -104,6 +104,8 @@ const AdmissionStepper = ({editData, clearEditData}) => {
         identityMark1: editData.identification1,
         identityMark2: editData.identification2,
         previouslyStudied: editData.previousSchool,
+        section: editData.section || undefined,
+        academicYear: editData.academicYear || undefined,
         vanNeeded: editData.transportMode === "Van" ? true : false,
         
         fatherName: editData.family?.fatherName,
@@ -140,6 +142,16 @@ const AdmissionStepper = ({editData, clearEditData}) => {
       if (doc.communityCert) docSelection.push("communityCert");
       if (doc.aadharStudent) docSelection.push("aadharStudent");
       flatData.documents = docSelection;
+
+      // Handle hard copy flags
+      const hardCopySelection = [];
+      if (doc.birthCertHardCopy) hardCopySelection.push("birthCert");
+      if (doc.communityCertHardCopy) hardCopySelection.push("communityCert");
+      if (doc.aadharStudentHardCopy) hardCopySelection.push("aadharStudent");
+      if (doc.aadharFatherHardCopy) hardCopySelection.push("aadharFather");
+      if (doc.aadharMotherHardCopy) hardCopySelection.push("aadharMother");
+      if (doc.transferCertHardCopy) hardCopySelection.push("transferCert");
+      flatData.hardCopyDocs = hardCopySelection;
 
       // Handle photo structure assuming we are getting a valid image config
       if (doc.photo || doc.photoPath) {
@@ -377,6 +389,27 @@ const getDefaultFile = (path, name = "file") => {
           <Col span={12}><Form.Item name="identityMark1" label="Identity Mark 1" rules={[requiredRule]}><Input /></Form.Item></Col>
           <Col span={12}><Form.Item name="identityMark2" label="Identity Mark 2" rules={[requiredRule]}><Input /></Form.Item></Col>
           <Col span={12}><Form.Item name="previouslyStudied" label="Previously Studied" rules={[requiredRule]}><Input /></Form.Item></Col>
+          <Col span={12}>
+            <Form.Item name="section" label="Section">
+              <Select placeholder="Select section" allowClear>
+                <Select.Option value="A">A</Select.Option>
+                <Select.Option value="B">B</Select.Option>
+                <Select.Option value="C">C</Select.Option>
+                <Select.Option value="D">D</Select.Option>
+                <Select.Option value="E">E</Select.Option>
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item name="academicYear" label="Academic Year">
+              <Select placeholder="Select academic year" allowClear>
+                <Select.Option value="2024-2025">2024-2025</Select.Option>
+                <Select.Option value="2025-2026">2025-2026</Select.Option>
+                <Select.Option value="2026-2027">2026-2027</Select.Option>
+                <Select.Option value="2027-2028">2027-2028</Select.Option>
+              </Select>
+            </Form.Item>
+          </Col>
           <Col span={12}>
             <Form.Item name="vanNeeded" valuePropName="checked">
               <Checkbox>Transport Needed</Checkbox>
@@ -750,6 +783,19 @@ const getDefaultFile = (path, name = "file") => {
         </Checkbox.Group>
       </Form.Item>
 
+      {/* ✅ HARD COPY FLAGS */}
+      <Divider orientation="left" style={{ fontSize: 13 }}>Hard Copy Received (mark if physical document is submitted)</Divider>
+      <Form.Item name="hardCopyDocs" label="Hard Copy Documents">
+        <Checkbox.Group>
+          <Checkbox value="birthCert">Birth Certificate</Checkbox>
+          <Checkbox value="communityCert">Community Certificate</Checkbox>
+          <Checkbox value="aadharStudent">Aadhar (Student)</Checkbox>
+          <Checkbox value="aadharFather">Aadhar (Father)</Checkbox>
+          <Checkbox value="aadharMother">Aadhar (Mother)</Checkbox>
+          <Checkbox value="transferCert">Transfer Certificate</Checkbox>
+        </Checkbox.Group>
+      </Form.Item>
+
       {/* ✅ BIRTH CERT */}
       {documentsChecked?.includes("birthCert") && (
         <Form.Item
@@ -1106,13 +1152,20 @@ const generatePDF = async () => {
 
                     // Build the documents array
                     const documents = [];
+                    const hardCopyDocs = values.hardCopyDocs || [];
                     // Profile photo
                     if (values.profilePhotoChecked) {
                       documents.push({ key: "profilePhoto", photoPath: "" }); // backend will set photoPath
                     }
-                    // Other documents
+                    // Other documents (with hardCopy flag)
                     (values.documentsChecked || []).forEach(docKey => {
-                      documents.push({ key: docKey, photoPath: "" });
+                      documents.push({ key: docKey, photoPath: "", hardCopy: hardCopyDocs.includes(docKey) });
+                    });
+                    // Hard-copy only docs (not in documentsChecked but marked as hard copy)
+                    hardCopyDocs.forEach(docKey => {
+                      if (!(values.documentsChecked || []).includes(docKey)) {
+                        documents.push({ key: docKey, uploaded: false, hardCopy: true });
+                      }
                     });
 
                     // Build the main data object
@@ -1132,6 +1185,8 @@ const generatePDF = async () => {
                       identification2: values.identityMark2,
                       previousSchool: values.previouslyStudied,
                       transportMode: values.vanNeeded ? "Van" : "Local",
+                      section: values.section || undefined,
+                      academicYear: values.academicYear || undefined,
                       family: {
                         fatherName: values.fatherName,
                         fatherPhone: values.fatherPhone,

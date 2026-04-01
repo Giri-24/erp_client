@@ -30,6 +30,10 @@ const TransportViewPage = () => {
   const [loading, setLoading] = useState(false);
   const [academicYear, setAcademicYear] = useState("");
   const [search, setSearch] = useState("");
+  const [standardFilter, setStandardFilter] = useState(undefined);
+  const [sectionFilter, setSectionFilter] = useState(undefined);
+  const [fatherNameFilter, setFatherNameFilter] = useState("");
+  const [siblingFilter, setSiblingFilter] = useState(undefined);
   const [editing, setEditing] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -108,13 +112,22 @@ const TransportViewPage = () => {
 
   const filtered = assignments.filter((a) => {
     const q = search.toLowerCase();
-    return (
+    const matchesSearch =
       (a.student?.name || "").toLowerCase().includes(q) ||
       (a.student?.standardLabel || a.student?.standard || "").toLowerCase().includes(q) ||
       (a.route?.routeName || "").toLowerCase().includes(q) ||
-      (a.route?.routeNo || "").toLowerCase().includes(q)
-    );
+      (a.route?.routeNo || "").toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+    if (standardFilter && (a.student?.standardLabel || a.student?.standard) !== standardFilter) return false;
+    if (sectionFilter && a.student?.section !== sectionFilter) return false;
+    if (fatherNameFilter && !(a.student?.family?.fatherName || "").toLowerCase().includes(fatherNameFilter.toLowerCase())) return false;
+    if (siblingFilter === "has" && !a.student?.siblingGroupId) return false;
+    if (siblingFilter === "none" && a.student?.siblingGroupId) return false;
+    return true;
   });
+
+  const standardOptions = Array.from(new Set(assignments.map((a) => a.student?.standardLabel || a.student?.standard).filter(Boolean))).sort();
+  const sectionOptions = Array.from(new Set(assignments.map((a) => a.student?.section).filter(Boolean))).sort();
 
   const columns = [
     {
@@ -125,6 +138,18 @@ const TransportViewPage = () => {
     {
       title: "Standard",
       render: (_, r) => r.student?.standardLabel || r.student?.standard || "-",
+    },
+    {
+      title: "Section",
+      render: (_, r) => r.student?.section || "-",
+    },
+    {
+      title: "Father Name",
+      render: (_, r) => r.student?.family?.fatherName || "-",
+    },
+    {
+      title: "Sibling",
+      render: (_, r) => r.student?.siblingGroupId ? <Tag color="blue">Yes</Tag> : <Tag>No</Tag>,
     },
     {
       title: "Route",
@@ -185,17 +210,47 @@ const TransportViewPage = () => {
     <Card
       title="All Transport Assignments"
       extra={
-        <Space>
-          <Input
-            prefix={null}
-            style={{ display: "none" }}
-          />
+        <Space wrap>
           <Select
             value={academicYear || undefined}
             onChange={setAcademicYear}
             options={availableYears.map((year) => ({ label: year, value: year }))}
             style={{ width: 150 }}
             placeholder="Academic Year"
+          />
+          <Select
+            allowClear
+            placeholder="Standard"
+            style={{ width: 140 }}
+            value={standardFilter}
+            onChange={setStandardFilter}
+            options={standardOptions.map((s) => ({ label: s, value: s }))}
+          />
+          <Select
+            allowClear
+            placeholder="Section"
+            style={{ width: 110 }}
+            value={sectionFilter}
+            onChange={setSectionFilter}
+            options={sectionOptions.map((s) => ({ label: s, value: s }))}
+          />
+          <Input
+            allowClear
+            placeholder="Father name"
+            value={fatherNameFilter}
+            onChange={(e) => setFatherNameFilter(e.target.value)}
+            style={{ width: 160 }}
+          />
+          <Select
+            allowClear
+            placeholder="Sibling"
+            style={{ width: 130 }}
+            value={siblingFilter}
+            onChange={setSiblingFilter}
+            options={[
+              { label: "Has Sibling", value: "has" },
+              { label: "No Sibling", value: "none" },
+            ]}
           />
           <Button onClick={fetchData}>Load</Button>
           <Input

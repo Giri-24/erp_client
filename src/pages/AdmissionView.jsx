@@ -117,6 +117,9 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
   const [filterApproval, setFilterApproval] = useState(undefined);
   const [filterDate, setFilterDate] = useState([]);
   const [filterAcademicYear, setFilterAcademicYear] = useState(undefined);
+  const [filterSection, setFilterSection] = useState(undefined);
+  const [filterFatherName, setFilterFatherName] = useState("");
+  const [filterSibling, setFilterSibling] = useState(undefined);
   const [availableYears, setAvailableYears] = useState([]);
 
   const fetchAdmissions = async () => {
@@ -127,7 +130,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
         : (await instance.get("/admissions")).data;
       setData(rows);
       // Apply filters to initial data
-      applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, rows);
+      applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling, rows);
     } catch {
       message.error("Failed to load admissions");
     } finally {
@@ -170,7 +173,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
 
 
   // Combined filter
-  const applyFilters = (searchVal, std, gender, status, approval, dateRange, academicYear, sourceData = data) => {
+  const applyFilters = (searchVal, std, gender, status, approval, dateRange, academicYear, section, fatherName, sibling, sourceData = data) => {
     let filtered = sourceData.filter((item) => {
       // Search
       let matchesSearch = true;
@@ -207,6 +210,20 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
       if (academicYear) {
         matchesAcademicYear = item.admission?.academicYear === academicYear;
       }
+      // Section
+      let matchesSection = true;
+      if (section) {
+        matchesSection = item.section === section;
+      }
+      // Father Name
+      let matchesFatherName = true;
+      if (fatherName) {
+        matchesFatherName = (item.family?.fatherName || "").toLowerCase().includes(fatherName.toLowerCase());
+      }
+      // Sibling
+      let matchesSibling = true;
+      if (sibling === 'has') matchesSibling = !!item.siblingGroupId;
+      else if (sibling === 'none') matchesSibling = !item.siblingGroupId;
       // Admission Date
       let matchesDate = true;
       if (dateRange && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
@@ -216,7 +233,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
           matchesDate = d.isAfter(dateRange[0].startOf('day').subtract(1, 'ms')) && d.isBefore(dateRange[1].endOf('day').add(1, 'ms'));
         }
       }
-      return matchesSearch && matchesStd && matchesGender && matchesStatus && matchesApproval && matchesDate && matchesAcademicYear;
+      return matchesSearch && matchesStd && matchesGender && matchesStatus && matchesApproval && matchesDate && matchesAcademicYear && matchesSection && matchesFatherName && matchesSibling;
     });
     setFilteredData(filtered);
   };
@@ -224,31 +241,43 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
   // Handlers
   const handleSearch = (value) => {
     setSearchText(value);
-    applyFilters(value, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear);
+    applyFilters(value, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
   };
   const handleStandard = (value) => {
     setFilterStandard(value);
-    applyFilters(searchText, value, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear);
+    applyFilters(searchText, value, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
   };
   const handleGender = (value) => {
     setFilterGender(value);
-    applyFilters(searchText, filterStandard, value, filterStatus, filterApproval, filterDate, filterAcademicYear);
+    applyFilters(searchText, filterStandard, value, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
   };
   const handleStatus = (value) => {
     setFilterStatus(value);
-    applyFilters(searchText, filterStandard, filterGender, value, filterApproval, filterDate, filterAcademicYear);
+    applyFilters(searchText, filterStandard, filterGender, value, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
   };
   const handleApprovalFilter = (value) => {
     setFilterApproval(value);
-    applyFilters(searchText, filterStandard, filterGender, filterStatus, value, filterDate, filterAcademicYear);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, value, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
   };
   const handleDate = (dates) => {
     setFilterDate(dates);
-    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, dates, filterAcademicYear);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, dates, filterAcademicYear, filterSection, filterFatherName, filterSibling);
   };
   const handleAcademicYear = (value) => {
     setFilterAcademicYear(value);
-    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, value);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, value, filterSection, filterFatherName, filterSibling);
+  };
+  const handleSection = (value) => {
+    setFilterSection(value);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, value, filterFatherName, filterSibling);
+  };
+  const handleFatherName = (value) => {
+    setFilterFatherName(value);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, value, filterSibling);
+  };
+  const handleSibling = (value) => {
+    setFilterSibling(value);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, value);
   };
 
   const handleSetApproval = async (record, approved, reason) => {
@@ -262,7 +291,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
       await setAdmissionApproval(record.id, approved, reason);
       message.success(approved ? "Admission approved" : "Admission marked pending");
       await fetchAdmissions();
-      applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate);
+      applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
     } catch (err) {
       message.error(err?.response?.data?.message || "Failed to update approval");
     } finally {
@@ -295,7 +324,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
       message.success(`${result.updatedCount} admissions ${approved ? 'approved' : 'marked pending'}`);
       setSelectedRowKeys([]);
       await fetchAdmissions();
-      applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate);
+      applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
     } catch (err) {
       message.error(err?.response?.data?.message || 'Bulk approval failed');
     } finally {
@@ -516,6 +545,18 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
       render: (_, record) => formatStandardLabel(record.standard || record.admission?.standard),
     },
     { title: "Gender", dataIndex: "gender", width: 100 },
+    { title: "Section", dataIndex: "section", width: 100 },
+    { title: "Academic Year", dataIndex: ["admission", "academicYear"], width: 130 },
+    {
+      title: "Father Name",
+      width: 150,
+      render: (_, record) => record.family?.fatherName || "-",
+    },
+    {
+      title: "Sibling",
+      width: 100,
+      render: (_, record) => record.siblingGroupId ? <Tag color="blue">Yes</Tag> : <Tag>No</Tag>,
+    },
     {
       title: "Actions",
       fixed: "right",
@@ -653,6 +694,32 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
           options={[
             { label: "Approved", value: "approved" },
             { label: "Pending", value: "pending" },
+          ]}
+        />
+        <Select
+          allowClear
+          placeholder="Section"
+          style={{ width: 110 }}
+          value={filterSection}
+          onChange={handleSection}
+          options={getUnique(data, "section").map((v) => ({ label: v, value: v }))}
+        />
+        <Input
+          allowClear
+          placeholder="Father Name"
+          value={filterFatherName}
+          onChange={(e) => handleFatherName(e.target.value)}
+          style={{ width: 160, borderRadius: 9999, background: '#f0f4f8', border: 'none' }}
+        />
+        <Select
+          allowClear
+          placeholder="Sibling"
+          style={{ width: 130 }}
+          value={filterSibling}
+          onChange={handleSibling}
+          options={[
+            { label: "Has Sibling", value: "has" },
+            { label: "No Sibling", value: "none" },
           ]}
         />
         <DatePicker.RangePicker
