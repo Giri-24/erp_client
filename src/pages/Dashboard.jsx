@@ -236,14 +236,14 @@ const Dashboard = () => {
       case "admission-edit":      return <AdmissionEdit />;
       case "bulk-upload":         return <BulkUploadPage />;
       case "promotion":           return <PromotionPage />;
-      case "students":            return <StudentView onCollectFee={(studentId) => { setFeeStudentId(studentId); setSelectedKey("fees-assign"); }} />;
+      case "students":            return <StudentView onCollectFee={(studentId) => { setFeeStudentId(studentId); setSelectedKey("fees-collect"); }} />;
       case "approval":            return <ApprovalsView />;
       case "profile":             return <ProfilePage />;
       case "admin-settings":      return <AdminSettings />;
       case "fees-structure":      return <FeeStructurePage />;
       case "fees-assign":         return <AssignFeePage initialStudentId={feeStudentId} onMounted={() => setFeeStudentId(null)} />;
-      case "fees-collect":        return <CollectPaymentPage />;
-      case "fees-dashboard":      return <FeesDashboardPage />;
+case "fees-collect":
+  return <CollectPaymentPage studentId={feeStudentId} />;      case "fees-dashboard":      return <FeesDashboardPage />;
       case "fees-view":           return <FeesViewPage />;
       case "fees-refund-report":  return <RefundCancellationReportPage />;
       case "fees-ledger":          return <StudentFeeLedgerPage />;

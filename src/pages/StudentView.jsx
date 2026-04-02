@@ -3,6 +3,7 @@ import { Modal, Select, message } from "antd";
 import instance from "../utils/axios";
 import dayjs from "dayjs";
 import { linkSiblings } from "../modules/admission/admission.service";
+import { useNavigate } from "react-router-dom";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
@@ -12,6 +13,14 @@ const AVATAR_COLORS = [
   "bg-surface-container-highest text-on-surface",
   "bg-error-container text-error",
 ];
+
+
+
+const formatLabel = (text) => {
+  return text
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (str) => str.toUpperCase());
+};
 
 const avatarColor = (name = "") =>
   AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
@@ -25,6 +34,9 @@ const initials = (name = "") => {
 
 // ── component ─────────────────────────────────────────────────────────────
 const StudentView = ({ onCollectFee }) => {
+  const [feeModalOpen, setFeeModalOpen] = useState(false);
+const [selectedStudentId, setSelectedStudentId] = useState(null);
+const [fees, setFees] = useState([]);
   const [students, setStudents] = useState([]);
   const [classFilter, setClassFilter] = useState("");
   const [sectionFilter, setSectionFilter] = useState("");
@@ -367,8 +379,7 @@ const StudentView = ({ onCollectFee }) => {
                               <button
                                 title="Collect Fee"
                                 onClick={() => onCollectFee(s.id)}
-                                className="p-2 rounded-lg text-on-surface-variant hover:bg-[#44ddc1]/10 hover:text-[#001813] transition-colors"
-                              >
+                          >
                                 <span className="material-symbols-outlined text-lg">payments</span>
                               </button>
                             )}
@@ -562,7 +573,10 @@ const StudentView = ({ onCollectFee }) => {
             />
           </div>
         </div>
+        
       </Modal>
+
+      
     </div>
   );
 };

@@ -271,7 +271,30 @@ const documentsChecked = Form.useWatch("documentsChecked", form);
 const profilePhotoChecked = Form.useWatch("profilePhotoChecked", form);
 const watchedStandard = Form.useWatch("standard", form);
 const watchedSubjects = Form.useWatch("subjects", form) || [];
+
+useEffect(() => {
+  if (!watchedSubjects || watchedSubjects.length === 0) return;
+
+  let totalMax = 0;
+  let totalObtained = 0;
+
+  watchedSubjects.forEach((s) => {
+    totalMax += Number(s?.maxMarks) || 0;
+    totalObtained += Number(s?.obtainedMarks) || 0;
+  });
+
+  if (totalMax > 0) {
+    const percent = (totalObtained / totalMax) * 100;
+
+    form.setFieldsValue({
+      totalPercentage: Number(percent.toFixed(2)),
+    });
+  }
+}, [watchedSubjects]);
 const isHigherSecondary = watchedStandard === '11' || watchedStandard === '12';
+
+
+
 useEffect(() => {
   if (editData?.documents?.[0]) {
     const doc = editData.documents[0];
@@ -285,6 +308,8 @@ useEffect(() => {
     });
   }
 }, [editData]);
+
+
 
 // Re-sync subjects to Form.List after it mounts when navigating to the Academic step.
 // Form.List may not receive values set via setFieldsValue while it was unmounted,
@@ -315,6 +340,9 @@ const getDefaultFile = (path, name = "file") => {
     },
   ];
 };
+
+
+
   const steps = [
     // 🔥 STUDENT
     {
@@ -415,6 +443,12 @@ const getDefaultFile = (path, name = "file") => {
               <Checkbox>Transport Needed</Checkbox>
             </Form.Item>
           </Col>
+
+          <Col span={12}>
+  <Form.Item name="rteApplied" valuePropName="checked">
+    <Checkbox>RTE Applied Student</Checkbox>
+  </Form.Item>
+</Col>
         </Row>
       ),
     },
@@ -425,23 +459,73 @@ const getDefaultFile = (path, name = "file") => {
       icon: <TeamOutlined />,
       fields: [],
       content: (
-        <Row gutter={[16, 16]}>
-          <Col span={12}><Form.Item name="fatherName" label="Father Name" rules={[requiredRule]}><Input /></Form.Item></Col>
-          <Col span={12}><Form.Item name="fatherPhone" label="Father Phone" rules={[phoneRule]}><Input maxLength={10} /></Form.Item></Col>
-          <Col span={12}><Form.Item name="fatherOccupation" label="Father Occupation" rules={[requiredRule]}><Input /></Form.Item></Col>
-          <Col span={12}><Form.Item name="fatherAadharNo" label="Father Aadhar" rules={[aadharRule]}><Input maxLength={12} /></Form.Item></Col>
-          <Col span={12}><Form.Item name="fatherWhatsAppNo" label="Father WhatsApp" rules={[phoneRule]}><Input maxLength={10} /></Form.Item></Col>
+  <>
+    <Row gutter={16}>
 
-          <Col span={12}><Form.Item name="motherName" label="Mother Name" rules={[requiredRule]}><Input /></Form.Item></Col>
-          <Col span={12}><Form.Item name="motherPhone" label="Mother Phone" rules={[phoneRule]}><Input maxLength={10} /></Form.Item></Col>
-          <Col span={12}><Form.Item name="motherOccupation" label="Mother Occupation" rules={[requiredRule]}><Input /></Form.Item></Col>
-          <Col span={12}><Form.Item name="motherAadharNo" label="Mother Aadhar" rules={[aadharRule]}><Input maxLength={12} /></Form.Item></Col>
-          <Col span={12}><Form.Item name="motherWhatsAppNo" label="Mother WhatsApp" rules={[phoneRule]}><Input maxLength={10} /></Form.Item></Col>
+      {/* LEFT — FATHER */}
+      <Col span={12}>
+        <Form.Item name="fatherName" label="Father Name" /*</Col>rules={[requiredRule]}*/>
+          <Input />
+        </Form.Item>
 
-          <Col span={12}><Form.Item name="familyIncome" label="Family Income" rules={[requiredRule]}><Input /></Form.Item></Col>
-          <Col span={12}><Form.Item name="sibblings" label="Siblings" rules={[requiredRule]}><Input /></Form.Item></Col>
-        </Row>
-      ),
+        <Form.Item name="fatherPhone" label="Father Phone" /*rules={[phoneRule]}*/>
+          <Input maxLength={10} />
+        </Form.Item>
+
+        <Form.Item name="fatherOccupation" label="Father Occupation" /*rules={[requiredRule]}*/>
+          <Input />
+        </Form.Item>
+
+        <Form.Item name="fatherAadharNo" label="Father Aadhar" /*rules={[aadharRule]}*/>
+          <Input maxLength={12} />
+        </Form.Item>
+
+        <Form.Item name="fatherWhatsAppNo" label="Father WhatsApp" /*rules={[phoneRule]}*/>
+          <Input maxLength={10} />
+        </Form.Item>
+      </Col>
+
+      {/* RIGHT — MOTHER */}
+      <Col span={12}>
+        <Form.Item name="motherName" label="Mother Name" /*rules={[requiredRule]}*/>
+          <Input />
+        </Form.Item>
+
+        <Form.Item name="motherPhone" label="Mother Phone" /*rules={[phoneRule]}*/>
+          <Input maxLength={10} />
+        </Form.Item>
+
+        <Form.Item name="motherOccupation" label="Mother Occupation" /*rules={[requiredRule]}*/ >
+          <Input />
+        </Form.Item>
+
+        <Form.Item name="motherAadharNo" label="Mother Aadhar" /*rules={[aadharRule]}*/>
+          <Input maxLength={12} />
+        </Form.Item>
+
+        <Form.Item name="motherWhatsAppNo" label="Mother WhatsApp" /*rules={[phoneRule]}*/>
+          <Input maxLength={10} />
+        </Form.Item>
+      </Col>
+
+    </Row>
+
+    {/* BELOW BOTH */}
+    <Row gutter={16}>
+      <Col span={12}>
+        <Form.Item name="familyIncome" label="Family Income" /*rules={[requiredRule]}*/>
+          <Input />
+        </Form.Item>
+      </Col>
+
+      <Col span={12}>
+        <Form.Item name="sibblings" label="Siblings" /*rules={[requiredRule]}*/>
+          <Input />
+        </Form.Item>
+      </Col>
+    </Row>
+  </>
+)
     },
 
     // 🔥 ADDRESS
