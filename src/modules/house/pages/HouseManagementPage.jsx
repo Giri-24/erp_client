@@ -1,3 +1,4 @@
+import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Card, Table, Button, Modal, Form, Input, Select, Tag, Space, message,
@@ -20,6 +21,7 @@ const STANDARDS = [
 const formatStd = (s) => s?.replace("STD_", "Std ") || s;
 
 export default function HouseManagementPage() {
+  const { hasPermission } = usePermissionHelpers();
   const [houses, setHouses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formModal, setFormModal] = useState(false);

@@ -9,7 +9,7 @@ import {
   getTransportFee,
 } from "../transport.service";
 import instance from "../../../utils/axios";
-import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN");
@@ -42,6 +42,7 @@ const AssignTransportPage = () => {
   const [loading, setLoading] = useState(false);
   const [showTip, setShowTip] = useState(true);
 
+  const { hasPermission } = usePermissionHelpers();
   const canAssign = hasPermission(PERMISSIONS.TRANSPORT_ASSIGN);
 
   // ── data ─────────────────────────────────────────────────────────────────

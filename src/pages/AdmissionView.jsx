@@ -62,7 +62,7 @@ import instance from "../utils/axios";
 import dayjs from "dayjs";
 import { getPendingAdmissions, setAdmissionApproval, bulkApproval } from "../modules/admission/admission.service";
 import { getAcademicYears, getAcademicYear as fetchCurrentYear } from "../modules/fees/fees.service";
-import { hasPermission, PERMISSIONS } from "../utils/permissions";
+import { PERMISSIONS, usePermissionHelpers } from "../utils/permissions";
 
 const normalizeStandardValue = (value) => {
   if (value === null || value === undefined) return "";
@@ -108,6 +108,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
   const [approvalReason, setApprovalReason] = useState("");
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [bulkApprovalLoading, setBulkApprovalLoading] = useState(false);
+  const { hasPermission } = usePermissionHelpers();
   const canApprove = hasPermission(PERMISSIONS.ADMISSION_APPROVE);
 
   // Filter states

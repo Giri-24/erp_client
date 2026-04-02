@@ -3,17 +3,20 @@ import { LockOutlined, MailOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import logo from '../assets/logo.jpeg'
 import instance from '../utils/axios'
+import { usePermissions } from '../context/PermissionsContext'
 
 const { Title, Text } = Typography
 
 const Login = () => {
   const navigate = useNavigate()
+  const { refresh } = usePermissions()
 
   const onFinish = async (values) => {
     try {
       const res = await instance.post('/auth/login', values)
       localStorage.setItem('token', res.data.access_token)
       localStorage.setItem('user', JSON.stringify(res.data.user))
+      await refresh()
       message.success('Login successful!')
       navigate('/dashboard')
     } catch (err) {

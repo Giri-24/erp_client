@@ -1,3 +1,5 @@
+import { usePermissions } from '../context/PermissionsContext';
+
 export const PERMISSIONS = {
   ADMISSION_CREATE: 'admission:create',
   ADMISSION_READ: 'admission:read',
@@ -5,7 +7,10 @@ export const PERMISSIONS = {
   ADMISSION_APPROVE: 'admission:approve',
   ADMISSION_DELETE: 'admission:delete',
 
+  STUDENT_CREATE: 'student:create',
   STUDENT_READ: 'student:read',
+  STUDENT_UPDATE: 'student:update',
+  STUDENT_DELETE: 'student:delete',
 
   FEES_STRUCTURE_CREATE: 'fees:structure:create',
   FEES_STRUCTURE_READ: 'fees:structure:read',
@@ -23,11 +28,17 @@ export const PERMISSIONS = {
   TRANSPORT_ASSIGN: 'transport:assign',
   TRANSPORT_READ: 'transport:read',
   LOCATION_READ: 'location:read',
+  LOCATION_CREATE: 'location:create',
 
   STAFF_CREATE: 'staff:create',
   STAFF_READ: 'staff:read',
   STAFF_UPDATE: 'staff:update',
   STAFF_DELETE: 'staff:delete',
+
+  USER_CREATE: 'user:create',
+  USER_READ: 'user:read',
+  USER_UPDATE: 'user:update',
+  USER_DELETE: 'user:delete',
 
   REPORTS_READ: 'reports:read',
 
@@ -57,7 +68,13 @@ export const PERMISSIONS = {
   POS_MANAGE: 'pos:manage',
   POS_DASHBOARD: 'pos:dashboard',
   POS_PURCHASE: 'pos:purchase',
+  POS_PURCHASE_CREATE: 'pos:purchase:create',
+  POS_PURCHASE_READ: 'pos:purchase:read',
+  POS_PURCHASE_UPDATE: 'pos:purchase:update',
+  POS_PURCHASE_DELETE: 'pos:purchase:delete',
   POS_SELL: 'pos:sell',
+  POS_SALE_CREATE: 'pos:sale:create',
+  POS_SALE_READ: 'pos:sale:read',
 
   // Document Issue
   DOC_REQUEST_CREATE: 'doc:request:create',
@@ -72,6 +89,7 @@ export const PERMISSIONS = {
   HOUSE_DELETE: 'house:delete',
 };
 
+// ── localStorage-based helpers (work everywhere, no hooks needed) ──────
 export const getCurrentUser = () => {
   try {
     const raw = localStorage.getItem('user');
@@ -95,4 +113,17 @@ export const hasPermission = (permission) => {
 export const hasAnyPermission = (permissions) => {
   const granted = getCurrentUserPermissions();
   return permissions.some((p) => granted.includes(p));
+};
+
+// ── React hook helpers (for components using PermissionsContext) ────────
+export const usePermissionHelpers = () => {
+  const { profile, permissions, loading } = usePermissions();
+
+  return {
+    profile,
+    permissions,
+    loading,
+    hasPermission: (permission) => permissions.includes(permission),
+    hasAnyPermission: (perms) => perms.some((p) => permissions.includes(p)),
+  };
 };
