@@ -34,6 +34,7 @@ const TransportViewPage = () => {
   const [sectionFilter, setSectionFilter] = useState(undefined);
   const [fatherNameFilter, setFatherNameFilter] = useState("");
   const [siblingFilter, setSiblingFilter] = useState(undefined);
+  const [areaFilter, setAreaFilter] = useState("");
   const [editing, setEditing] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -123,6 +124,11 @@ const TransportViewPage = () => {
     if (fatherNameFilter && !(a.student?.family?.fatherName || "").toLowerCase().includes(fatherNameFilter.toLowerCase())) return false;
     if (siblingFilter === "has" && !a.student?.siblingGroupId) return false;
     if (siblingFilter === "none" && a.student?.siblingGroupId) return false;
+    if (areaFilter) {
+      const addr = a.student?.address;
+      const areaStr = [addr?.line1, addr?.line2, addr?.line3, addr?.pin].filter(Boolean).join(" ").toLowerCase();
+      if (!areaStr.includes(areaFilter.toLowerCase())) return false;
+    }
     return true;
   });
 
@@ -251,6 +257,12 @@ const TransportViewPage = () => {
               { label: "Has Sibling", value: "has" },
               { label: "No Sibling", value: "none" },
             ]}
+          />
+          <Input
+            placeholder="Area / Pin"
+            value={areaFilter}
+            onChange={(e) => setAreaFilter(e.target.value)}
+            style={{ width: 160 }}
           />
           <Button onClick={fetchData}>Load</Button>
           <Input

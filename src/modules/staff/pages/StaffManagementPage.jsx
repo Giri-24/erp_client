@@ -109,6 +109,7 @@ const StaffManagementPage = () => {
     form.setFieldsValue({
       ...record,
       joiningDate: record.joiningDate ? dayjs(record.joiningDate) : null,
+      pfJoiningDate: record.pfJoiningDate ? dayjs(record.pfJoiningDate) : null,
     });
     setModalOpen(true);
   };
@@ -136,6 +137,9 @@ const StaffManagementPage = () => {
         ...(values.employeeId ? { employeeId: values.employeeId } : {}),
         joiningDate: values.joiningDate
           ? values.joiningDate.toISOString()
+          : null,
+        pfJoiningDate: values.pfJoiningDate
+          ? values.pfJoiningDate.toISOString()
           : null,
       };
 
@@ -208,6 +212,19 @@ const StaffManagementPage = () => {
     { title: "Employee ID", dataIndex: "employeeId", width: 120 },
     { title: "Name", dataIndex: "name", sorter: (a, b) => a.name.localeCompare(b.name) },
     { title: "Designation", dataIndex: "designation" },
+    {
+      title: "Category",
+      dataIndex: "category",
+      render: (v) => {
+        const map = { TEACHING_REGULAR: "Teaching", TEACHING_TRAINEE: "Teaching (Trainee)", NON_TEACHING_REGULAR: "Non-Teaching", NON_TEACHING_TRAINEE: "Non-Teaching (Trainee)" };
+        return map[v] || v || "-";
+      },
+    },
+    {
+      title: "Pay Mode",
+      dataIndex: "paymentMode",
+      render: (v) => v === "BANK_TRANSFER" ? "BT" : v === "CASH" ? "Cash" : v || "-",
+    },
     { title: "Department", dataIndex: "department", render: (v) => v || "-" },
     { title: "Phone", dataIndex: "phone", render: (v) => v || "-" },
     {
@@ -358,6 +375,32 @@ const StaffManagementPage = () => {
             </Form.Item>
             <Form.Item name="salary" label="Salary">
               <InputNumber min={0} prefix="₹" style={{ width: 150 }} />
+            </Form.Item>
+            <Form.Item name="category" label="Category" rules={[{ required: true }]}>
+              <Select>
+                <Option value="TEACHING_REGULAR">Teaching Staff - Regular</Option>
+                <Option value="TEACHING_TRAINEE">Teaching Staff - Trainee</Option>
+                <Option value="NON_TEACHING_REGULAR">Non-Teaching Staff - Regular</Option>
+                <Option value="NON_TEACHING_TRAINEE">Non-Teaching Staff - Trainee</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name="paymentMode" label="Payment Mode">
+              <Select allowClear>
+                <Option value="BANK_TRANSFER">Bank Transfer (BT)</Option>
+                <Option value="CASH">Cash</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name="bankName" label="Bank Name">
+              <Input />
+            </Form.Item>
+            <Form.Item name="bankAccountNo" label="Bank Account No">
+              <Input />
+            </Form.Item>
+            <Form.Item name="bankIfsc" label="Bank IFSC">
+              <Input />
+            </Form.Item>
+            <Form.Item name="pfJoiningDate" label="PF Joining Date">
+              <DatePicker />
             </Form.Item>
           </Space>
         </Form>

@@ -26,7 +26,7 @@ const StatusBadge = ({ status }) => {
 const RefundCancellationReportPage = () => {
   const [academicYear, setAcademicYear] = useState("2025-26");
   const [academicYearOptions, setAcademicYearOptions] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("REFUNDED");
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");

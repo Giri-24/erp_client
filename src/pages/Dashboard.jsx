@@ -21,6 +21,8 @@ import CollectPaymentPage from "../modules/fees/pages/CollectPaymentPage";
 import FeesDashboardPage from "../modules/fees/pages/FeesDashboardPage";
 import FeesViewPage from "../modules/fees/pages/FeesViewPage";
 import RefundCancellationReportPage from "../modules/fees/pages/RefundCancellationReportPage";
+import StudentFeeLedgerPage from "../modules/fees/pages/StudentFeeLedgerPage";
+import ClassFeeSummaryPage from "../modules/fees/pages/ClassFeeSummaryPage";
 
 import RouteManagementPage from "../modules/transport/pages/RouteManagementPage";
 import AssignTransportPage from "../modules/transport/pages/AssignTransportPage";
@@ -40,6 +42,8 @@ import PermissionPage from "../modules/hr/pages/PermissionPage";
 import PFESIPage from "../modules/hr/pages/PFESIPage";
 import ESSLSyncPage from "../modules/hr/pages/ESSLSyncPage";
 import PayrollPage from "../modules/hr/pages/PayrollPage";
+import AdvanceRequestPage from "../modules/hr/pages/AdvanceRequestPage";
+import SalaryAbstractPage from "../modules/hr/pages/SalaryAbstractPage";
 
 import POSDashboardPage from "../modules/pos/pages/POSDashboardPage";
 import StoreItemsPage from "../modules/pos/pages/StoreItemsPage";
@@ -49,6 +53,7 @@ import StockTransferPage from "../modules/pos/pages/StockTransferPage";
 import StaffAllowancePage from "../modules/pos/pages/StaffAllowancePage";
 import IncomeExpensePage from "../modules/pos/pages/IncomeExpensePage";
 import DocRequestPage from "../modules/doc-request/pages/DocRequestPage";
+import HouseManagementPage from "../modules/house/pages/HouseManagementPage";
 
 import { hasPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions";
 
@@ -56,6 +61,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [selectedKey, setSelectedKey] = useState("dashboard");
   const [editData, setEditData] = useState(null);
+  const [feeStudentId, setFeeStudentId] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
   const currentUser = getCurrentUser();
   const displayName = currentUser?.name || currentUser?.email || "User";
@@ -90,6 +96,7 @@ const Dashboard = () => {
   const canPOSSell = hasPermission(PERMISSIONS.POS_SELL);
   const canPOSPurchase = hasPermission(PERMISSIONS.POS_PURCHASE);
   const canDocRequest = hasPermission(PERMISSIONS.DOC_REQUEST_READ);
+  const canHouseRead = hasPermission(PERMISSIONS.HOUSE_READ);
 
   const onLogout = () => {
     Modal.confirm({
@@ -146,6 +153,8 @@ const Dashboard = () => {
         { key: "fees-view", label: "All Fees", icon: "receipt_long", permission: canFeesRead },
         { key: "fees-collect", label: "Collect Payment", icon: "point_of_sale", permission: canFeesCollect },
         { key: "fees-refund-report", label: "Refund Report", icon: "undo", permission: canReportsRead },
+        { key: "fees-ledger", label: "Student Ledger", icon: "menu_book", permission: canFeesDashboard },
+        { key: "fees-class-summary", label: "Class Summary", icon: "analytics", permission: canFeesDashboard },
       ],
     },
     {
@@ -174,6 +183,8 @@ const Dashboard = () => {
         { key: "hr-pf-esi", label: "PF & ESI", icon: "account_balance", permission: canHRStatutory },
         { key: "hr-essl", label: "ESSL Sync", icon: "fingerprint", permission: canHRESSL },
         { key: "hr-payroll", label: "Payroll", icon: "payments", permission: canHRPayroll },
+        { key: "hr-advance", label: "Advance / Loan", icon: "request_quote", permission: canHRPayroll },
+        { key: "hr-salary-abstract", label: "Salary Abstract", icon: "summarize", permission: canHRPayroll },
       ],
     },
     {
@@ -200,6 +211,15 @@ const Dashboard = () => {
         { key: "doc-requests", label: "Issue Desk", icon: "assignment", permission: canDocRequest },
       ],
     },
+    {
+      key: "house-group",
+      label: "Houses",
+      icon: "real_estate_agent",
+      permission: canHouseRead,
+      children: [
+        { key: "house-management", label: "House Management", icon: "groups", permission: canHouseRead },
+      ],
+    },
   ];
 
   const isChildSelected = (children) => children?.some((c) => c.key === selectedKey);
@@ -216,16 +236,18 @@ const Dashboard = () => {
       case "admission-edit":      return <AdmissionEdit />;
       case "bulk-upload":         return <BulkUploadPage />;
       case "promotion":           return <PromotionPage />;
-      case "students":            return <StudentView />;
+      case "students":            return <StudentView onCollectFee={(studentId) => { setFeeStudentId(studentId); setSelectedKey("fees-assign"); }} />;
       case "approval":            return <ApprovalsView />;
       case "profile":             return <ProfilePage />;
       case "admin-settings":      return <AdminSettings />;
       case "fees-structure":      return <FeeStructurePage />;
-      case "fees-assign":         return <AssignFeePage />;
+      case "fees-assign":         return <AssignFeePage initialStudentId={feeStudentId} onMounted={() => setFeeStudentId(null)} />;
       case "fees-collect":        return <CollectPaymentPage />;
       case "fees-dashboard":      return <FeesDashboardPage />;
       case "fees-view":           return <FeesViewPage />;
       case "fees-refund-report":  return <RefundCancellationReportPage />;
+      case "fees-ledger":          return <StudentFeeLedgerPage />;
+      case "fees-class-summary":   return <ClassFeeSummaryPage />;
       case "transport-routes":    return <RouteManagementPage />;
       case "transport-assign":    return <AssignTransportPage />;
       case "transport-view":      return <TransportViewPage />;
@@ -238,6 +260,8 @@ const Dashboard = () => {
       case "hr-pf-esi":           return <PFESIPage />;
       case "hr-essl":             return <ESSLSyncPage />;
       case "hr-payroll":          return <PayrollPage />;
+      case "hr-advance":          return <AdvanceRequestPage />;
+      case "hr-salary-abstract":  return <SalaryAbstractPage />;
       case "pos-dashboard":       return <POSDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
       case "pos-items":           return <StoreItemsPage />;
       case "pos-sales":           return <SalesPage />;
@@ -246,6 +270,7 @@ const Dashboard = () => {
       case "pos-teacher-allowance": return <StaffAllowancePage />;
       case "pos-transactions":    return <IncomeExpensePage />;
       case "doc-requests":        return <DocRequestPage />;
+      case "house-management":    return <HouseManagementPage />;
       default:                    return <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
     }
   };

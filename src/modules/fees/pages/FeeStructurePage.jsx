@@ -218,7 +218,7 @@ const FeeStructurePage = () => {
                     key={s.id}
                     className={`bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.05)] relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300 border-l-4 ${colors.border}`}
                   >
-                    {/* decorative corner */}
+    
                     <div className="absolute top-0 right-0 w-20 h-20 bg-primary/5 rounded-bl-full -mr-6 -mt-6 transition-transform group-hover:scale-125 pointer-events-none" />
 
                     <div className="flex justify-between items-start mb-5">
@@ -318,7 +318,7 @@ const FeeStructurePage = () => {
               </div>
 
               <div className="space-y-7">
-                {/* Standard + Year */}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-primary uppercase tracking-wider ml-1">
@@ -352,7 +352,7 @@ const FeeStructurePage = () => {
                   </div>
                 </div>
 
-                {/* Core fee components */}
+
                 <div className="space-y-3">
                   <h4 className="font-headline font-bold text-primary flex items-center gap-2 text-sm">
                     <span className="material-symbols-outlined text-sm">receipt_long</span>
@@ -384,7 +384,7 @@ const FeeStructurePage = () => {
                       </div>
                     ))}
                   </div>
-                  {/* Other fee + terms */}
+  
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-white p-4 rounded-xl">
                       <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">Other Fee</p>
@@ -410,9 +410,72 @@ const FeeStructurePage = () => {
                       />
                     </div>
                   </div>
+
+  
+                  {form.numberOfTerms > 1 && (
+                    <div className="col-span-2 bg-white/50 border border-dashed border-outline-variant rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold text-on-surface-variant uppercase">Custom Term Split</p>
+                        <button type="button" onClick={() => {
+                          const n = form.numberOfTerms;
+                          const total = grossTotal(form);
+                          const perTerm = Math.floor(total / n);
+                          const remainder = total - perTerm * n;
+                          setField("terms", Array.from({ length: n }, (_, i) => ({
+                            termNumber: i + 1,
+                            termName: form.terms?.[i]?.termName || `Term ${i + 1}`,
+                            amount: form.terms?.[i]?.amount || (i === 0 ? perTerm + remainder : perTerm),
+                            dueDate: form.terms?.[i]?.dueDate || "",
+                          })));
+                        }} className="text-primary text-xs font-bold flex items-center gap-1 hover:underline">
+                          <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+                          Auto-split equally
+                        </button>
+                      </div>
+                      {(form.terms || []).length === 0 ? (
+                        <button type="button" onClick={() => {
+                          setField("terms", Array.from({ length: form.numberOfTerms }, (_, i) => ({
+                            termNumber: i + 1, termName: `Term ${i + 1}`, amount: 0, dueDate: "",
+                          })));
+                        }} className="w-full flex items-center justify-center gap-2 border border-dashed border-outline-variant rounded-lg py-2.5 text-xs text-on-surface-variant hover:border-primary hover:text-primary transition-all">
+                          <span className="material-symbols-outlined text-sm">add</span>
+                          Set Custom Term Amounts
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          {form.terms.map((t, i) => (
+                            <div key={i} className="grid grid-cols-3 gap-2 items-center">
+                              <input type="text" value={t.termName}
+                                onChange={(e) => {
+                                  const next = [...form.terms]; next[i] = { ...next[i], termName: e.target.value };
+                                  setField("terms", next);
+                                }}
+                                placeholder={`Term ${i + 1}`}
+                                className="bg-white border-none rounded-lg p-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20" />
+                              <div className="relative">
+                                <span className="absolute left-2 top-2.5 text-on-surface-variant text-sm">₹</span>
+                                <input type="number" min={0} value={t.amount}
+                                  onChange={(e) => {
+                                    const next = [...form.terms]; next[i] = { ...next[i], amount: Number(e.target.value) || 0 };
+                                    setField("terms", next);
+                                  }}
+                                  className="w-full bg-white border-none rounded-lg p-2.5 pl-6 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" />
+                              </div>
+                              <input type="date" value={t.dueDate}
+                                onChange={(e) => {
+                                  const next = [...form.terms]; next[i] = { ...next[i], dueDate: e.target.value };
+                                  setField("terms", next);
+                                }}
+                                className="bg-white border-none rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Custom items */}
+
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <h4 className="font-headline font-bold text-primary flex items-center gap-2 text-sm">
@@ -475,13 +538,12 @@ const FeeStructurePage = () => {
                   )}
                 </div>
 
-                {/* Live total */}
                 <div className="bg-white rounded-xl px-5 py-4 flex justify-between items-center">
                   <span className="text-sm font-bold text-on-surface-variant">Calculated Annual Total</span>
                   <span className="text-xl font-extrabold text-primary">{fmt(grossTotal(form))}</span>
                 </div>
 
-                {/* Actions */}
+
                 <div className="flex justify-end gap-3 pt-2">
                   {editingId && (
                     <button

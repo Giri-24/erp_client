@@ -21,7 +21,9 @@ const fmt = (v) => "₹" + Math.round(Number(v || 0)).toLocaleString("en-IN");
 const PAYMENT_MODES = [
   { value: "CASH", label: "Cash", icon: "payments" },
   { value: "UPI", label: "UPI / Online", icon: "language" },
+  { value: "GPAY", label: "GPay", icon: "phone_android" },
   { value: "BANK", label: "Bank Transfer", icon: "receipt_long" },
+  { value: "CHEQUE", label: "Cheque", icon: "description" },
 ];
 
 const RECEIPT_COMPONENT_LABELS = {
