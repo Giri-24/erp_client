@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { message } from "antd";
 import { getSalaryAbstract } from "../hr.service";
+import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
@@ -18,6 +19,7 @@ const CATEGORY_LABELS = {
 };
 
 const SalaryAbstractPage = () => {
+  const canViewPayroll = hasPermission(PERMISSIONS.HR_PAYROLL_READ);
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -73,6 +75,14 @@ const SalaryAbstractPage = () => {
     doc.autoTable({ head, body, startY: 30, styles: { fontSize: 8 }, headStyles: { fillColor: [0, 21, 42] } });
     doc.save(`salary-abstract-${month}.pdf`);
   };
+
+  if (!canViewPayroll) {
+    return (
+      <div className="flex items-center justify-center h-64 text-on-surface-variant">
+        You do not have permission to view salary abstracts.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

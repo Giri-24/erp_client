@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { message, Modal } from "antd";
 import { getPosDashboard, getAllStores, getStockOverview } from "../pos.service";
-import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+
 
 const POSDashboardPage = ({ onNavigate }) => {
   const [dashboard, setDashboard] = useState(null);
   const [stores, setStores] = useState([]);
   const [lowStock, setLowStock] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { hasPermission } = usePermissionHelpers();
 
   useEffect(() => {
     loadData();

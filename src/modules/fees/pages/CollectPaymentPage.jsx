@@ -13,7 +13,7 @@ import {
   getPaymentLinks,
   checkPaymentLinkStatus,
 } from "../fees.service";
-import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => "₹" + Math.round(Number(v || 0)).toLocaleString("en-IN");
@@ -103,6 +103,7 @@ const CollectPaymentPage = () => {
   const [splitMode, setSplitMode] = useState(false);
   const [splitPayments, setSplitPayments] = useState([]);
 
+  const { hasPermission } = usePermissionHelpers();
   const canCollectFee = hasPermission(PERMISSIONS.FEES_COLLECT);
 
   // ── data fetching ─────────────────────────────────────────────────────

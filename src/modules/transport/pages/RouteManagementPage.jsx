@@ -6,7 +6,7 @@ import {
   updateTransportRoute,
   deleteTransportRoute,
 } from "../transport.service";
-import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN");
@@ -41,6 +41,7 @@ const RouteManagementPage = () => {
   const [editingRouteId, setEditingRouteId] = useState(null);
   const [showInlineForm, setShowInlineForm] = useState(false);
 
+  const { hasPermission } = usePermissionHelpers();
   const canCreate = hasPermission(PERMISSIONS.TRANSPORT_ROUTE_CREATE);
   const canUpdate = hasPermission(PERMISSIONS.TRANSPORT_ROUTE_UPDATE);
   const canDelete = hasPermission(PERMISSIONS.TRANSPORT_ROUTE_DELETE);

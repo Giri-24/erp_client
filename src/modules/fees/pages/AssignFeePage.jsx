@@ -16,7 +16,7 @@ import {
 } from "../fees.service";
 import { getTransportFee } from "../../transport/transport.service";
 import instance from "../../../utils/axios";
-import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 
 const { Option } = Select;
 
@@ -78,6 +78,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
   const [manualDiscounts, setManualDiscounts] = useState([]);
 
   const [loading, setLoading] = useState(false);
+  const { hasPermission } = usePermissionHelpers();
   const canAssignFee = hasPermission(PERMISSIONS.FEES_ASSIGN);
   const canCollectFee = hasPermission(PERMISSIONS.FEES_COLLECT);
 

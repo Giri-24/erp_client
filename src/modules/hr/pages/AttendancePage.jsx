@@ -77,7 +77,6 @@ const AttendancePage = () => {
   const fetchAttendance = async () => {
     setLoading(true);
     try {
-      const data = await getAttendance({ date: selectedDate.format("YYYY-MM-DD") });
       setAttendance(data);
     } catch {
       setAttendance([]);
@@ -106,7 +105,6 @@ const AttendancePage = () => {
     } catch {
       setMonthlyReport([]);
     }
-    setLoading(false);
   };
 
   useEffect(() => {

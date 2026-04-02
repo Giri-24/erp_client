@@ -6,7 +6,7 @@ import {
   updateFeeStructure,
   deleteFeeStructure,
 } from "../fees.service";
-import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN");
@@ -69,6 +69,7 @@ const FeeStructurePage = () => {
   // Ref for form scroll
   const formRef = React.useRef(null);
 
+  const { hasPermission } = usePermissionHelpers();
   const canCreate = hasPermission(PERMISSIONS.FEES_STRUCTURE_CREATE);
   const canUpdate = hasPermission(PERMISSIONS.FEES_STRUCTURE_UPDATE);
   const canDelete = hasPermission(PERMISSIONS.FEES_STRUCTURE_DELETE);
