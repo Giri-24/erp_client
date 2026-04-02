@@ -1,11 +1,18 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Form, message, Select } from "antd";
+import { Form, message, Select, Modal, InputNumber, Radio } from "antd";
 import {
   assignFeeToStudent,
+  assignFeeToClass,
   getFeeStructureByStandard,
   checkDiscountEligibility,
   getAcademicYears,
   getAllStudentFees,
+  getStudentFee,
+  collectPayment,
+  getNextReceiptNo,
+  cancelPayment,
+  refundPayment,
+  getPaymentsByStudentFee,
 } from "../fees.service";
 import { getTransportFee } from "../../transport/transport.service";
 import instance from "../../../utils/axios";
@@ -35,7 +42,7 @@ const ToggleSwitch = ({ checked, onChange, disabled }) => (
 );
 
 // ── component ─────────────────────────────────────────────────────────────────
-const AssignFeePage = () => {
+const AssignFeePage = ({ initialStudentId, onMounted }) => {
   const [form] = Form.useForm();
 
   const [students, setStudents] = useState([]);
@@ -72,12 +79,43 @@ const AssignFeePage = () => {
 
   const [loading, setLoading] = useState(false);
   const canAssignFee = hasPermission(PERMISSIONS.FEES_ASSIGN);
+  const canCollectFee = hasPermission(PERMISSIONS.FEES_COLLECT);
+
+  // existing fee data (when student already has fees assigned)
+  const [existingFee, setExistingFee] = useState(null);
+  const [existingPayments, setExistingPayments] = useState([]);
+
+  // inline payment fields
+  const [payAmount, setPayAmount] = useState("");
+  const [payMode, setPayMode] = useState("CASH");
+  const [payTerm, setPayTerm] = useState(null);
+  const [payRemarks, setPayRemarks] = useState("");
+  const [payLoading, setPayLoading] = useState(false);
+
+  // bulk assign
+  const [bulkModal, setBulkModal] = useState(false);
+  const [bulkStandard, setBulkStandard] = useState("");
+  const [bulkSection, setBulkSection] = useState("");
+  const [bulkYear, setBulkYear] = useState("");
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  // cancel/refund modal
+  const [cancelModal, setCancelModal] = useState({ open: false, payment: null, action: "", reason: "", refundAmount: 0 });
 
   // ── load initial data ─────────────────────────────────────────────────────
   useEffect(() => {
     instance.get("/admissions").then((res) => {
       const active = res.data.filter((s) => s.users?.isActive !== false);
       setStudents(active);
+      // Auto-select student if navigated from StudentView
+      if (initialStudentId) {
+        const match = active.find((s) => s.id === initialStudentId);
+        if (match) {
+          // Trigger student selection asynchronously once years are loaded
+          setTimeout(() => onStudentChange(initialStudentId), 200);
+        }
+        if (onMounted) onMounted();
+      }
     });
     getAcademicYears()
       .then((data) => {
@@ -89,7 +127,7 @@ const AssignFeePage = () => {
     getAllStudentFees()
       .then((data) => setRecentAssignments((data || []).slice(0, 5)))
       .catch(() => {});
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── derived totals ────────────────────────────────────────────────────────
   const grossFee =
@@ -125,6 +163,8 @@ const AssignFeePage = () => {
   const onStudentChange = async (studentId) => {
     const student = students.find((s) => s.id === studentId);
     setSelectedStudent(student);
+    setExistingFee(null);
+    setExistingPayments([]);
 
     try {
       const fee = await getTransportFee(studentId);
@@ -146,12 +186,35 @@ const AssignFeePage = () => {
       setDiscountEligibility(null);
     }
 
-    if (student && selectedYear) loadStructure(student.standard, selectedYear);
+    if (student && selectedYear) {
+      loadStructure(student.standard, selectedYear);
+      // check if fee already assigned
+      try {
+        const ef = await getStudentFee(studentId, selectedYear);
+        if (ef) {
+          setExistingFee(ef);
+          const pays = await getPaymentsByStudentFee(ef.id);
+          setExistingPayments(pays || []);
+        }
+      } catch { /* no existing fee */ }
+    }
   };
 
-  const onYearChange = (year) => {
+  const onYearChange = async (year) => {
     setSelectedYear(year);
-    if (selectedStudent && year) loadStructure(selectedStudent.standard, year);
+    setExistingFee(null);
+    setExistingPayments([]);
+    if (selectedStudent && year) {
+      loadStructure(selectedStudent.standard, year);
+      try {
+        const ef = await getStudentFee(selectedStudent.id, year);
+        if (ef) {
+          setExistingFee(ef);
+          const pays = await getPaymentsByStudentFee(ef.id);
+          setExistingPayments(pays || []);
+        }
+      } catch { /* no existing fee */ }
+    }
   };
 
   const loadStructure = async (standard, academicYear) => {
@@ -213,6 +276,84 @@ const AssignFeePage = () => {
     setLoading(false);
   };
 
+  // ── inline payment handler ──────────────────────────────────────────────
+  const handleInlinePayment = async () => {
+    if (!existingFee) return;
+    if (!payAmount || Number(payAmount) <= 0) { message.error("Enter a valid amount"); return; }
+    setPayLoading(true);
+    try {
+      const payload = {
+        studentFeeId: existingFee.id,
+        amount: Number(payAmount),
+        paymentMode: payMode,
+        remarks: payRemarks || undefined,
+      };
+      if (payTerm) payload.termNumber = payTerm;
+      await collectPayment(payload);
+      message.success("Payment collected!");
+      setPayAmount("");
+      setPayRemarks("");
+      setPayTerm(null);
+      // refresh
+      const ef = await getStudentFee(selectedStudent.id, selectedYear);
+      setExistingFee(ef);
+      const pays = await getPaymentsByStudentFee(ef.id);
+      setExistingPayments(pays || []);
+    } catch (e) {
+      message.error(e?.response?.data?.message || "Payment failed");
+    }
+    setPayLoading(false);
+  };
+
+  // ── bulk assign handler ───────────────────────────────────────────────────
+  const handleBulkAssign = async () => {
+    if (!bulkStandard || !bulkYear) { message.error("Select standard and year"); return; }
+    setBulkLoading(true);
+    try {
+      const res = await assignFeeToClass({
+        standard: bulkStandard,
+        section: bulkSection || undefined,
+        academicYear: bulkYear,
+        autoTeacherDiscount: true,
+        autoSiblingDiscount: true,
+        autoRteDiscount: true,
+      });
+      message.success(res.message || "Done");
+      setBulkModal(false);
+      getAllStudentFees().then((d) => setRecentAssignments((d || []).slice(0, 5))).catch(() => {});
+    } catch (e) {
+      message.error(e?.response?.data?.message || "Bulk assign failed");
+    }
+    setBulkLoading(false);
+  };
+
+  // ── cancel / refund handler ────────────────────────────────────────────────
+  const handleCancelRefund = async () => {
+    const { payment, action, reason, refundAmount } = cancelModal;
+    if (!payment) return;
+    try {
+      if (action === "cancel") {
+        await cancelPayment(payment.id, { reason: reason || "Manual cancellation" });
+        message.success("Payment cancelled");
+      } else {
+        await refundPayment(payment.id, { refundAmount: Number(refundAmount), reason });
+        message.success("Refund processed");
+      }
+      setCancelModal({ open: false, payment: null, action: "", reason: "", refundAmount: 0 });
+      const ef = await getStudentFee(selectedStudent.id, selectedYear);
+      setExistingFee(ef);
+      const pays = await getPaymentsByStudentFee(ef.id);
+      setExistingPayments(pays || []);
+    } catch (e) {
+      message.error(e?.response?.data?.message || "Failed");
+    }
+  };
+
+  const STANDARDS_LIST = [
+    "LKG","UKG","STD_1","STD_2","STD_3","STD_4","STD_5",
+    "STD_6","STD_7","STD_8","STD_9","STD_10","STD_11","STD_12",
+  ];
+
   // ── fee input helper ──────────────────────────────────────────────────────
   const FeeInput = ({ label, field }) => (
     <div className="space-y-2">
@@ -258,18 +399,61 @@ const AssignFeePage = () => {
   return (
     <div className="space-y-8">
       {/* Page header */}
-      <div>
-        <nav className="flex items-center gap-1.5 text-on-surface-variant text-xs mb-2 font-medium">
-          <span className="hover:text-primary cursor-pointer transition-colors">Finance</span>
-          <span className="material-symbols-outlined text-[10px]">chevron_right</span>
-          <span className="hover:text-primary cursor-pointer transition-colors">Fees</span>
-          <span className="material-symbols-outlined text-[10px]">chevron_right</span>
-          <span className="text-primary font-bold">Assign</span>
-        </nav>
-        <h2 className="font-headline text-3xl font-extrabold text-primary tracking-tight">
-          Assign Student Fees
-        </h2>
+      <div className="flex justify-between items-start">
+        <div>
+          <nav className="flex items-center gap-1.5 text-on-surface-variant text-xs mb-2 font-medium">
+            <span className="hover:text-primary cursor-pointer transition-colors">Finance</span>
+            <span className="material-symbols-outlined text-[10px]">chevron_right</span>
+            <span className="hover:text-primary cursor-pointer transition-colors">Fees</span>
+            <span className="material-symbols-outlined text-[10px]">chevron_right</span>
+            <span className="text-primary font-bold">Assign &amp; Collect</span>
+          </nav>
+          <h2 className="font-headline text-3xl font-extrabold text-primary tracking-tight">
+            Assign &amp; Collect Fees
+          </h2>
+        </div>
+        <button
+          onClick={() => { setBulkModal(true); setBulkYear(selectedYear || academicYears[0] || ""); }}
+          className="bg-secondary text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:scale-[1.02] transition-all shadow"
+        >
+          <span className="material-symbols-outlined text-base">groups</span>
+          Bulk Assign Class
+        </button>
       </div>
+
+      {/* Bulk Assign Modal */}
+      <Modal
+        open={bulkModal} title="Bulk Assign Fees — Whole Class"
+        onCancel={() => setBulkModal(false)}
+        onOk={handleBulkAssign} okText="Assign to All" confirmLoading={bulkLoading}
+      >
+        <div className="space-y-4 py-2">
+          <div>
+            <label className="block text-xs font-bold text-on-surface-variant mb-1">Standard</label>
+            <select value={bulkStandard} onChange={(e) => setBulkStandard(e.target.value)}
+              className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none">
+              <option value="">Select...</option>
+              {STANDARDS_LIST.map((s) => <option key={s} value={s}>{s.replace("STD_", "Std ")}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-on-surface-variant mb-1">Section (optional)</label>
+            <input value={bulkSection} onChange={(e) => setBulkSection(e.target.value)}
+              placeholder="A, B, C..." className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-on-surface-variant mb-1">Academic Year</label>
+            <select value={bulkYear} onChange={(e) => setBulkYear(e.target.value)}
+              className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none">
+              <option value="">Select...</option>
+              {academicYears.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+          <p className="text-xs text-on-surface-variant">
+            This will assign fees from the fee structure to all approved students in the selected class who don't already have fees. Auto-discounts (teacher, sibling, RTE) will be applied.
+          </p>
+        </div>
+      </Modal>
 
       {/* Main 3-col grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -349,6 +533,221 @@ const AssignFeePage = () => {
           </div>
 
           {/* Fee breakdown */}
+          {existingFee ? (
+            /* ── Existing Fee: Read-Only View + Collect Payment ── */
+            <>
+              <div className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
+                <h4 className="font-headline font-bold text-xl text-primary flex items-center gap-2 mb-5">
+                  <span className="material-symbols-outlined text-secondary">receipt_long</span>
+                  Assigned Fee (View Only)
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {[
+                    ["Tuition Fee", existingFee.tuitionFee],
+                    ["Transport Fee", existingFee.transportFee],
+                    ["Book Fee", existingFee.bookFee],
+                    ["Hostel Fee", existingFee.hostelFee],
+                    ["Other Fee", existingFee.otherFee],
+                  ].map(([label, val]) => (
+                    <div key={label} className="bg-surface-container-low rounded-xl p-3">
+                      <div className="text-[10px] font-bold text-on-surface-variant uppercase">{label}</div>
+                      <div className="text-lg font-bold text-on-surface">{fmt(val)}</div>
+                    </div>
+                  ))}
+                </div>
+                {(existingFee.customItems || []).length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    <div className="text-[10px] font-bold text-on-surface-variant uppercase">Custom Items</div>
+                    {existingFee.customItems.map((ci, i) => (
+                      <div key={i} className="flex justify-between text-sm px-2">
+                        <span>{ci.name}</span><span className="font-bold">{fmt(ci.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4 pt-4 border-t border-outline-variant/20 grid grid-cols-3 gap-4">
+                  <div className="bg-primary-container/30 rounded-xl p-3 text-center">
+                    <div className="text-[10px] font-bold uppercase">Total</div>
+                    <div className="text-xl font-black text-primary">{fmt(existingFee.totalFee)}</div>
+                  </div>
+                  <div className="bg-[#44ddc1]/10 rounded-xl p-3 text-center">
+                    <div className="text-[10px] font-bold uppercase">Discount</div>
+                    <div className="text-xl font-black text-[#001813]">{fmt(existingFee.discount)}</div>
+                  </div>
+                  <div className="bg-secondary-container/30 rounded-xl p-3 text-center">
+                    <div className="text-[10px] font-bold uppercase">Net Fee</div>
+                    <div className="text-xl font-black text-secondary">{fmt(existingFee.netFee)}</div>
+                  </div>
+                </div>
+                {/* Term-wise status */}
+                {(existingFee.terms || []).length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-outline-variant/20">
+                    <div className="text-[10px] font-bold text-on-surface-variant uppercase mb-2">Term Breakdown</div>
+                    <div className="space-y-2">
+                      {existingFee.terms.map((t) => (
+                        <div key={t.id} className="flex justify-between items-center bg-surface-container-low rounded-xl px-4 py-2.5">
+                          <span className="font-bold text-sm">{t.termName}</span>
+                          <span className="text-sm">{fmt(t.amount)}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                            t.status === "PAID" ? "bg-[#44ddc1]/20 text-[#001813]" :
+                            t.status === "PARTIAL" ? "bg-yellow-100 text-yellow-800" :
+                            "bg-surface-container-high text-on-surface-variant"
+                          }`}>{t.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Inline Collect Payment */}
+              <div className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
+                <h4 className="font-headline font-bold text-xl text-primary flex items-center gap-2 mb-5">
+                  <span className="material-symbols-outlined text-secondary">payments</span>
+                  Collect Payment
+                </h4>
+                <div className="flex items-center gap-2 mb-4 text-sm">
+                  <span className="font-bold">Paid:</span>
+                  <span className="text-[#001813] font-bold">{fmt(existingFee.totalPaid || 0)}</span>
+                  <span className="mx-2 text-on-surface-variant">|</span>
+                  <span className="font-bold">Pending:</span>
+                  <span className={`font-bold ${(existingFee.pending || 0) > 0 ? "text-error" : "text-[#001813]"}`}>
+                    {fmt(existingFee.pending || 0)}
+                  </span>
+                </div>
+                {(existingFee.pending || 0) <= 0 ? (
+                  <div className="bg-[#44ddc1]/10 rounded-xl px-4 py-6 text-center">
+                    <span className="material-symbols-outlined text-4xl text-[#001813] mb-2 block">task_alt</span>
+                    <span className="font-bold text-[#001813]">Fully Paid — No pending balance</span>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase mb-1">Amount</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-3 text-on-surface-variant font-bold text-sm">₹</span>
+                          <input type="number" min={0} value={payAmount}
+                            onChange={(e) => setPayAmount(e.target.value)}
+                            className="w-full bg-surface-container-high border-none rounded-xl py-3 pl-7 pr-4 outline-none font-bold" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase mb-1">Mode</label>
+                        <select value={payMode} onChange={(e) => setPayMode(e.target.value)}
+                          className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none">
+                          <option value="CASH">Cash</option>
+                          <option value="UPI">UPI</option>
+                          <option value="GPAY">GPay</option>
+                          <option value="BANK">Bank</option>
+                          <option value="CHEQUE">Cheque</option>
+                        </select>
+                      </div>
+                      {(existingFee.terms || []).length > 0 && (
+                        <div>
+                          <label className="block text-[10px] font-bold uppercase mb-1">Term</label>
+                          <select value={payTerm || ""} onChange={(e) => setPayTerm(e.target.value ? Number(e.target.value) : null)}
+                            className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none">
+                            <option value="">Select term</option>
+                            {existingFee.terms.filter((t) => t.status !== "PAID").map((t) => (
+                              <option key={t.termNumber} value={t.termNumber}>{t.termName}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase mb-1">Remarks</label>
+                        <input value={payRemarks} onChange={(e) => setPayRemarks(e.target.value)}
+                          placeholder="Optional" className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none text-sm" />
+                      </div>
+                    </div>
+                    <button onClick={handleInlinePayment} disabled={payLoading || !canCollectFee}
+                      className="bg-primary text-white px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 hover:scale-[1.02] transition-all disabled:opacity-50">
+                      {payLoading ? (
+                        <><span className="material-symbols-outlined animate-spin text-base">refresh</span> Processing...</>
+                      ) : (
+                        <><span className="material-symbols-outlined text-base">check_circle</span> Collect Payment</>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Payment history */}
+                {existingPayments.length > 0 && (
+                  <div className="mt-5 pt-5 border-t border-outline-variant/20">
+                    <div className="text-[10px] font-bold text-on-surface-variant uppercase mb-2">Payment History</div>
+                    <div className="space-y-2">
+                      {existingPayments.map((p) => (
+                        <div key={p.id} className="flex justify-between items-center bg-surface-container-low rounded-xl px-4 py-2.5">
+                          <div>
+                            <span className="font-bold text-sm">{fmt(p.amount)}</span>
+                            <span className="text-xs text-on-surface-variant ml-2">{p.paymentMode}</span>
+                            {p.receiptNo && <span className="text-xs text-on-surface-variant ml-2">#{p.receiptNo}</span>}
+                            {p.termNumber && <span className="text-xs text-on-surface-variant ml-2">Term {p.termNumber}</span>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              p.status === "CANCELLED" ? "bg-surface-container-high text-on-surface-variant" :
+                              p.status === "REFUNDED" ? "bg-error-container text-error" :
+                              "bg-[#44ddc1]/20 text-[#001813]"
+                            }`}>{p.status || "SUCCESS"}</span>
+                            {p.status === "SUCCESS" && canCollectFee && (
+                              <>
+                                <button onClick={() => setCancelModal({ open: true, payment: p, action: "cancel", reason: "", refundAmount: 0 })}
+                                  className="text-xs text-on-surface-variant hover:text-error transition-colors font-bold">Cancel</button>
+                                <button onClick={() => setCancelModal({ open: true, payment: p, action: "refund", reason: "", refundAmount: p.amount })}
+                                  className="text-xs text-on-surface-variant hover:text-error transition-colors font-bold">Refund</button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Cancel/Refund Modal */}
+              <Modal
+                open={cancelModal.open}
+                title={cancelModal.action === "cancel" ? "Cancel Receipt" : "Refund Payment"}
+                onCancel={() => setCancelModal({ open: false, payment: null, action: "", reason: "", refundAmount: 0 })}
+                onOk={handleCancelRefund}
+                okText={cancelModal.action === "cancel" ? "Cancel Receipt" : "Process Refund"}
+                okButtonProps={{ danger: true }}
+              >
+                <div className="space-y-3 py-2">
+                  {cancelModal.payment && (
+                    <div className="bg-surface-container-low rounded-xl px-4 py-3">
+                      <div className="text-sm font-bold">Amount: {fmt(cancelModal.payment.amount)}</div>
+                      <div className="text-xs text-on-surface-variant">
+                        Receipt: {cancelModal.payment.receiptNo || "—"} | Mode: {cancelModal.payment.paymentMode}
+                      </div>
+                    </div>
+                  )}
+                  {cancelModal.action === "refund" && (
+                    <div>
+                      <label className="block text-xs font-bold mb-1">Refund Amount</label>
+                      <input type="number" min={0} max={cancelModal.payment?.amount}
+                        value={cancelModal.refundAmount}
+                        onChange={(e) => setCancelModal((p) => ({ ...p, refundAmount: Number(e.target.value) }))}
+                        className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none font-bold" />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-bold mb-1">Reason</label>
+                    <input value={cancelModal.reason}
+                      onChange={(e) => setCancelModal((p) => ({ ...p, reason: e.target.value }))}
+                      placeholder={cancelModal.action === "cancel" ? "Reason for cancellation (e.g. human error)" : "Reason for refund"}
+                      className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none text-sm" />
+                  </div>
+                </div>
+              </Modal>
+            </>
+          ) : (
+          /* ── No existing fee: show the assign form ── */
+          <>
+          {/* Fee breakdown */}
           <div className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
             <div className="flex justify-between items-center mb-6">
               <h4 className="font-headline font-bold text-xl text-primary flex items-center gap-2">
@@ -421,9 +820,12 @@ const AssignFeePage = () => {
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
 
-        {/* ── right: discounts + summary ── */}
+        {/* ── right: discounts + summary (only when assigning new fee) ── */}
+        {!existingFee && (
         <div className="space-y-5">
 
           {/* Discount card */}
@@ -568,6 +970,7 @@ const AssignFeePage = () => {
             </button>
           </div>
         </div>
+        )}
       </div>
 
       {/* ── recent assignments table ── */}

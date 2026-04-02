@@ -41,6 +41,16 @@ export const assignFeeToStudent = async (data) => {
   return res.data;
 };
 
+export const assignFeeToClass = async (data) => {
+  const res = await axios.post('/fees/assign-class', data);
+  return res.data;
+};
+
+export const getStudentPendingTotal = async (studentId) => {
+  const res = await axios.get(`/fees/pending-total/${studentId}`);
+  return res.data;
+};
+
 export const updateStudentFee = async (id, data) => {
   const res = await axios.put(`/fees/student-fees/${id}`, data);
   return res.data;
@@ -147,6 +157,16 @@ export const getDailyCollection = async (date) => {
 
 export const getFeesDashboard = async (academicYear) => {
   const res = await axios.get('/fees/dashboard', { params: { academicYear } });
+  return res.data;
+};
+
+export const getMultiYearLedger = async () => {
+  const res = await axios.get('/fees/multi-year-ledger');
+  return res.data;
+};
+
+export const getClassWiseSummary = async (academicYear) => {
+  const res = await axios.get('/fees/class-summary', { params: { academicYear } });
   return res.data;
 };
 // ─── PAYMENT LINKS (PhonePe) ─────────────────

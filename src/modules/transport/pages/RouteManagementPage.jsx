@@ -35,7 +35,7 @@ const RouteManagementPage = () => {
 
   // inline create form state (left panel)
   const [inlineForm, setInlineForm] = useState({
-    routeName: "", routeNo: "", baseFee: "", splClassFee: "", description: "",
+    routeName: "", routeNo: "", baseFee: "", splClassFee: "", description: "", conductorName: "", conductorPhone: "",
   });
   const [inlineStops, setInlineStops] = useState([]);
   const [editingRouteId, setEditingRouteId] = useState(null);
@@ -78,6 +78,8 @@ const RouteManagementPage = () => {
       baseFee: route.baseFee || "",
       splClassFee: route.splClassFee || "",
       description: route.description || "",
+      conductorName: route.conductorName || "",
+      conductorPhone: route.conductorPhone || "",
     });
     setInlineStops(
       [...(route.stops || [])].sort((a, b) => a.stopOrder - b.stopOrder).map((s) => ({
@@ -117,6 +119,8 @@ const RouteManagementPage = () => {
         baseFee: Number(inlineForm.baseFee),
         splClassFee: Number(inlineForm.splClassFee || 0),
         description: inlineForm.description,
+        conductorName: inlineForm.conductorName || undefined,
+        conductorPhone: inlineForm.conductorPhone || undefined,
         stops: inlineStops.map((s, i) => ({
           ...s,
           stopOrder: i + 1,
@@ -211,6 +215,8 @@ const RouteManagementPage = () => {
                   { label: "Route Number", field: "routeNo", placeholder: "RT-402", full: false },
                   { label: "Base Fee (₹)", field: "baseFee", placeholder: "4500", type: "number", full: false },
                   { label: "Special Surcharge (₹)", field: "splClassFee", placeholder: "1250", type: "number", full: false },
+                  { label: "Conductor Name", field: "conductorName", placeholder: "e.g. Ramesh Kumar", full: false },
+                  { label: "Conductor Phone", field: "conductorPhone", placeholder: "e.g. 9876543210", full: false },
                 ].map(({ label, field, placeholder, type }) => (
                   <div key={field} className="space-y-1.5">
                     <label className="text-[10px] font-bold text-on-surface-variant/80 uppercase tracking-widest px-1">{label}</label>

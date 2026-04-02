@@ -75,7 +75,15 @@ const PayrollPage = () => {
     setLoading(true);
     try {
       const data = await getPayroll({ month: selectedMonth.format("YYYY-MM") });
-      setPayrollData(data);
+      setPayrollData(data.map((p) => ({
+        ...p,
+        staffName: p.staff?.name || p.staffName,
+        employeeId: p.staff?.employeeId || p.employeeId,
+        department: p.staff?.department || p.department,
+        designation: p.staff?.designation || p.designation,
+        category: p.staff?.category || p.category,
+        paymentMode: p.staff?.paymentMode || p.paymentMode,
+      })));
     } catch {
       setPayrollData([]);
     }
@@ -86,7 +94,11 @@ const PayrollPage = () => {
     setLoading(true);
     try {
       const data = await getLOPReport({ month: selectedMonth.format("YYYY-MM") });
-      setLopReport(data);
+      setLopReport(data.map((p) => ({
+        ...p,
+        staffName: p.staff?.name || p.staffName,
+        employeeId: p.staff?.employeeId || p.employeeId,
+      })));
     } catch {
       setLopReport([]);
     }
@@ -179,6 +191,21 @@ const PayrollPage = () => {
   const payrollColumns = [
     { title: "Emp ID", dataIndex: "employeeId", width: 100 },
     { title: "Name", dataIndex: "staffName", sorter: (a, b) => (a.staffName || "").localeCompare(b.staffName || "") },
+    {
+      title: "Category",
+      dataIndex: "category",
+      render: (v) => {
+        const map = { TEACHING_REGULAR: "T", TEACHING_TRAINEE: "T-Tr", NON_TEACHING_REGULAR: "NT", NON_TEACHING_TRAINEE: "NT-Tr" };
+        return map[v] || v || "-";
+      },
+      width: 70,
+    },
+    {
+      title: "Pay Mode",
+      dataIndex: "paymentMode",
+      render: (v) => v === "BANK_TRANSFER" ? "BT" : v === "CASH" ? "Cash" : "-",
+      width: 70,
+    },
     { title: "Basic", dataIndex: "basicSalary", render: (v) => `₹${(v || 0).toLocaleString()}` },
     { title: "Gross", dataIndex: "grossSalary", render: (v) => `₹${(v || 0).toLocaleString()}` },
     {
@@ -187,20 +214,17 @@ const PayrollPage = () => {
       render: (v) => v ? <Tag color="red">{v}</Tag> : <Tag color="green">0</Tag>,
     },
     {
-      title: "LOP Deduction",
+      title: "LOP Ded.",
       dataIndex: "lopDeduction",
       render: (v) => v ? <Tag color="red">₹{v.toLocaleString()}</Tag> : "₹0",
     },
-    {
-      title: "Permission LOP",
-      dataIndex: "permissionLopDeduction",
-      render: (v) => v ? <Tag color="orange">₹{v.toLocaleString()}</Tag> : "₹0",
-    },
     { title: "PF", dataIndex: "pfDeduction", render: (v) => `₹${(v || 0).toLocaleString()}` },
     { title: "ESI", dataIndex: "esiDeduction", render: (v) => `₹${(v || 0).toLocaleString()}` },
-    { title: "PT", dataIndex: "ptDeduction", render: (v) => v ? `₹${v}` : "-" },
+    { title: "Fixed Adv.", dataIndex: "fixedAdvanceDeduction", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
+    { title: "Sal. Adv.", dataIndex: "salaryAdvanceDeduction", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
+    { title: "Other Adv.", dataIndex: "otherAdvanceDeduction", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
     {
-      title: "Total Deductions",
+      title: "Total Ded.",
       dataIndex: "totalDeductions",
       render: (v) => <Tag color="red">₹{(v || 0).toLocaleString()}</Tag>,
     },
@@ -398,7 +422,8 @@ const PayrollPage = () => {
               <li>PF: {settings?.pf?.employeeRate || 12}% employee + {settings?.pf?.employerRate || 12}% employer</li>
               <li>ESI: {settings?.esi?.employeeRate || 0.75}% employee + {settings?.esi?.employerRate || 3.25}% employer (if gross ≤ ₹{(settings?.esi?.wageLimit || 21000).toLocaleString()})</li>
               <li>Professional Tax (if applicable)</li>
-              <li>Net = Gross − LOP − PF − ESI − PT</li>
+              <li>Advance deductions: Fixed / Salary / Other (auto-deducted from active advances)</li>
+              <li>Net = Gross + Extra − LOP − PF − ESI − PT − Advances</li>
             </ul>
           }
           type="info"
@@ -433,6 +458,8 @@ const PayrollPage = () => {
               <Descriptions.Item label="Emp ID">{selectedPayslip.employeeId}</Descriptions.Item>
               <Descriptions.Item label="Department">{selectedPayslip.department || "-"}</Descriptions.Item>
               <Descriptions.Item label="Designation">{selectedPayslip.designation || "-"}</Descriptions.Item>
+              <Descriptions.Item label="Category">{({ TEACHING_REGULAR: "Teaching Regular", TEACHING_TRAINEE: "Teaching Trainee", NON_TEACHING_REGULAR: "Non-Teaching Regular", NON_TEACHING_TRAINEE: "Non-Teaching Trainee" })[selectedPayslip.category] || "-"}</Descriptions.Item>
+              <Descriptions.Item label="Pay Mode">{selectedPayslip.paymentMode === "BANK_TRANSFER" ? "Bank Transfer" : selectedPayslip.paymentMode === "CASH" ? "Cash" : "-"}</Descriptions.Item>
             </Descriptions>
 
             <Divider orientation="left">Earnings</Divider>
@@ -441,6 +468,7 @@ const PayrollPage = () => {
               <Descriptions.Item label="HRA">₹{(selectedPayslip.hra || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="DA">₹{(selectedPayslip.da || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="Others">₹{(selectedPayslip.otherAllowances || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="Extra Allowance">₹{(selectedPayslip.extraAllowance || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="Gross Salary" span={2}>
                 <Tag color="blue">₹{(selectedPayslip.grossSalary || 0).toLocaleString()}</Tag>
               </Descriptions.Item>
@@ -454,6 +482,9 @@ const PayrollPage = () => {
               <Descriptions.Item label="PF (Employee)">₹{(selectedPayslip.pfDeduction || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="ESI (Employee)">₹{(selectedPayslip.esiDeduction || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="Professional Tax">₹{(selectedPayslip.ptDeduction || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="Fixed Advance">₹{(selectedPayslip.fixedAdvanceDeduction || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="Salary Advance">₹{(selectedPayslip.salaryAdvanceDeduction || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="Other Advance">₹{(selectedPayslip.otherAdvanceDeduction || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="Total Deductions" span={2}>
                 <Tag color="red">₹{(selectedPayslip.totalDeductions || 0).toLocaleString()}</Tag>
               </Descriptions.Item>

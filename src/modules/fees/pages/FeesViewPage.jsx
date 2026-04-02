@@ -44,6 +44,7 @@ const FeesViewPage = () => {
   const [sectionFilter, setSectionFilter] = useState("");
   const [fatherNameFilter, setFatherNameFilter] = useState("");
   const [siblingFilter, setSiblingFilter] = useState("");
+  const [areaFilter, setAreaFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
 
@@ -104,10 +105,15 @@ const FeesViewPage = () => {
       if (fatherNameFilter && !(f.student?.family?.fatherName || "").toLowerCase().includes(fatherNameFilter.toLowerCase())) return false;
       if (siblingFilter === "has" && !f.student?.siblingGroupId) return false;
       if (siblingFilter === "none" && f.student?.siblingGroupId) return false;
+      if (areaFilter) {
+        const addr = f.student?.address;
+        const areaStr = [addr?.line1, addr?.line2, addr?.line3, addr?.pin].filter(Boolean).join(" ").toLowerCase();
+        if (!areaStr.includes(areaFilter.toLowerCase())) return false;
+      }
       if (q && !(f.student?.name || "").toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [fees, search, standardFilter, sectionFilter, fatherNameFilter, siblingFilter]);
+  }, [fees, search, standardFilter, sectionFilter, fatherNameFilter, siblingFilter, areaFilter]);
 
   // ── summary stats ─────────────────────────────────────────────────────
   const summary = useMemo(() => ({
@@ -321,6 +327,21 @@ const FeesViewPage = () => {
                 </div>
               </div>
 
+              {/* Area / Pin */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-bold text-on-surface-variant px-1 uppercase tracking-tight">Area / Pin</label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-base">location_on</span>
+                  <input
+                    type="text"
+                    value={areaFilter}
+                    onChange={(e) => { setAreaFilter(e.target.value); setPage(1); }}
+                    placeholder="Area, locality, pin..."
+                    className="bg-surface-container-low border-none rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium text-primary focus:ring-2 focus:ring-primary outline-none min-w-[160px]"
+                  />
+                </div>
+              </div>
+
               {/* Search */}
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-on-surface-variant px-1 uppercase tracking-tight">Search</label>
@@ -349,8 +370,8 @@ const FeesViewPage = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low">
-                  {["Student Name", "Standard", "Section", "Father Name", "Sibling", "Total Fee", "Discount", "Net Fee", "Paid", "Status", ""].map((h, i) => (
-                    <th key={h || i} className={`px-6 py-4 text-[10px] font-extrabold text-on-surface-variant uppercase tracking-wider ${i === 10 ? "text-right" : ""}`}>
+                  {["Student Name", "Adm. Status", "Standard", "Section", "Father Name", "Sibling", "Total Fee", "Discount", "Net Fee", "Paid", "Status", ""].map((h, i) => (
+                    <th key={h || i} className={`px-6 py-4 text-[10px] font-extrabold text-on-surface-variant uppercase tracking-wider ${i === 11 ? "text-right" : ""}`}>
                       {h}
                     </th>
                   ))}
@@ -359,7 +380,7 @@ const FeesViewPage = () => {
               <tbody className="divide-y divide-surface-container">
                 {loading ? (
                   <tr>
-                    <td colSpan={11} className="px-6 py-16 text-center text-on-surface-variant">
+                    <td colSpan={12} className="px-6 py-16 text-center text-on-surface-variant">
                       <div className="flex flex-col items-center gap-3">
                         <span className="material-symbols-outlined text-4xl animate-spin opacity-30">refresh</span>
                         <p className="text-sm">Loading fee data...</p>
@@ -368,7 +389,7 @@ const FeesViewPage = () => {
                   </tr>
                 ) : pagedRows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-6 py-16 text-center text-on-surface-variant">
+                    <td colSpan={12} className="px-6 py-16 text-center text-on-surface-variant">
                       <span className="material-symbols-outlined text-4xl block mb-2 opacity-25">payments</span>
                       <p className="text-sm font-medium">No records found</p>
                     </td>
@@ -394,9 +415,19 @@ const FeesViewPage = () => {
                             </div>
                             <div>
                               <p className="text-sm font-bold text-primary">{name}</p>
-                              <p className="text-[10px] text-on-surface-variant">{f.student?.admissionNo || ""}</p>
+                              <p className="text-[10px] text-on-surface-variant">{f.student?.admission?.admissionNo || ""}</p>
                             </div>
                           </div>
+                        </td>
+
+                        {/* Admission Status */}
+                        <td className="px-6 py-5">
+                          {(() => {
+                            const hasTC = (f.student?.docRequests || []).some(d => d.status === "ISSUED");
+                            if (hasTC) return <span className="px-2.5 py-1 rounded-full bg-error-container text-error text-[10px] font-bold">TC</span>;
+                            if (f.student?.admission?.isApproved) return <span className="px-2.5 py-1 rounded-full bg-[#44ddc1]/20 text-[#001813] text-[10px] font-bold">Active</span>;
+                            return <span className="px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant text-[10px] font-bold">Pending</span>;
+                          })()}
                         </td>
 
                         {/* Standard */}

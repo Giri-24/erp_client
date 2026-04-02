@@ -24,11 +24,12 @@ const initials = (name = "") => {
 };
 
 // ── component ─────────────────────────────────────────────────────────────
-const StudentView = () => {
+const StudentView = ({ onCollectFee }) => {
   const [students, setStudents] = useState([]);
   const [classFilter, setClassFilter] = useState("");
   const [sectionFilter, setSectionFilter] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
+  const [areaFilter, setAreaFilter] = useState("");
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize] = useState(12);
@@ -69,6 +70,11 @@ const StudentView = () => {
       if (classFilter && (s.standard || s.admission?.standard) !== classFilter) return false;
       if (sectionFilter && (s.section || "") !== sectionFilter) return false;
       if (genderFilter && (s.gender || "").toLowerCase() !== genderFilter) return false;
+      if (areaFilter) {
+        const addr = s.address;
+        const areaStr = [addr?.line1, addr?.line2, addr?.line3, addr?.pin].filter(Boolean).join(" ").toLowerCase();
+        if (!areaStr.includes(areaFilter.toLowerCase())) return false;
+      }
       if (q) {
         const blob = [
           s.name, s.standard, s.gender, s.admission?.admissionNo,
@@ -78,7 +84,7 @@ const StudentView = () => {
       }
       return true;
     });
-  }, [students, classFilter, sectionFilter, genderFilter, searchText]);
+  }, [students, classFilter, sectionFilter, genderFilter, areaFilter, searchText]);
 
   // ── summary stats ─────────────────────────────────────────────────────────
   const totalEnrollment = students.length;
@@ -239,10 +245,22 @@ const StudentView = () => {
               <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">expand_more</span>
             </div>
 
+            {/* Area / Pin */}
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-3 text-on-surface-variant text-base">location_on</span>
+              <input
+                type="text"
+                value={areaFilter}
+                onChange={(e) => { setAreaFilter(e.target.value); setPage(1); }}
+                placeholder="Area / Pin..."
+                className="bg-white border-none rounded-xl py-3 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm min-w-[160px]"
+              />
+            </div>
+
             {/* Clear */}
-            {(classFilter || sectionFilter || genderFilter || searchText) && (
+            {(classFilter || sectionFilter || genderFilter || areaFilter || searchText) && (
               <button
-                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setSearchText(""); setPage(1); }}
+                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setAreaFilter(""); setSearchText(""); setPage(1); }}
                 className="h-[46px] px-4 flex items-center gap-1 bg-surface-container-highest rounded-xl text-on-surface-variant hover:text-error hover:bg-error-container transition-all text-sm font-medium"
               >
                 <span className="material-symbols-outlined text-base">close</span>
@@ -345,6 +363,15 @@ const StudentView = () => {
                         {/* Actions */}
                         <td className="py-5 px-5 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {onCollectFee && (
+                              <button
+                                title="Collect Fee"
+                                onClick={() => onCollectFee(s.id)}
+                                className="p-2 rounded-lg text-on-surface-variant hover:bg-[#44ddc1]/10 hover:text-[#001813] transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-lg">payments</span>
+                              </button>
+                            )}
                             <button
                               title="Link Sibling"
                               onClick={() => openLinkModal(s)}

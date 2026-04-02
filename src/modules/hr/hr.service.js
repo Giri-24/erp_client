@@ -248,3 +248,41 @@ export const getHRDashboard = async (params) => {
   const res = await axios.get('/hr/dashboard', { params });
   return res.data;
 };
+// ─── ADVANCE / LOAN TICKETS ─────────────────────
+
+export const createAdvanceRequest = async (data) => {
+  const res = await axios.post('/hr/advance', data);
+  return res.data;
+};
+
+export const getAdvanceRequests = async (params) => {
+  const res = await axios.get('/hr/advance', { params });
+  return res.data;
+};
+
+export const getAdvanceRequest = async (id) => {
+  const res = await axios.get(`/hr/advance/${id}`);
+  return res.data;
+};
+
+export const approveAdvance = async (id, email) => {
+  const res = await axios.put(`/hr/advance/${id}/approve`, { email });
+  return res.data;
+};
+
+export const rejectAdvance = async (id, email, reason) => {
+  const res = await axios.put(`/hr/advance/${id}/reject`, { email, reason });
+  return res.data;
+};
+
+export const disburseAdvance = async (id) => {
+  const res = await axios.put(`/hr/advance/${id}/disburse`);
+  return res.data;
+};
+
+// ─── SALARY ABSTRACT ────────────────────────────
+
+export const getSalaryAbstract = async (month) => {
+  const res = await axios.get(`/hr/salary-abstract/${month}`);
+  return res.data;
+};
