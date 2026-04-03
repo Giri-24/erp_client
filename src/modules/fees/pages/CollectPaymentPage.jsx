@@ -25,6 +25,9 @@ const PAYMENT_MODES = [
   { value: "BANK", label: "Bank Transfer", icon: "receipt_long" },
   { value: "CHEQUE", label: "Cheque", icon: "description" },
 ];
+  
+
+
 
 const RECEIPT_COMPONENT_LABELS = {
   transportFee: "Transport Fee",
@@ -75,7 +78,7 @@ const statusBadge = (status) => {
 };
 
 // ── component ─────────────────────────────────────────────────────────────
-const CollectPaymentPage = () => {
+const CollectPaymentPage = ({ studentId }) => {
   const [form] = Form.useForm();
   const [statusActionForm] = Form.useForm();
   const [linkForm] = Form.useForm();
@@ -137,6 +140,16 @@ const CollectPaymentPage = () => {
   useEffect(() => {
     if (academicYear) fetchFees(academicYear);
   }, [academicYear]);
+
+  useEffect(() => {
+  if (studentId && studentFees.length > 0) {
+    const fee = studentFees.find(f => f.student?.id === studentId);
+
+    if (fee) {
+      onSelectFee(fee.id); // 🔥 auto select
+    }
+  }
+}, [studentId, studentFees]);
 
   const onSelectFee = async (feeId) => {
     const fee = studentFees.find((f) => f.id === feeId);
