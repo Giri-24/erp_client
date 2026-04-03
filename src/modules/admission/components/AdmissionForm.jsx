@@ -14,13 +14,23 @@ export default function AdmissionForm() {
   });
 
   const onSubmit = async (data) => {
-    try {
-      await createAdmission(data);
-      alert('Admission Created Successfully');
-    } catch (err) {
-      alert('Error submitting form');
-    }
-  };
+  try {
+    // 🔥 get user from storage (adjust if you use context)
+    const user = JSON.parse(localStorage.getItem('user'));
+
+    const hasApprovePermission =
+      user?.permissions?.includes('admission:approve');
+
+    await createAdmission({
+      ...data,
+      autoApprove: hasApprovePermission, // 🔥 important
+    });
+
+    alert('Admission Created Successfully');
+  } catch (err) {
+    alert('Error submitting form');
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-100 py-10 px-4">

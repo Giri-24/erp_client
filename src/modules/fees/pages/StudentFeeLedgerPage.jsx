@@ -4,6 +4,8 @@ import { getMultiYearLedger } from "../fees.service";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
+
+
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => {
   const n = Number(v || 0);
@@ -25,6 +27,16 @@ const StudentFeeLedgerPage = () => {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [standardFilter, setStandardFilter] = useState("");
+
+  
+
+
+  const [sectionFilter, setSectionFilter] = useState("");
+const [genderFilter, setGenderFilter] = useState("");
+const [areaFilter, setAreaFilter] = useState("");
+const [admissionFilter, setAdmissionFilter] = useState("");
+
+
 
   useEffect(() => {
     setLoading(true);
@@ -157,24 +169,48 @@ const StudentFeeLedgerPage = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap items-center gap-4">
-        <div className="flex-grow min-w-[200px] relative">
-          <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-base">search</span>
-          <input
-            type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search student name..."
-            className="w-full bg-surface-container-low border-none rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-          />
-        </div>
-        <div className="relative">
-          <select value={standardFilter} onChange={(e) => setStandardFilter(e.target.value)}
-            className="appearance-none bg-surface-container-low border-none rounded-xl px-4 py-2.5 pr-10 text-sm font-bold text-primary outline-none focus:ring-2 focus:ring-primary/20 min-w-[140px]">
-            <option value="">All Standards</option>
-            {standardOptions.map((s) => <option key={s} value={s}>{STANDARD_LABELS[s] || s}</option>)}
-          </select>
-          <span className="material-symbols-outlined absolute right-3 top-2.5 pointer-events-none text-on-surface-variant text-base">expand_more</span>
-        </div>
-      </div>
+      
+      {/* Filters - Single Row */}
+<div className="bg-white rounded-2xl shadow-sm p-3 flex items-center gap-3">
+
+  {/* Search */}
+  <div className="relative flex-grow">
+    <span className="material-symbols-outlined absolute left-3 top-2.5 text-gray-400 text-base">
+      search
+    </span>
+    <input
+      type="text"
+      placeholder="Search student name..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      className="w-full bg-gray-100 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none"
+    />
+  </div>
+
+  {/* Standard */}
+  <select
+    value={standardFilter}
+    onChange={(e) => setStandardFilter(e.target.value)}
+    className="bg-gray-100 rounded-xl px-4 py-2.5 text-sm font-medium outline-none"
+  >
+    <option value="">All Standards</option>
+    {standardOptions.map((s) => (
+      <option key={s} value={s}>{s}</option>
+    ))}
+  </select>
+
+  {/* Section */}
+  <select
+    value={sectionFilter}
+    onChange={(e) => setSectionFilter(e.target.value)}
+    className="bg-gray-100 rounded-xl px-4 py-2.5 text-sm font-medium outline-none"
+  >
+    <option value="">All Sections</option>
+    <option value="A">A</option>
+    <option value="B">B</option>
+  </select>
+
+</div>
 
       {/* Table */}
       <div className="bg-white rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.05)] overflow-hidden">
@@ -191,7 +227,9 @@ const StudentFeeLedgerPage = () => {
                   <th className="py-3 px-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest sticky left-0 bg-surface-container-low z-10">#</th>
                   <th className="py-3 px-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest sticky left-8 bg-surface-container-low z-10 min-w-[180px]">Student Name</th>
                   <th className="py-3 px-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Std</th>
-                  {years.map((y) => (
+<th className="py-3 px-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest text-center min-w-[80px]">
+  Section
+</th>                  {years.map((y) => (
                     <th key={y} className="py-3 px-4 text-[10px] font-bold text-on-surface-variant uppercase tracking-widest text-right min-w-[100px]">{y}</th>
                   ))}
                   <th className="py-3 px-4 text-[10px] font-bold text-primary uppercase tracking-widest text-right">Total</th>
@@ -210,47 +248,120 @@ const StudentFeeLedgerPage = () => {
                 ) : (
                   <>
                     {filtered.map((s, idx) => (
-                      <tr key={s.student?.id || idx} className={`hover:bg-surface-container-low/30 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-surface-container-low/20"}`}>
-                        <td className="py-3.5 px-4 text-xs text-on-surface-variant font-medium sticky left-0 bg-inherit z-10">{idx + 1}</td>
-                        <td className="py-3.5 px-4 sticky left-8 bg-inherit z-10">
-                          <span className="font-bold text-sm text-primary">{s.student?.name || "—"}</span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="bg-surface-container-high px-2 py-0.5 rounded-full text-[10px] font-bold">
-                            {STANDARD_LABELS[s.student?.standard] || s.student?.standard || "—"}
-                          </span>
-                        </td>
-                        {years.map((y) => {
-                          const yd = s.yearData[y];
-                          return (
-                            <td key={y} className="py-3.5 px-4 text-right text-sm font-medium text-on-surface-variant">
-                              {yd ? fmt(yd.paid || yd.totalFee) : <span className="text-on-surface-variant/30">-</span>}
-                            </td>
-                          );
-                        })}
-                        <td className="py-3.5 px-4 text-right text-sm font-bold text-primary">{fmt(s.grandTotal)}</td>
-                        <td className="py-3.5 px-4 text-right text-sm font-bold text-[#001813]">{s.grandDiscount > 0 ? fmt(s.grandDiscount) : "-"}</td>
-                        <td className="py-3.5 px-4 text-right">
-                          <span className={`text-sm font-bold ${s.grandBalance > 0 ? "text-error" : "text-[#001813]"}`}>
-                            {s.grandBalance > 0 ? fmt(s.grandBalance) : "-"}
-                          </span>
-                        </td>
-                      </tr>
+                      <tr
+  key={s.student?.id || idx}
+  className={`hover:bg-surface-container-low/30 transition-colors ${
+    idx % 2 === 0 ? "bg-white" : "bg-surface-container-low/20"
+  }`}
+>
+  {/* Index */}
+  <td className="py-3.5 px-4 text-xs text-on-surface-variant font-medium sticky left-0 bg-inherit z-10">
+    {idx + 1}
+  </td>
+
+  {/* Student Name */}
+  <td className="py-3.5 px-4 sticky left-8 bg-inherit z-10">
+    <span className="font-bold text-sm text-primary">
+      {s.student?.name || "—"}
+    </span>
+  </td>
+
+  {/* Standard */}
+  <td className="py-3.5 px-4">
+    <span className="bg-surface-container-high px-2 py-0.5 rounded-full text-[10px] font-bold">
+      {STANDARD_LABELS[s.student?.standard] ||
+        s.student?.standard ||
+        "—"}
+    </span>
+  </td>
+  {/* ✅ Section (NEW COLUMN) */}
+  <td className="py-3.5 px-4 min-w-[80px] text-center">
+  <span className="inline-block bg-surface-container-high px-3 py-1 rounded-full text-[10px] font-bold">
+    {s.student?.section || "—"}
+  </span>
+</td>
+
+  {/* Year-wise Fees */}
+  {years.map((y) => {
+    const yd = s.yearData[y];
+    return (
+      <td
+        key={y}
+className="py-3.5 px-4 text-right text-sm font-medium min-w-[100px]"      >
+        {yd ? (
+          fmt(yd.paid || yd.totalFee)
+        ) : (
+          <span className="text-on-surface-variant/30">-</span>
+        )}
+      </td>
+    );
+  })}
+
+  {/* Total */}
+<td className="py-3.5 px-4 text-right text-sm font-bold text-primary min-w-[100px]">
+  {fmt(s.grandTotal)}
+</td>
+  
+
+  {/* Discount */}
+ <td className="py-3.5 px-4 text-right text-sm font-bold text-[#001813] min-w-[100px]">
+  {s.grandDiscount > 0 ? fmt(s.grandDiscount) : "-"}
+</td>
+
+{/* Balance */}
+<td className="py-3.5 px-4 text-right text-sm font-bold min-w-[100px]">
+  <span
+    className={s.grandBalance > 0 ? "text-error" : "text-[#001813]"}
+  >
+    {s.grandBalance > 0 ? fmt(s.grandBalance) : "-"}
+  </span>
+</td>
+</tr>
                     ))}
                     {/* Grand total row */}
                     <tr className="bg-primary/5 font-black border-t-2 border-primary/20">
-                      <td className="py-4 px-4 sticky left-0 bg-primary/5 z-10" />
-                      <td className="py-4 px-4 sticky left-8 bg-primary/5 z-10 text-primary font-extrabold text-sm">GRAND TOTAL</td>
-                      <td className="py-4 px-4" />
-                      {years.map((y) => (
-                        <td key={y} className="py-4 px-4 text-right text-sm font-extrabold text-primary">
-                          {grandTotals.yearTotals[y] ? fmt(grandTotals.yearTotals[y]) : "-"}
-                        </td>
-                      ))}
-                      <td className="py-4 px-4 text-right text-sm font-extrabold text-primary">{fmt(grandTotals.total)}</td>
-                      <td className="py-4 px-4 text-right text-sm font-extrabold text-[#001813]">{fmt(grandTotals.discount)}</td>
-                      <td className="py-4 px-4 text-right text-sm font-extrabold text-error">{fmt(grandTotals.balance)}</td>
-                    </tr>
+
+  {/* # */}
+  <td className="py-4 px-4 sticky left-0 bg-primary/5 z-10" />
+
+  {/* Name */}
+  <td className="py-4 px-4 sticky left-8 bg-primary/5 z-10 text-primary font-extrabold text-sm min-w-[180px]">
+  
+    GRAND TOTAL
+  </td>
+
+  {/* Std */}
+  <td className="py-4 px-4" />
+
+  {/* ✅ Section (IMPORTANT SHIFT FIX) */}
+  <td className="py-4 px-4 min-w-[80px]" />
+
+  {/* Year columns */}
+  {years.map((y) => (
+    <td
+      key={y}
+      className="py-4 px-4 text-right text-sm font-extrabold text-primary min-w-[100px]"
+    >
+      {grandTotals.yearTotals[y] ? fmt(grandTotals.yearTotals[y]) : "-"}
+    </td>
+  ))}
+
+  {/* Total */}
+  <td className="py-4 px-4 text-right text-sm font-extrabold text-primary min-w-[100px]">
+    {fmt(grandTotals.total)}
+  </td>
+
+  {/* Discount */}
+  <td className="py-4 px-4 text-right text-sm font-extrabold text-[#001813] min-w-[100px]">
+    {fmt(grandTotals.discount)}
+  </td>
+
+  {/* Balance */}
+  <td className="py-4 px-4 text-right text-sm font-extrabold text-error min-w-[100px]">
+    {fmt(grandTotals.balance)}
+  </td>
+
+</tr>
                   </>
                 )}
               </tbody>
