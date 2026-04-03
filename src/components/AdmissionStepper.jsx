@@ -87,6 +87,31 @@ const AdmissionStepper = ({editData, clearEditData}) => {
   });
 
   useEffect(() => {
+  const fetchAdmissionNo = async () => {
+    try {
+      const res = await getNextAdmissionNo();
+
+      form.setFieldsValue({
+        admissionNo: res.admissionNo,
+      });
+
+      setFormData(prev => ({
+        ...prev,
+        admissionNo: res.admissionNo,
+      }));
+
+    } catch (err) {
+      message.error("Auto admission number failed");
+    }
+  };
+
+  // ✅ only for NEW admission (not edit)
+  if (!editData) {
+    fetchAdmissionNo();
+  }
+}, []);
+
+  useEffect(() => {
     if (editData) {
       const primaryAcademic = editData.academics?.[0] || {};
       const flatData = {
@@ -234,7 +259,7 @@ const AdmissionStepper = ({editData, clearEditData}) => {
         { subjectName: 'Social Science', maxMarks: 100, obtainedMarks: 85  },
       ],
       
-      admissionNo: `ADM${Math.floor(1000 + Math.random() * 9000)}`,
+      //admissionNo: `ADM${Math.floor(1000 + Math.random() * 9000)}`,
       admissionDate: dayjs(),
       admissionFrom: dayjs(),
       admissionTo: dayjs().add(3, 'year'),
@@ -271,6 +296,7 @@ const documentsChecked = Form.useWatch("documentsChecked", form);
 const profilePhotoChecked = Form.useWatch("profilePhotoChecked", form);
 const watchedStandard = Form.useWatch("standard", form);
 const watchedSubjects = Form.useWatch("subjects", form) || [];
+const siblingSchool = Form.useWatch("siblingSchool", form);
 
 useEffect(() => {
   if (!watchedSubjects || watchedSubjects.length === 0) return;
@@ -393,24 +419,35 @@ const getDefaultFile = (path, name = "file") => {
             </Form.Item>
           </Col>
           <Col span={12}>
-            <Form.Item name="community" label="Community" rules={[requiredRule]}>
-              <Select onChange={(v) => setCommunity(v)}>
-                <Select.Option value="BC">BC</Select.Option>
-                <Select.Option value="MBC">MBC</Select.Option>
-                <Select.Option value="SC">SC</Select.Option>
-                <Select.Option value="OTHERS">Others</Select.Option>
-              </Select>
-            </Form.Item>
-          </Col>
-          {community === "OTHERS" && (
-            <Col span={12}>
-              <Form.Item name="communityOther" label="Custom Community" rules={[requiredRule]}>
-                <Input />
-              </Form.Item>
-            </Col>
-          )}
-          <Col span={12}><Form.Item name="religion" label="Religion" rules={[requiredRule]}><Input /></Form.Item></Col>
-          <Col span={12}><Form.Item name="caste" label="Caste" rules={[requiredRule]}><Input /></Form.Item></Col>
+  <Form.Item name="religion" label="Religion" rules={[requiredRule]}>
+    <Input />
+  </Form.Item>
+</Col>
+
+<Col span={12}>
+  <Form.Item name="community" label="Community" rules={[requiredRule]}>
+    <Select onChange={(v) => setCommunity(v)}>
+      <Select.Option value="BC">BC</Select.Option>
+      <Select.Option value="MBC">MBC</Select.Option>
+      <Select.Option value="SC">SC</Select.Option>
+      <Select.Option value="OTHERS">Others</Select.Option>
+    </Select>
+  </Form.Item>
+</Col>
+
+{community === "OTHERS" && (
+  <Col span={12}>
+    <Form.Item name="communityOther" label="Custom Community" rules={[requiredRule]}>
+      <Input />
+    </Form.Item>
+  </Col>
+)}
+
+<Col span={12}>
+  <Form.Item name="caste" label="Caste" rules={[requiredRule]}>
+    <Input />
+  </Form.Item>
+</Col>
           <Col span={12}><Form.Item name="motherTongue" label="Mother Tongue" rules={[requiredRule]}><Input /></Form.Item></Col>
           <Col span={12}><Form.Item name="aadharNo" label="Aadhar No" rules={[aadharRule]}><Input maxLength={12} /></Form.Item></Col>
           <Col span={12}><Form.Item name="bloodGroup" label="Blood Group" rules={[requiredRule]}><Input /></Form.Item></Col>
@@ -522,6 +559,29 @@ const getDefaultFile = (path, name = "file") => {
         <Form.Item name="sibblings" label="Siblings" /*rules={[requiredRule]}*/>
           <Input />
         </Form.Item>
+
+        <Row gutter={16}>
+  <Col span={12}>
+    <Form.Item name="siblingSchool" label="Sibling School">
+      <Select placeholder="Select option">
+        <Select.Option value="same">Same School</Select.Option>
+        <Select.Option value="other">Other School</Select.Option>
+      </Select>
+    </Form.Item>
+  </Col>
+
+  {siblingSchool === "other" && (
+    <Col span={12}>
+      <Form.Item
+        name="otherSchoolName"
+        label="Other School Name"
+        rules={[{ required: true, message: "Enter school name" }]}
+      >
+        <Input placeholder="Enter school name" />
+      </Form.Item>
+    </Col>
+  )}
+</Row>
       </Col>
     </Row>
   </>
@@ -534,11 +594,43 @@ const getDefaultFile = (path, name = "file") => {
       icon: <HomeOutlined />,
       fields: [],
       content: (
-        <>
-          <Form.Item name="line1" label="Address Line 1" rules={[requiredRule]}><Input /></Form.Item>
-          <Form.Item name="line2" label="Address Line 2" rules={[requiredRule]}><Input /></Form.Item>
-          <Form.Item name="pin" label="PIN" rules={[pinRule]}><Input maxLength={6} /></Form.Item>
-        </>
+        <Row gutter={16}>
+  <Col span={12}>
+    <Form.Item name="doorNo" label="Door No / House No" rules={[requiredRule]}>
+      <Input />
+    </Form.Item>
+  </Col>
+
+  <Col span={12}>
+    <Form.Item name="street" label="Street / Area" rules={[requiredRule]}>
+      <Input />
+    </Form.Item>
+  </Col>
+
+  <Col span={12}>
+    <Form.Item name="landmark" label="Landmark">
+      <Input />
+    </Form.Item>
+  </Col>
+
+  <Col span={12}>
+    <Form.Item name="city" label="City" rules={[requiredRule]}>
+      <Input />
+    </Form.Item>
+  </Col>
+
+  <Col span={12}>
+    <Form.Item name="state" label="State" rules={[requiredRule]}>
+      <Input />
+    </Form.Item>
+  </Col>
+
+  <Col span={12}>
+    <Form.Item name="pin" label="Pincode" rules={[pinRule]}>
+      <Input maxLength={6} />
+    </Form.Item>
+  </Col>
+</Row>
       ),
     },
 
@@ -958,7 +1050,7 @@ const getDefaultFile = (path, name = "file") => {
           <Form.Item name="admissionNo" label="Admission No">
             <Input disabled placeholder="Auto-generated" />
           </Form.Item>
-          <Button
+         {/* <Button
             type="link"
             style={{ marginBottom: 16 }}
             onClick={async () => {
@@ -973,7 +1065,7 @@ const getDefaultFile = (path, name = "file") => {
             }}
           >
             Generate Admission No
-          </Button>
+          </Button> */ }
           <Form.Item name="admissionDate" label="Admission Date" rules={[requiredRule]}>
             <DatePicker style={{ width: "100%" }} />
           </Form.Item>
@@ -995,7 +1087,7 @@ const getDefaultFile = (path, name = "file") => {
     <Card>
       <Descriptions bordered column={2}>
         {Object.entries(formData).map(([k, v]) => {
-          
+          if (k === "rteApplied" || k === "vanNeeded") return null;
           // 🔥 HANDLE PHOTO SEPARATELY
           if (k === "profilePhoto" && v?.length > 0) {
             const url =
@@ -1054,23 +1146,39 @@ const getDefaultFile = (path, name = "file") => {
           if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) {
             return null;
           }
+
+          const formatLabel = (key) =>
+  key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (str) => str.toUpperCase());
           return (
-            <Descriptions.Item key={k} label={k}>
-              {typeof v === "object"
-                ? v?.format
-                  ? v.format("DD-MM-YYYY")
-                  : Array.isArray(v)
-                    ? v.map((item) =>
-                        typeof item === 'object'
-                          ? item.subjectName || JSON.stringify(item)
-                          : String(item)
-                      ).join(', ')
-                    : JSON.stringify(v)
-                : String(v)}
-            </Descriptions.Item>
+            
+            <Descriptions.Item key={k} label={formatLabel(k)}>
+  {typeof v === "object"
+    ? v?.format
+      ? v.format("DD-MM-YYYY")
+      : Array.isArray(v)
+        ? v.map((item) =>
+            typeof item === 'object'
+              ? item.subjectName || JSON.stringify(item)
+              : String(item)
+          ).join(', ')
+        : JSON.stringify(v)
+    : String(v)}
+</Descriptions.Item>
           );
         })}
       </Descriptions>
+
+      <Descriptions bordered column={2} style={{ marginTop: 16 }}>
+  <Descriptions.Item label="Transport">
+    {formData.vanNeeded ? "Van" : "Local"}
+  </Descriptions.Item>
+
+  <Descriptions.Item label="RTE Applied">
+    {formData.rteApplied ? "Yes" : "No"}
+  </Descriptions.Item>
+</Descriptions>
     </Card>
   ),
 }
@@ -1123,20 +1231,18 @@ const getImageDimensions = (src) =>
   });
 const styles = {
   field: {
-    display: "inline-block",
-    borderBottom: "1px solid black",
-    minWidth: "250px",
-    marginLeft: 10,
-    fontWeight: "bold",
-  },
+  display: "inline-block",
+  minWidth: "250px",
+  marginLeft: 10,
+  fontWeight: "bold",
+},
 
   fieldSmall: {
-    display: "inline-block",
-    borderBottom: "1px solid black",
-    minWidth: "120px",
-    marginLeft: 10,
-    fontWeight: "bold",
-  },
+  display: "inline-block",
+  minWidth: "120px",
+  marginLeft: 10,
+  fontWeight: "bold",
+},
 
   row: {
     display: "flex",
@@ -1256,6 +1362,7 @@ const generatePDF = async () => {
                     const data = {
                       name: values.name,
                       standard: values.standard || "10th",
+                      rte: values.rteApplied || false,
                       gender: values.gender,
                       dob: values.dob ? values.dob.toISOString() : undefined,
                       religion: values.religion,
