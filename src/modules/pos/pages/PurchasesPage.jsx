@@ -6,12 +6,13 @@ import {
   getAllSuppliers, createSupplier, updateSupplier, deleteSupplier,
   uploadPurchaseReceipt,
 } from "../pos.service";
-import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 import { exportToCSV } from "../exportCsv";
 
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
 const PurchasesPage = () => {
+  const { hasPermission } = usePermissionHelpers();
   const [stores, setStores] = useState([]);
   const [items, setItems] = useState([]);
   const [purchases, setPurchases] = useState([]);

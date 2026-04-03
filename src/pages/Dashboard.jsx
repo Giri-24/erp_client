@@ -54,6 +54,7 @@ import StaffAllowancePage from "../modules/pos/pages/StaffAllowancePage";
 import IncomeExpensePage from "../modules/pos/pages/IncomeExpensePage";
 import DocRequestPage from "../modules/doc-request/pages/DocRequestPage";
 import HouseManagementPage from "../modules/house/pages/HouseManagementPage";
+import StaffDashboard from "./StaffDashboard";
 
 import { hasPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions";
 
@@ -230,7 +231,7 @@ const Dashboard = () => {
 
   const renderContent = () => {
     switch (selectedKey) {
-      case "dashboard":           return <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
+      case "dashboard":           return userRole === "STAFF" ? <StaffDashboard onNavigate={(key) => setSelectedKey(key)} /> : <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
       case "admission":           return <AdmissionPage editData={editData} clearEditData={() => setEditData(null)} />;
       case "admission-view":      return <AdmissionView onEdit={(record) => { setEditData(record); setSelectedKey("admission"); }} />;
       case "admission-edit":      return <AdmissionEdit />;
@@ -271,7 +272,7 @@ case "fees-collect":
       case "pos-transactions":    return <IncomeExpensePage />;
       case "doc-requests":        return <DocRequestPage />;
       case "house-management":    return <HouseManagementPage />;
-      default:                    return <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
+      default:                    return userRole === "STAFF" ? <StaffDashboard onNavigate={(key) => setSelectedKey(key)} /> : <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
     }
   };
 
@@ -363,7 +364,7 @@ case "fees-collect":
       <aside className="h-screen w-64 fixed left-0 top-0 overflow-y-auto bg-surface-container-low dark:bg-primary flex flex-col py-6 z-50 border-r border-outline-variant/10">
         <div className="px-6 mb-8">
           <h1 className="text-xl font-bold text-primary dark:text-surface font-headline">Academic Architect</h1>
-          <p className="text-xs font-semibold tracking-tight text-on-surface-variant dark:text-surface-container/70">Admin Dashboard</p>
+          <p className="text-xs font-semibold tracking-tight text-on-surface-variant dark:text-surface-container/70">{userRole === "STAFF" ? "Staff Portal" : userRole === "STUDENT" ? "Student Portal" : "Admin Dashboard"}</p>
         </div>
 
         <nav className="flex-1 space-y-0.5 px-2">
@@ -371,17 +372,19 @@ case "fees-collect":
         </nav>
 
         <div className="mt-auto pt-4 border-t border-outline-variant/20 mx-4 space-y-1">
-          <button
-            onClick={() => setSelectedKey("admin-settings")}
-            className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all ${
-              selectedKey === "admin-settings"
-                ? "bg-white text-primary font-semibold"
-                : "text-on-surface-variant dark:text-surface-container/70 hover:bg-surface-container-high"
-            }`}
-          >
-            <span className="material-symbols-outlined text-xl">settings</span>
-            <span className="font-headline tracking-tight">Settings</span>
-          </button>
+          {canReadSettings && (
+            <button
+              onClick={() => setSelectedKey("admin-settings")}
+              className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all ${
+                selectedKey === "admin-settings"
+                  ? "bg-white text-primary font-semibold"
+                  : "text-on-surface-variant dark:text-surface-container/70 hover:bg-surface-container-high"
+              }`}
+            >
+              <span className="material-symbols-outlined text-xl">settings</span>
+              <span className="font-headline tracking-tight">Settings</span>
+            </button>
+          )}
           <button
             onClick={onLogout}
             className="w-full text-left text-on-surface-variant dark:text-surface-container/70 hover:bg-surface-container-high dark:hover:bg-primary-container/50 px-4 py-3 rounded-xl flex items-center gap-3 transition-all"

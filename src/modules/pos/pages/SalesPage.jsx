@@ -3,7 +3,7 @@ import { message, Modal } from "antd";
 import {
   getAllStoreItems, getAllStores, createSale, getAllSales,
 } from "../pos.service";
-import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 import { exportToCSV } from "../exportCsv";
 
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
@@ -12,6 +12,7 @@ const CUSTOMER_TYPES = ["WALK_IN", "STUDENT", "STAFF"];
 const PAYMENT_MODES = ["CASH", "UPI", "CARD"];
 
 const SalesPage = () => {
+  const { hasPermission } = usePermissionHelpers();
   const [stores, setStores] = useState([]);
   const [items, setItems] = useState([]);
   const [sales, setSales] = useState([]);
