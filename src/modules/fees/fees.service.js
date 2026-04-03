@@ -169,6 +169,23 @@ export const getClassWiseSummary = async (academicYear) => {
   const res = await axios.get('/fees/class-summary', { params: { academicYear } });
   return res.data;
 };
+
+// ─── KIT / BOOK FEE MANAGEMENT ──────────────
+
+export const issueKitItem = async (data) => {
+  const res = await axios.post('/fees/kit/issue', data);
+  return res.data;
+};
+
+export const getStudentKitIssues = async (studentFeeId) => {
+  const res = await axios.get(`/fees/kit/${studentFeeId}`);
+  return res.data;
+};
+
+export const removeKitIssue = async (kitIssueId) => {
+  const res = await axios.delete(`/fees/kit/${kitIssueId}`);
+  return res.data;
+};
 // ─── PAYMENT LINKS (PhonePe) ─────────────────
 
 /**

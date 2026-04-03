@@ -7,6 +7,8 @@ import {
   getStudentTransport,
   getTransportAcademicYears,
   getTransportFee,
+  updateSplClassDates,
+  stopSplClass,
 } from "../transport.service";
 import instance from "../../../utils/axios";
 import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
@@ -41,6 +43,11 @@ const AssignTransportPage = () => {
   const [feePreview, setFeePreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showTip, setShowTip] = useState(true);
+
+  // spl class tracking
+  const [splClassDaysUsed, setSplClassDaysUsed] = useState("");
+  const [totalWorkingDays, setTotalWorkingDays] = useState("");
+  const [stoppingSplClass, setStoppingSplClass] = useState(false);
 
   const { hasPermission } = usePermissionHelpers();
   const canAssign = hasPermission(PERMISSIONS.TRANSPORT_ASSIGN);
@@ -84,12 +91,16 @@ const AssignTransportPage = () => {
     setStudentId(id);
     setCurrentAssignment(null);
     setFeePreview(null);
+    setSplClassDaysUsed("");
+    setTotalWorkingDays("");
     try {
       const assignment = await getStudentTransport(id);
       setCurrentAssignment(assignment);
       setRouteId(assignment.routeId);
       setStopId(assignment.stopId);
       setIsSplClass(!!assignment.isSplClass);
+      setSplClassDaysUsed(assignment.splClassDaysUsed ?? "");
+      setTotalWorkingDays(assignment.totalWorkingDays ?? "");
       setAcademicYear(assignment.academicYear || academicYear || availableYears[0] || "2026-2027");
       const route = routes.find((r) => r.id === assignment.routeId);
       setSelectedRoute(route || null);
@@ -124,6 +135,28 @@ const AssignTransportPage = () => {
       message.error(err?.response?.data?.message || "Failed to assign transport");
     }
     setLoading(false);
+  };
+
+  const handleStopSplClass = async () => {
+    if (!studentId) { message.error("Please select a student"); return; }
+    if (!splClassDaysUsed || !totalWorkingDays) { message.error("Please enter days used and total working days"); return; }
+    setStoppingSplClass(true);
+    try {
+      await stopSplClass(studentId, {
+        splClassDaysUsed: Number(splClassDaysUsed),
+        totalWorkingDays: Number(totalWorkingDays),
+      });
+      message.success("Special class stopped — pro-rata fee updated");
+      const fee = await getTransportFee(studentId);
+      setFeePreview(fee);
+      const assignment = await getStudentTransport(studentId);
+      setCurrentAssignment(assignment);
+      setSplClassDaysUsed(assignment.splClassDaysUsed ?? "");
+      setTotalWorkingDays(assignment.totalWorkingDays ?? "");
+    } catch (err) {
+      message.error(err?.response?.data?.message || "Failed to stop special class");
+    }
+    setStoppingSplClass(false);
   };
 
   // student options for antd Select
@@ -318,6 +351,75 @@ const AssignTransportPage = () => {
                 </label>
               </div>
 
+              {/* Spl Class Pro-rata Tracking */}
+              {isSplClass && currentAssignment?.isSplClass && (
+                <div className="bg-surface-container-low p-5 rounded-xl space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center text-primary shadow-sm flex-shrink-0">
+                      <span className="material-symbols-outlined text-sm">calculate</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-primary text-sm">Pro-rata Calculation</h4>
+                      <p className="text-xs text-on-surface-variant">Track actual days used for pro-rata transport billing</p>
+                    </div>
+                  </div>
+
+                  {currentAssignment.splClassStartDate && (
+                    <div className="flex items-center gap-2 bg-[#44ddc1]/10 border border-[#44ddc1]/30 rounded-lg px-3 py-2">
+                      <span className="material-symbols-outlined text-[#44ddc1] text-sm">event</span>
+                      <span className="text-xs font-medium text-primary">
+                        Started: {new Date(currentAssignment.splClassStartDate).toLocaleDateString("en-IN")}
+                        {currentAssignment.splClassEndDate && ` — Ended: ${new Date(currentAssignment.splClassEndDate).toLocaleDateString("en-IN")}`}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider ml-1">Days Used</label>
+                      <input
+                        type="number" min={0}
+                        value={splClassDaysUsed}
+                        onChange={(e) => setSplClassDaysUsed(e.target.value)}
+                        placeholder="e.g. 10"
+                        className="w-full px-4 py-3 bg-white border-none rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider ml-1">Total Working Days</label>
+                      <input
+                        type="number" min={1}
+                        value={totalWorkingDays}
+                        onChange={(e) => setTotalWorkingDays(e.target.value)}
+                        placeholder="e.g. 30"
+                        className="w-full px-4 py-3 bg-white border-none rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                  </div>
+
+                  {splClassDaysUsed && totalWorkingDays && Number(totalWorkingDays) > 0 && (
+                    <div className="bg-primary-fixed/30 rounded-xl px-4 py-3 flex justify-between items-center">
+                      <span className="text-xs font-bold text-on-surface-variant">Pro-rata ratio</span>
+                      <span className="text-sm font-extrabold text-primary">
+                        {splClassDaysUsed} / {totalWorkingDays} = {((Number(splClassDaysUsed) / Number(totalWorkingDays)) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+
+                  {!currentAssignment.splClassEndDate && (
+                    <button
+                      onClick={handleStopSplClass}
+                      disabled={stoppingSplClass || !splClassDaysUsed || !totalWorkingDays}
+                      className="w-full py-3 px-4 bg-error text-white font-bold text-sm rounded-xl hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {stoppingSplClass && <span className="material-symbols-outlined text-sm animate-spin">refresh</span>}
+                      <span className="material-symbols-outlined text-sm">stop_circle</span>
+                      Stop Special Class & Calculate Pro-rata
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Fee preview */}
               {feePreview && (
                 <div className="bg-[#44ddc1]/10 border border-[#44ddc1]/30 rounded-xl p-4">
@@ -334,6 +436,12 @@ const AssignTransportPage = () => {
                       </div>
                     ))}
                   </div>
+                  {feePreview.proRataSplClassFee != null && feePreview.proRataSplClassFee !== feePreview.splClassFee && (
+                    <div className="mt-3 pt-3 border-t border-[#44ddc1]/20 flex justify-between items-center">
+                      <span className="text-xs font-medium text-on-surface-variant">Pro-rata Spl. Class Fee</span>
+                      <span className="text-sm font-extrabold text-[#005145]">{fmt(feePreview.proRataSplClassFee)}</span>
+                    </div>
+                  )}
                 </div>
               )}
 

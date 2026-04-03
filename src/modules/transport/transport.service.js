@@ -64,6 +64,18 @@ export const getTransportFee = async (studentId) => {
   return res.data;
 };
 
+// ─── SPECIAL CLASS PRO-RATA ─────────────────
+
+export const updateSplClassDates = async (data) => {
+  const res = await axios.put('/transport/spl-class/dates', data);
+  return res.data;
+};
+
+export const stopSplClass = async (studentId, data) => {
+  const res = await axios.post(`/transport/spl-class/stop/${studentId}`, data);
+  return res.data;
+};
+
 export const getLiveDriverLocations = async () => {
   const res = await axios.get('/location/live/drivers');
   return res.data;

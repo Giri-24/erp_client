@@ -37,6 +37,41 @@ const RECEIPT_COMPONENT_LABELS = {
   customItems: "Custom Items",
 };
 
+const COMPONENT_FEE_FIELDS = {
+  transportFee: "transportFee",
+  bookFee: "bookFee",
+  hostelFee: "hostelFee",
+  otherFee: "otherFee",
+};
+
+// Compute per-term component split (only tuition + transport are term-wise)
+const computeTermComponents = (fee) => {
+  if (!fee?.terms?.length) return fee?.terms || [];
+  const nTerms = fee.terms.length;
+  const splitEvenly = (val, n) => {
+    const perTerm = Math.round((val / n) * 100) / 100;
+    return Array.from({ length: n }, (_, i) =>
+      i === n - 1 ? Math.round((val - perTerm * (n - 1)) * 100) / 100 : perTerm
+    );
+  };
+  // Check if component amounts are already populated
+  const hasComponents = fee.terms.some(
+    (t) => (t.tuitionAmount || 0) > 0 || (t.transportAmount || 0) > 0
+  );
+  if (hasComponents) return fee.terms;
+  // Fallback: only split tuition + transport; book/hostel/other are non-term
+  const tuition = splitEvenly(Number(fee.tuitionFee || 0), nTerms);
+  const transport = splitEvenly(Number(fee.transportFee || 0), nTerms);
+  return fee.terms.map((t, i) => ({
+    ...t,
+    tuitionAmount: tuition[i],
+    transportAmount: transport[i],
+    bookAmount: 0,
+    hostelAmount: 0,
+    otherAmount: 0,
+  }));
+};
+
 const getAvailableReceiptComponentOptions = (fee) => {
   if (!fee) return [];
   const opts = [];
@@ -105,6 +140,8 @@ const CollectPaymentPage = ({ studentId }) => {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [splitMode, setSplitMode] = useState(false);
   const [splitPayments, setSplitPayments] = useState([]);
+  const [payComponents, setPayComponents] = useState([]);  // which components to pay: ["tuition", "transport", ...] or [] = full term
+  const [payingNonTerm, setPayingNonTerm] = useState(false);  // paying non-term fees (book, hostel, other, custom)
 
   const { hasPermission } = usePermissionHelpers();
   const canCollectFee = hasPermission(PERMISSIONS.FEES_COLLECT);
@@ -156,6 +193,8 @@ const CollectPaymentPage = ({ studentId }) => {
     setSelectedFee(fee);
     setAmount("");
     setTermNumber(null);
+    setPayingNonTerm(false);
+    setPayComponents([]);
     setReceiptComponents(getAvailableReceiptComponentOptions(fee));
     setLinkResult(null);
 
@@ -199,7 +238,7 @@ const CollectPaymentPage = ({ studentId }) => {
     
     if (!splitMode) {
       if (!amount || Number(amount) <= 0) { message.error("Please enter an amount"); return; }
-      if (selectedFee.terms?.length > 0 && !termNumber) { message.error("Please select a term"); return; }
+      if (selectedFee.terms?.length > 0 && !termNumber && !payingNonTerm) { message.error("Please select a term or Non-Term Fees"); return; }
     }
 
     setLoading(true);
@@ -232,6 +271,30 @@ const CollectPaymentPage = ({ studentId }) => {
           receiptComponents,
         };
       } else {
+        // Build paidComponents from chip selection
+        let paidComps;
+        if (payComponents.length > 0 && termNumber) {
+          const enriched = computeTermComponents(selectedFee);
+          const selTerm = enriched.find((t) => t.termNumber === termNumber);
+          if (selTerm) {
+            const keyMap = { tuition: "tuitionAmount", transport: "transportAmount", book: "bookAmount", hostel: "hostelAmount", other: "otherAmount" };
+            paidComps = {};
+            payComponents.forEach((k) => { paidComps[k] = Math.round(selTerm[keyMap[k]] || 0); });
+          }
+        } else if (payComponents.length > 0 && payingNonTerm) {
+          // Non-term component selection
+          const feeMap = { book: Number(selectedFee.bookFee || 0), hostel: Number(selectedFee.hostelFee || 0), other: Number(selectedFee.otherFee || 0) };
+          paidComps = {};
+          payComponents.forEach((k) => {
+            if (feeMap[k] !== undefined) {
+              paidComps[k] = Math.round(feeMap[k]);
+            } else {
+              // custom item
+              const ci = (selectedFee.customItems || []).find((c) => `custom-${c.id || c.name}` === k);
+              if (ci) paidComps[k] = Math.round(Number(ci.amount || 0));
+            }
+          });
+        }
         payload = {
           studentFeeId: selectedFee.id,
           amount: Math.round(Number(amount)),
@@ -240,6 +303,7 @@ const CollectPaymentPage = ({ studentId }) => {
           remarks,
           termNumber: termNumber || undefined,
           receiptComponents,
+          ...(paidComps ? { paidComponents: paidComps } : {}),
         };
       }
 
@@ -261,6 +325,7 @@ const CollectPaymentPage = ({ studentId }) => {
         customItems: selectedFee?.customItems,
         discounts: selectedFee?.discounts,
         receiptComponents,
+        paidComponents: result?.paidComponents || payload.paidComponents,
         status: result?.status || "SUCCESS",
       });
 
@@ -272,6 +337,8 @@ const CollectPaymentPage = ({ studentId }) => {
       setAmount("");
       setRemarks("");
       setTermNumber(null);
+      setPayComponents([]);
+      setPayingNonTerm(false);
       setSplitMode(false);
       setSplitPayments([]);
       await fetchReceiptNo();
@@ -518,48 +585,438 @@ const CollectPaymentPage = ({ studentId }) => {
                 </div>
 
                 {!splitMode ? (
-                  <div className="flex gap-2 flex-wrap">
-                    {selectedFee.terms.map((t) => {
-                      const paid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
-                      const balance = Math.round(t.amount - paid);
-                      const isPaid = t.status === "PAID" || balance <= 0;
-                      
+                  <>
+                    <div className="flex gap-2 flex-wrap">
+                      {selectedFee.terms.map((t) => {
+                        const paid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                        const balance = Math.round(t.amount - paid);
+                        const isPaid = t.status === "PAID" || balance <= 0;
+                        
+                        return (
+                          <button
+                            key={t.termNumber}
+                            type="button"
+                            onClick={() => {
+                              setTermNumber(t.termNumber);
+                              setPayingNonTerm(false);
+                              setPayComponents([]);  // reset component selection
+                              setAmount(balance.toString());
+                            }}
+                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${
+                              termNumber === t.termNumber && !payingNonTerm
+                                ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-[1.02]"
+                                : isPaid
+                                ? "bg-green-50 text-green-700 border-green-100 cursor-not-allowed opacity-60"
+                                : "bg-white text-on-surface-variant border-surface-container-highest hover:border-primary/30 hover:bg-surface-bright"
+                            }`}
+                            disabled={isPaid}
+                          >
+                            <div className="flex flex-col items-start gap-0.5">
+                              <span>{t.termName}</span>
+                              <span className={`text-[10px] opacity-70 ${termNumber === t.termNumber && !payingNonTerm ? "text-white/80" : ""}`}>
+                                {isPaid ? "Paid" : `Bal: ${fmt(balance)}`}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+
+                      {/* Non-Term Fees button (Book, Hostel, Other, Custom) */}
+                      {(() => {
+                        const nonTermTotal = Number(selectedFee.bookFee || 0) + Number(selectedFee.hostelFee || 0) + Number(selectedFee.otherFee || 0) +
+                          (selectedFee.customItems || []).reduce((s, ci) => s + Number(ci.amount || 0), 0);
+                        if (nonTermTotal <= 0) return null;
+                        const nonTermPaid = payments?.filter((p) => !p.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                        const nonTermBal = Math.round(nonTermTotal - nonTermPaid);
+                        const isNonTermPaid = nonTermBal <= 0;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTermNumber(null);
+                              setPayingNonTerm(true);
+                              setPayComponents([]);
+                              setAmount(nonTermBal.toString());
+                            }}
+                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${
+                              payingNonTerm
+                                ? "bg-tertiary text-white border-tertiary shadow-lg shadow-tertiary/20 scale-[1.02]"
+                                : isNonTermPaid
+                                ? "bg-green-50 text-green-700 border-green-100 cursor-not-allowed opacity-60"
+                                : "bg-white text-tertiary border-tertiary/30 hover:border-tertiary/60 hover:bg-tertiary-fixed/10"
+                            }`}
+                            disabled={isNonTermPaid}
+                          >
+                            <div className="flex flex-col items-start gap-0.5">
+                              <span className="flex items-center gap-1">
+                                <span className="material-symbols-outlined text-sm">shopping_bag</span>
+                                Other Fees
+                              </span>
+                              <span className={`text-[10px] opacity-70 ${payingNonTerm ? "text-white/80" : ""}`}>
+                                {isNonTermPaid ? "Paid" : `Bal: ${fmt(nonTermBal)}`}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Non-Term Fees — interactive component selection */}
+                    {payingNonTerm && (() => {
+                      // Aggregate per-component paid from prior non-term payments
+                      const nonTermPayments = payments?.filter((p) => !p.termNumber && p.status === "SUCCESS") || [];
+                      const componentPaid = {};
+                      nonTermPayments.forEach((p) => {
+                        if (p.paidComponents && typeof p.paidComponents === "object") {
+                          Object.entries(p.paidComponents).forEach(([k, v]) => {
+                            componentPaid[k] = (componentPaid[k] || 0) + Number(v);
+                          });
+                        }
+                      });
+
+                      const items = [
+                        ...(Number(selectedFee.bookFee || 0) > 0 ? [{ key: "book", label: "Book Fee", val: Number(selectedFee.bookFee), icon: "menu_book" }] : []),
+                        ...(Number(selectedFee.hostelFee || 0) > 0 ? [{ key: "hostel", label: "Hostel Fee", val: Number(selectedFee.hostelFee), icon: "hotel" }] : []),
+                        ...(Number(selectedFee.otherFee || 0) > 0 ? [{ key: "other", label: "Other Fee", val: Number(selectedFee.otherFee), icon: "more_horiz" }] : []),
+                        ...((selectedFee.customItems || []).map((ci) => ({ key: `custom-${ci.id || ci.name}`, label: ci.name, val: Number(ci.amount || 0), icon: "label" }))),
+                      ].map((c) => ({
+                        ...c,
+                        paidAmount: componentPaid[c.key] || 0,
+                        isFullyPaid: (componentPaid[c.key] || 0) >= c.val,
+                      }));
+
+                      const unpaidItems = items.filter((c) => !c.isFullyPaid);
+                      const nonTermBal = Math.round(unpaidItems.reduce((s, c) => s + (c.val - c.paidAmount), 0));
+
+                      const toggleNonTermComp = (key) => {
+                        const comp = items.find((c) => c.key === key);
+                        if (comp?.isFullyPaid) return;
+                        let next;
+                        if (payComponents.includes(key)) {
+                          next = payComponents.filter((k) => k !== key);
+                        } else {
+                          next = [...payComponents, key];
+                        }
+                        setPayComponents(next);
+                        if (next.length === 0 || next.length === unpaidItems.length) {
+                          setPayComponents([]);
+                          setAmount(nonTermBal.toString());
+                        } else {
+                          const sum = Math.min(
+                            items.filter((c) => next.includes(c.key)).reduce((s, c) => s + Math.round(c.val - c.paidAmount), 0),
+                            nonTermBal
+                          );
+                          setAmount(Math.round(sum).toString());
+                        }
+                      };
+
+                      const allSelected = payComponents.length === 0;
                       return (
-                        <button
-                          key={t.termNumber}
-                          type="button"
-                          onClick={() => {
-                            setTermNumber(t.termNumber);
-                            setAmount(balance.toString());
-                          }}
-                          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${
-                            termNumber === t.termNumber
-                              ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-[1.02]"
-                              : isPaid
-                              ? "bg-green-50 text-green-700 border-green-100 cursor-not-allowed opacity-60"
-                              : "bg-white text-on-surface-variant border-surface-container-highest hover:border-primary/30 hover:bg-surface-bright"
-                          }`}
-                          disabled={isPaid}
-                        >
-                          <div className="flex flex-col items-start gap-0.5">
-                            <span>{t.termName}</span>
-                            <span className={`text-[10px] opacity-70 ${termNumber === t.termNumber ? "text-white/80" : ""}`}>
-                              {isPaid ? "Paid" : `Bal: ${fmt(balance)}`}
+                        <div className="mt-3 p-4 bg-tertiary/5 rounded-xl border border-tertiary/10">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-[10px] font-bold text-tertiary uppercase tracking-wider">
+                              Non-Term Fees — Balance {fmt(nonTermBal)}
                             </span>
+                            {nonTermBal > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => { setPayComponents([]); setAmount(nonTermBal.toString()); }}
+                                className={`text-[10px] px-2 py-1 rounded-md font-bold transition-colors ${
+                                  allSelected ? "bg-tertiary text-white" : "bg-white text-tertiary hover:bg-tertiary/10"
+                                }`}
+                              >
+                                Pay All
+                              </button>
+                            )}
                           </div>
-                        </button>
+                          {nonTermBal > 0 && (
+                            <p className="text-[10px] text-on-surface-variant mb-2">
+                              Select specific fees to pay (e.g., Book Fee only) or pay all:
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {items.map((c) => {
+                              const isActive = payComponents.includes(c.key);
+                              if (c.isFullyPaid) {
+                                return (
+                                  <div
+                                    key={c.key}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold bg-[#e8f5e9] text-[#2e7d32] border border-[#4caf50]/20 cursor-default"
+                                  >
+                                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                                    {c.label}
+                                    <span className="text-[10px] text-[#2e7d32]/70">{fmt(c.val)} Paid</span>
+                                  </div>
+                                );
+                              }
+                              const remaining = Math.round(c.val - c.paidAmount);
+                              return (
+                                <button
+                                  key={c.key}
+                                  type="button"
+                                  onClick={() => toggleNonTermComp(c.key)}
+                                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border ${
+                                    isActive
+                                      ? "bg-tertiary text-white border-tertiary shadow-md"
+                                      : allSelected
+                                      ? "bg-tertiary-fixed/20 text-tertiary border-tertiary/20"
+                                      : "bg-white text-on-surface-variant border-outline-variant/30 opacity-60"
+                                  }`}
+                                >
+                                  <span className="material-symbols-outlined text-sm">{c.icon}</span>
+                                  {c.label}
+                                  <span className={`text-[10px] font-medium ${
+                                    isActive ? "text-white/80" : allSelected ? "text-tertiary" : "text-on-surface-variant"
+                                  }`}>
+                                    {c.paidAmount > 0 ? `${fmt(remaining)} left` : fmt(c.val)}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {payComponents.length > 0 && (
+                            <div className="mt-2 text-[10px] text-tertiary font-bold">
+                              Paying: {payComponents.map((k) => items.find((c) => c.key === k)?.label).join(" + ")} = {fmt(amount)}
+                            </div>
+                          )}
+                        </div>
                       );
-                    })}
-                  </div>
+                    })()}
+
+                    {/* Selected term — quick pay by component */}
+                    {termNumber && (() => {
+                      const enriched = computeTermComponents(selectedFee);
+                      const selTerm = enriched.find((t) => t.termNumber === termNumber);
+                      if (!selTerm) return null;
+                      const termPayments = payments?.filter((p) => p.termNumber === termNumber && p.status === "SUCCESS") || [];
+                      const paid = termPayments.reduce((s, p) => s + p.amount, 0);
+                      const bal = Math.round(selTerm.amount - paid);
+
+                      // Aggregate per-component paid amounts from past payments
+                      const componentPaid = {};
+                      termPayments.forEach((p) => {
+                        if (p.paidComponents && typeof p.paidComponents === "object") {
+                          Object.entries(p.paidComponents).forEach(([k, v]) => {
+                            componentPaid[k] = (componentPaid[k] || 0) + Number(v);
+                          });
+                        }
+                      });
+
+                      const components = [
+                        { key: "tuition", label: "Tuition", val: selTerm.tuitionAmount || 0, icon: "school" },
+                        ...(Number(selTerm.transportAmount || 0) > 0 ? [{ key: "transport", label: "Transport", val: selTerm.transportAmount, icon: "directions_bus", highlight: true }] : []),
+                        ...(Number(selTerm.bookAmount || 0) > 0 ? [{ key: "book", label: "Book", val: selTerm.bookAmount, icon: "menu_book" }] : []),
+                        ...(Number(selTerm.hostelAmount || 0) > 0 ? [{ key: "hostel", label: "Hostel", val: selTerm.hostelAmount, icon: "hotel" }] : []),
+                        ...(Number(selTerm.otherAmount || 0) > 0 ? [{ key: "other", label: "Other", val: selTerm.otherAmount, icon: "more_horiz" }] : []),
+                      ].map((c) => ({
+                        ...c,
+                        paidAmount: componentPaid[c.key] || 0,
+                        isFullyPaid: (componentPaid[c.key] || 0) >= c.val,
+                      }));
+
+                      const unpaidComponents = components.filter((c) => !c.isFullyPaid);
+
+                      const toggleComponent = (key) => {
+                        const comp = components.find((c) => c.key === key);
+                        if (comp?.isFullyPaid) return; // can't toggle paid components
+                        let next;
+                        if (payComponents.includes(key)) {
+                          next = payComponents.filter((k) => k !== key);
+                        } else {
+                          next = [...payComponents, key];
+                        }
+                        setPayComponents(next);
+                        if (next.length === 0 || next.length === unpaidComponents.length) {
+                          setPayComponents([]);
+                          setAmount(bal.toString());
+                        } else {
+                          const sum = Math.min(
+                            components.filter((c) => next.includes(c.key)).reduce((s, c) => s + Math.round(c.val - c.paidAmount), 0),
+                            bal
+                          );
+                          setAmount(Math.round(sum).toString());
+                        }
+                      };
+
+                      const allSelected = payComponents.length === 0;
+                      return (
+                        <div className="mt-3 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
+                              {selTerm.termName} — Balance {fmt(bal)}
+                            </span>
+                            {bal > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => { setPayComponents([]); setAmount(bal.toString()); }}
+                                className={`text-[10px] px-2 py-1 rounded-md font-bold transition-colors ${
+                                  allSelected ? "bg-primary text-white" : "bg-white text-primary hover:bg-primary/10"
+                                }`}
+                              >
+                                Pay Full Term
+                              </button>
+                            )}
+                          </div>
+                          {bal > 0 && (
+                            <p className="text-[10px] text-on-surface-variant mb-2">
+                              Select specific components to pay (e.g., Transport only) or pay full term:
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {components.map((c) => {
+                              const isActive = payComponents.includes(c.key);
+                              if (c.isFullyPaid) {
+                                return (
+                                  <div
+                                    key={c.key}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold bg-[#e8f5e9] text-[#2e7d32] border border-[#4caf50]/20 cursor-default"
+                                  >
+                                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                                    {c.label}
+                                    <span className="text-[10px] text-[#2e7d32]/70">{fmt(c.val)} Paid</span>
+                                  </div>
+                                );
+                              }
+                              const remaining = Math.round(c.val - c.paidAmount);
+                              return (
+                                <button
+                                  key={c.key}
+                                  type="button"
+                                  onClick={() => toggleComponent(c.key)}
+                                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border ${
+                                    isActive
+                                      ? c.highlight
+                                        ? "bg-tertiary text-white border-tertiary shadow-md"
+                                        : "bg-primary text-white border-primary shadow-md"
+                                      : allSelected
+                                      ? c.highlight
+                                        ? "bg-tertiary-fixed/20 text-tertiary border-tertiary/20"
+                                        : "bg-white text-on-surface-variant border-outline-variant/30"
+                                      : "bg-white text-on-surface-variant border-outline-variant/30 opacity-60"
+                                  }`}
+                                >
+                                  <span className="material-symbols-outlined text-sm">{c.icon}</span>
+                                  {c.label}
+                                  <span className={`text-[10px] font-medium ${
+                                    isActive ? "text-white/80" : allSelected && c.highlight ? "text-tertiary" : "text-on-surface-variant"
+                                  }`}>
+                                    {c.paidAmount > 0 ? `${fmt(remaining)} left` : fmt(c.val)}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {payComponents.length > 0 && (
+                            <div className="mt-2 text-[10px] text-primary font-bold">
+                              Paying: {payComponents.map((k) => components.find((c) => c.key === k)?.label).join(" + ")} = {fmt(amount)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Component-wise breakdown per term (only Tuition + Transport) */}
+                    {(() => {
+                      const enrichedTerms = computeTermComponents(selectedFee);
+                      const nonTermFees = [
+                        ...(Number(selectedFee.bookFee || 0) > 0 ? [{ label: "Book Fee", amount: Number(selectedFee.bookFee), icon: "menu_book" }] : []),
+                        ...(Number(selectedFee.hostelFee || 0) > 0 ? [{ label: "Hostel Fee", amount: Number(selectedFee.hostelFee), icon: "hotel" }] : []),
+                        ...(Number(selectedFee.otherFee || 0) > 0 ? [{ label: "Other Fee", amount: Number(selectedFee.otherFee), icon: "more_horiz" }] : []),
+                        ...((selectedFee.customItems || []).map((ci) => ({ label: ci.name, amount: Number(ci.amount || 0), icon: "label" }))),
+                      ];
+                      return (
+                        <>
+                        <div className="mt-4 overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+                                <th className="text-left py-2 px-3">Component</th>
+                                {enrichedTerms.map((t) => (
+                                  <th key={t.termNumber} className="text-right py-2 px-3">{t.termName}</th>
+                                ))}
+                                <th className="text-right py-2 px-3">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {[
+                                { label: "Tuition", field: "tuitionAmount", total: selectedFee.tuitionFee },
+                                ...(Number(selectedFee.transportFee || 0) > 0
+                                  ? [{ label: "Transport", field: "transportAmount", total: selectedFee.transportFee, highlight: true }]
+                                  : []),
+                              ].map((row) => (
+                                <tr key={row.field} className={row.highlight ? "bg-tertiary-fixed/10" : ""}>
+                                  <td className={`py-2 px-3 font-bold ${row.highlight ? "text-tertiary" : "text-on-surface"}`}>
+                                    {row.label}
+                                  </td>
+                                  {enrichedTerms.map((t) => (
+                                    <td key={t.termNumber} className="text-right py-2 px-3 font-medium text-on-surface-variant">
+                                      {fmt(t[row.field] || 0)}
+                                    </td>
+                                  ))}
+                                  <td className="text-right py-2 px-3 font-bold text-on-surface">{fmt(row.total)}</td>
+                                </tr>
+                              ))}
+                              <tr className="border-t border-outline-variant/30">
+                                <td className="py-2 px-3 font-extrabold text-primary">Total</td>
+                                {enrichedTerms.map((t) => (
+                                  <td key={t.termNumber} className="text-right py-2 px-3 font-extrabold text-primary">
+                                    {fmt(t.amount)}
+                                  </td>
+                                ))}
+                                <td className="text-right py-2 px-3 font-extrabold text-primary">
+                                  {fmt(Number(selectedFee.tuitionFee || 0) + Number(selectedFee.transportFee || 0))}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        {/* Non-term fees (Book, Hostel, Other, Custom — paid as lump sum) */}
+                        {nonTermFees.length > 0 && (
+                          <div className="mt-3 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
+                            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">
+                              Non-Term Fees (paid separately)
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                              {nonTermFees.map((nf, idx) => (
+                                <div key={idx} className="flex items-center gap-1.5 px-3 py-2 bg-white rounded-lg border border-outline-variant/20 text-xs font-bold text-on-surface">
+                                  <span className="material-symbols-outlined text-sm text-on-surface-variant">{nf.icon}</span>
+                                  {nf.label}: {fmt(nf.amount)}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        </>
+                      );
+                    })()}
+                  </>
                 ) : (
                   <div className="bg-white rounded-xl border border-outline-variant/50 overflow-hidden shadow-sm">
                     <Table
-                      dataSource={splitPayments}
+                      dataSource={splitPayments.map((sp) => {
+                        const enriched = computeTermComponents(selectedFee);
+                        const t = enriched.find((tt) => tt.termNumber === sp.termNumber);
+                        return { ...sp, term: t };
+                      })}
                       columns={[
                         { 
                           title: "Term", 
                           dataIndex: "termName",
                           render: (v) => <span className="font-bold text-primary text-xs">{v}</span>
+                        },
+                        {
+                          title: "Breakdown",
+                          dataIndex: "term",
+                          render: (t) => t ? (
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-on-surface-variant">
+                              <span>Tuition: {fmt(t.tuitionAmount || 0)}</span>
+                              {Number(t.transportAmount || 0) > 0 && (
+                                <span className="text-tertiary font-bold">Transport: {fmt(t.transportAmount)}</span>
+                              )}
+                              {Number(t.bookAmount || 0) > 0 && <span>Book: {fmt(t.bookAmount)}</span>}
+                              {Number(t.otherAmount || 0) > 0 && <span>Other: {fmt(t.otherAmount)}</span>}
+                            </div>
+                          ) : null,
                         },
                         { 
                           title: "Pending", 
@@ -606,21 +1063,35 @@ const CollectPaymentPage = ({ studentId }) => {
 
             <div className="grid grid-cols-2 gap-5 mb-6">
               {/* Amount */}
-              {!splitMode && (
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
-                    Amount to Collect (₹)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-xl font-headline font-bold text-primary focus:bg-surface-container-highest transition-colors outline-none"
-                  />
-                </div>
-              )}
+              {!splitMode && (() => {
+                const selTerm = termNumber ? selectedFee?.terms?.find((t) => t.termNumber === termNumber) : null;
+                const maxBal = selTerm
+                  ? Math.round(selTerm.amount - (payments?.filter((p) => p.termNumber === termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0))
+                  : undefined;
+                return (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                      Amount to Collect (₹)
+                      {maxBal !== undefined && <span className="text-on-surface-variant font-medium ml-2">Max: {fmt(maxBal)}</span>}
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={maxBal || undefined}
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-xl font-headline font-bold text-primary focus:bg-surface-container-highest transition-colors outline-none"
+                    />
+                    {maxBal !== undefined && Number(amount) > maxBal && (
+                      <p className="text-xs text-error font-medium ml-1 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">warning</span>
+                        Amount exceeds term balance ({fmt(maxBal)}). Transport & other fees are already included in the term amount.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Payment mode */}
               <div className="space-y-1.5">
@@ -675,26 +1146,47 @@ const CollectPaymentPage = ({ studentId }) => {
               </div>
             </div>
 
-            {/* Receipt components */}
+            {/* Receipt components with amounts */}
             {selectedFee && getAvailableReceiptComponentOptions(selectedFee).length > 0 && (
-              <div className="flex flex-wrap gap-5 mb-6 p-4 bg-surface rounded-xl">
-                {getAvailableReceiptComponentOptions(selectedFee).map((key) => (
-                  <label key={key} className="flex items-center gap-3 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={receiptComponents.includes(key)}
-                      onChange={(e) => {
-                        setReceiptComponents((prev) =>
-                          e.target.checked ? [...prev, key] : prev.filter((k) => k !== key)
-                        );
-                      }}
-                      className="w-4 h-4 rounded border-outline accent-primary"
-                    />
-                    <span className="text-sm font-medium text-on-surface-variant group-hover:text-primary transition-colors">
-                      Include {RECEIPT_COMPONENT_LABELS[key]}
-                    </span>
-                  </label>
-                ))}
+              <div className="mb-6 p-4 bg-surface rounded-xl">
+                <p className="text-[10px] text-on-surface-variant mb-3 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[10px]">info</span>
+                  These components are already included in the term amounts above. Checking/unchecking controls what appears on the printed receipt.
+                </p>
+                <div className="flex flex-wrap gap-4">
+                {getAvailableReceiptComponentOptions(selectedFee).map((key) => {
+                  const feeAmount = Number(selectedFee[COMPONENT_FEE_FIELDS[key]] || 0);
+                  const perTerm = selectedFee.terms?.length
+                    ? Math.round((feeAmount / selectedFee.terms.length) * 100) / 100
+                    : feeAmount;
+                  return (
+                    <label key={key} className={`flex items-center gap-3 cursor-pointer group px-3 py-2 rounded-lg transition-colors ${
+                      receiptComponents.includes(key) ? "bg-primary-fixed/30" : "hover:bg-surface-container-low"
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={receiptComponents.includes(key)}
+                        onChange={(e) => {
+                          setReceiptComponents((prev) =>
+                            e.target.checked ? [...prev, key] : prev.filter((k) => k !== key)
+                          );
+                        }}
+                        className="w-4 h-4 rounded border-outline accent-primary"
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-on-surface-variant group-hover:text-primary transition-colors">
+                          Include {RECEIPT_COMPONENT_LABELS[key]}
+                        </span>
+                        <span className="text-[10px] text-on-surface-variant/70">
+                          {key === "customItems"
+                            ? fmt((selectedFee.customItems || []).reduce((s, ci) => s + Number(ci.amount || 0), 0)) + " total"
+                            : `${fmt(feeAmount)} total` + (selectedFee.terms?.length > 1 ? ` · ${fmt(perTerm)}/term` : "")}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
+                </div>
               </div>
             )}
 
@@ -868,7 +1360,20 @@ const CollectPaymentPage = ({ studentId }) => {
                         </td>
                         <td className="px-5 py-4 text-on-surface-variant">{p.receiptNo || "—"}</td>
                         <td className="px-5 py-4 text-on-surface-variant">{p.termNumber ? `Term ${p.termNumber}` : "General"}</td>
-                        <td className="px-5 py-4 text-right font-bold text-primary">{fmt(p.amount)}</td>
+                        <td className="px-5 py-4 text-right">
+                          <div className="font-bold text-primary">{fmt(p.amount)}</div>
+                          {p.paidComponents && Object.keys(p.paidComponents).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 justify-end">
+                              {Object.entries(p.paidComponents).map(([k, v]) => (
+                                <span key={k} className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                                  k === "transport" ? "bg-tertiary-fixed/20 text-tertiary" : "bg-surface-container-high text-on-surface-variant"
+                                }`}>
+                                  {k.charAt(0).toUpperCase() + k.slice(1)} {fmt(v)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-5 py-4">
                           <span className="flex items-center gap-2 text-on-surface-variant">
                             <span className="material-symbols-outlined text-sm">{modeIcon(p.paymentMode)}</span>
@@ -957,15 +1462,38 @@ const CollectPaymentPage = ({ studentId }) => {
                   <tr><th>Amount Paid</th><td style={{ fontSize: "16px", fontWeight: "bold" }}>₹{printPayment.amount?.toLocaleString()}</td></tr>
                 </tbody>
               </table>
-              <h4 style={{ marginTop: 16, marginBottom: 8 }}>Receipt Fee Components</h4>
-              <table>
-                <thead><tr><th>Component</th><th>Amount</th></tr></thead>
-                <tbody>
-                  {buildReceiptFeeRows(printPayment).map((row) => (
-                    <tr key={row.key}><td>{row.label}</td><td>₹{row.amount?.toLocaleString()}</td></tr>
-                  ))}
-                </tbody>
-              </table>
+              {printPayment.paidComponents && Object.keys(printPayment.paidComponents).length > 0 ? (
+                <>
+                  <h4 style={{ marginTop: 16, marginBottom: 8 }}>Paid Components</h4>
+                  <table>
+                    <thead><tr><th>Component</th><th>Amount</th></tr></thead>
+                    <tbody>
+                      {Object.entries(printPayment.paidComponents).map(([k, v]) => (
+                        <tr key={k}>
+                          <td>{k.charAt(0).toUpperCase() + k.slice(1)} Fee</td>
+                          <td>₹{Number(v).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      <tr className="total-row">
+                        <td>Total Paid</td>
+                        <td>₹{printPayment.amount?.toLocaleString()}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </>
+              ) : (
+                <>
+                  <h4 style={{ marginTop: 16, marginBottom: 8 }}>Receipt Fee Components</h4>
+                  <table>
+                    <thead><tr><th>Component</th><th>Amount</th></tr></thead>
+                    <tbody>
+                      {buildReceiptFeeRows(printPayment).map((row) => (
+                        <tr key={row.key}><td>{row.label}</td><td>₹{row.amount?.toLocaleString()}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
               {printPayment.totalFee && (
                 <>
                   <h4 style={{ marginTop: 16, marginBottom: 8 }}>Fee Summary</h4>
