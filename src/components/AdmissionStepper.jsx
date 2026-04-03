@@ -87,6 +87,31 @@ const AdmissionStepper = ({editData, clearEditData}) => {
   });
 
   useEffect(() => {
+  const fetchAdmissionNo = async () => {
+    try {
+      const res = await getNextAdmissionNo();
+
+      form.setFieldsValue({
+        admissionNo: res.admissionNo,
+      });
+
+      setFormData(prev => ({
+        ...prev,
+        admissionNo: res.admissionNo,
+      }));
+
+    } catch (err) {
+      message.error("Auto admission number failed");
+    }
+  };
+
+  // ✅ only for NEW admission (not edit)
+  if (!editData) {
+    fetchAdmissionNo();
+  }
+}, []);
+
+  useEffect(() => {
     if (editData) {
       const primaryAcademic = editData.academics?.[0] || {};
       const flatData = {
@@ -234,7 +259,7 @@ const AdmissionStepper = ({editData, clearEditData}) => {
         { subjectName: 'Social Science', maxMarks: 100, obtainedMarks: 85  },
       ],
       
-      admissionNo: `ADM${Math.floor(1000 + Math.random() * 9000)}`,
+      //admissionNo: `ADM${Math.floor(1000 + Math.random() * 9000)}`,
       admissionDate: dayjs(),
       admissionFrom: dayjs(),
       admissionTo: dayjs().add(3, 'year'),
@@ -1025,7 +1050,7 @@ const getDefaultFile = (path, name = "file") => {
           <Form.Item name="admissionNo" label="Admission No">
             <Input disabled placeholder="Auto-generated" />
           </Form.Item>
-          <Button
+         {/* <Button
             type="link"
             style={{ marginBottom: 16 }}
             onClick={async () => {
@@ -1040,7 +1065,7 @@ const getDefaultFile = (path, name = "file") => {
             }}
           >
             Generate Admission No
-          </Button>
+          </Button> */ }
           <Form.Item name="admissionDate" label="Admission Date" rules={[requiredRule]}>
             <DatePicker style={{ width: "100%" }} />
           </Form.Item>
