@@ -6,6 +6,7 @@ import {
   updateFeeStructure,
   deleteFeeStructure,
 } from "../fees.service";
+import { getAllStoreItems } from "../../pos/pos.service";
 import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ const GROUP_COLORS = {
 const emptyForm = {
   standard: "", academicYear: "", tuitionFee: 0, transportFee: 0,
   bookFee: 0, hostelFee: 0, otherFee: 0, numberOfTerms: 1, customItems: [], terms: [],
+  kitItems: [],
 };
 
 // ── component ─────────────────────────────────────────────────────────────
@@ -54,6 +56,7 @@ const FeeStructurePage = () => {
   const [structures, setStructures] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [storeItems, setStoreItems] = useState([]);
 
   // form state
   const [editingId, setEditingId] = useState(null);
@@ -88,6 +91,10 @@ const FeeStructurePage = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  useEffect(() => {
+    getAllStoreItems().then((items) => setStoreItems(items || [])).catch(() => {});
+  }, []);
+
   // ── form helpers ─────────────────────────────────────────────────────────
   const setField = (key, val) => setForm((prev) => ({ ...prev, [key]: val }));
 
@@ -109,6 +116,7 @@ const FeeStructurePage = () => {
         amount: t.amount,
         dueDate: t.dueDate ? t.dueDate.split("T")[0] : "",
       })),
+      kitItems: (record.kitItems || []).map((k) => ({ storeItemId: k.storeItemId, quantity: k.quantity || 1, amount: k.amount || 0 })),
     });
     setViewStructure(null);
     // Scroll to form
@@ -175,6 +183,20 @@ const FeeStructurePage = () => {
 
   const removeCustomItem = (idx) =>
     setForm((prev) => ({ ...prev, customItems: prev.customItems.filter((_, i) => i !== idx) }));
+
+  // ── kit items helpers ────────────────────────────────────────────────────
+  const addKitItem = () =>
+    setForm((prev) => ({ ...prev, kitItems: [...prev.kitItems, { storeItemId: "", quantity: 1, amount: 0 }] }));
+
+  const updateKitItem = (idx, key, val) =>
+    setForm((prev) => {
+      const next = [...prev.kitItems];
+      next[idx] = { ...next[idx], [key]: val };
+      return { ...prev, kitItems: next };
+    });
+
+  const removeKitItem = (idx) =>
+    setForm((prev) => ({ ...prev, kitItems: prev.kitItems.filter((_, i) => i !== idx) }));
 
   // ── render ───────────────────────────────────────────────────────────────
   const recentTwo = [...structures].reverse().slice(0, 4);
@@ -539,6 +561,101 @@ const FeeStructurePage = () => {
                   )}
                 </div>
 
+                {/* ── Kit Items (POS) ── */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-headline font-bold text-primary flex items-center gap-2 text-sm">
+                      <span className="material-symbols-outlined text-sm">inventory_2</span>
+                      Kit / Book Items (POS)
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={addKitItem}
+                      className="text-primary text-xs font-bold flex items-center gap-1 hover:underline"
+                    >
+                      <span className="material-symbols-outlined text-sm">add_circle</span>
+                      Add Kit Item
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-on-surface-variant -mt-1">
+                    Map POS items (shoes, belt, etc.) to the Books / Kit fee. Total kit value is deducted from book fee balance.
+                  </p>
+
+                  {form.kitItems.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={addKitItem}
+                      className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-outline-variant rounded-xl py-3 text-xs text-on-surface-variant hover:border-primary hover:text-primary transition-all"
+                    >
+                      <span className="material-symbols-outlined text-sm">add</span>
+                      Add Items like Shoes, Belt, Uniform, etc.
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      {form.kitItems.map((ki, idx) => {
+                        const item = storeItems.find((s) => s.id === ki.storeItemId);
+                        return (
+                          <div
+                            key={idx}
+                            className="flex gap-3 items-center bg-white/60 border border-dashed border-outline-variant px-3 py-2.5 rounded-xl"
+                          >
+                            <div className="flex-1">
+                              <select
+                                value={ki.storeItemId}
+                                onChange={(e) => {
+                                  const selected = storeItems.find((s) => s.id === e.target.value);
+                                  updateKitItem(idx, "storeItemId", e.target.value);
+                                  if (selected) updateKitItem(idx, "amount", selected.sellingPrice || 0);
+                                }}
+                                className="w-full bg-transparent border-none text-sm font-medium focus:ring-0 outline-none appearance-none"
+                              >
+                                <option value="">Select POS Item</option>
+                                {storeItems.map((si) => (
+                                  <option key={si.id} value={si.id}>
+                                    {si.name} — {fmt(si.sellingPrice || 0)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="relative w-16">
+                              <input
+                                type="number" min={1}
+                                placeholder="Qty"
+                                value={ki.quantity}
+                                onChange={(e) => updateKitItem(idx, "quantity", Number(e.target.value) || 1)}
+                                className="w-full bg-transparent border-none text-sm font-bold text-center focus:ring-0 outline-none"
+                              />
+                            </div>
+                            <div className="relative w-24">
+                              <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm">₹</span>
+                              <input
+                                type="number" min={0}
+                                placeholder="Amount"
+                                value={ki.amount}
+                                onChange={(e) => updateKitItem(idx, "amount", Number(e.target.value) || 0)}
+                                className="w-full bg-transparent border-none text-sm font-bold text-right pl-4 focus:ring-0 outline-none"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeKitItem(idx)}
+                              className="text-error/40 hover:text-error transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-base">delete</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                      <div className="flex justify-between items-center bg-primary-fixed/30 rounded-xl px-4 py-2">
+                        <span className="text-xs font-bold text-on-surface-variant">Kit Total</span>
+                        <span className="text-sm font-extrabold text-primary">
+                          {fmt(form.kitItems.reduce((s, k) => s + (Number(k.amount) || 0) * (Number(k.quantity) || 1), 0))}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="bg-white rounded-xl px-5 py-4 flex justify-between items-center">
                   <span className="text-sm font-bold text-on-surface-variant">Calculated Annual Total</span>
                   <span className="text-xl font-extrabold text-primary">{fmt(grossTotal(form))}</span>
@@ -700,6 +817,19 @@ const FeeStructurePage = () => {
                   <span className="font-bold text-primary">{fmt(ci.amount)}</span>
                 </div>
               ))}
+              {(viewStructure.kitItems || []).length > 0 && (
+                <>
+                  <div className="pt-2 border-t border-surface-container-high">
+                    <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Kit Items (from POS)</p>
+                  </div>
+                  {viewStructure.kitItems.map((ki, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-on-surface-variant">{ki.storeItem?.name || "Item"} ×{ki.quantity || 1}</span>
+                      <span className="font-bold text-primary">{fmt((ki.amount || 0) * (ki.quantity || 1))}</span>
+                    </div>
+                  ))}
+                </>
+              )}
               <div className="pt-3 border-t border-surface-container-high flex justify-between">
                 <span className="font-bold text-primary">Annual Total</span>
                 <span className="font-extrabold text-primary text-lg">{fmt(grossTotal(viewStructure))}</span>

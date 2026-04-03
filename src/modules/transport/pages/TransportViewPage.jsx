@@ -182,6 +182,17 @@ const TransportViewPage = () => {
       onFilter: (value, record) => record.isSplClass === value,
     },
     {
+      title: "Spl Class Days",
+      render: (_, r) => {
+        if (!r.isSplClass) return "—";
+        if (r.splClassDaysUsed != null && r.totalWorkingDays != null)
+          return <span>{r.splClassDaysUsed}/{r.totalWorkingDays} days</span>;
+        if (r.splClassStartDate)
+          return <span className="text-xs">Started {new Date(r.splClassStartDate).toLocaleDateString("en-IN")}</span>;
+        return "—";
+      },
+    },
+    {
       title: "Base Fee",
       render: (_, r) => `₹${r.route?.baseFee?.toLocaleString() || 0}`,
     },
@@ -189,8 +200,20 @@ const TransportViewPage = () => {
       title: "Total Fee",
       render: (_, r) => {
         const base = r.stop?.fee ?? r.route?.baseFee ?? 0;
-        const spl = r.isSplClass ? (r.route?.splClassFee || 0) : 0;
-        return <Tag color="blue">₹{(base + spl).toLocaleString()}</Tag>;
+        const splFull = r.isSplClass ? (r.route?.splClassFee || 0) : 0;
+        let splActual = splFull;
+        if (r.isSplClass && r.splClassDaysUsed != null && r.totalWorkingDays > 0) {
+          splActual = Math.round((splFull * r.splClassDaysUsed) / r.totalWorkingDays);
+        }
+        const total = base + splActual;
+        return (
+          <span>
+            <Tag color="blue">₹{total.toLocaleString()}</Tag>
+            {splActual !== splFull && splFull > 0 && (
+              <span className="text-[10px] text-gray-400 ml-1">(pro-rata)</span>
+            )}
+          </span>
+        );
       },
     },
     {

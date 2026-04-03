@@ -23,6 +23,7 @@ import FeesViewPage from "../modules/fees/pages/FeesViewPage";
 import RefundCancellationReportPage from "../modules/fees/pages/RefundCancellationReportPage";
 import StudentFeeLedgerPage from "../modules/fees/pages/StudentFeeLedgerPage";
 import ClassFeeSummaryPage from "../modules/fees/pages/ClassFeeSummaryPage";
+import KitIssuePage from "../modules/fees/pages/KitIssuePage";
 
 import RouteManagementPage from "../modules/transport/pages/RouteManagementPage";
 import AssignTransportPage from "../modules/transport/pages/AssignTransportPage";
@@ -156,6 +157,7 @@ const Dashboard = () => {
         { key: "fees-refund-report", label: "Refund Report", icon: "undo", permission: canReportsRead },
         { key: "fees-ledger", label: "Student Ledger", icon: "menu_book", permission: canFeesDashboard },
         { key: "fees-class-summary", label: "Class Summary", icon: "analytics", permission: canFeesDashboard },
+        { key: "fees-kit-issue", label: "Kit / Book Issue", icon: "inventory_2", permission: canFeesAssign },
       ],
     },
     {
@@ -249,6 +251,7 @@ case "fees-collect":
       case "fees-refund-report":  return <RefundCancellationReportPage />;
       case "fees-ledger":          return <StudentFeeLedgerPage />;
       case "fees-class-summary":   return <ClassFeeSummaryPage />;
+      case "fees-kit-issue":        return <KitIssuePage />;
       case "transport-routes":    return <RouteManagementPage />;
       case "transport-assign":    return <AssignTransportPage />;
       case "transport-view":      return <TransportViewPage />;

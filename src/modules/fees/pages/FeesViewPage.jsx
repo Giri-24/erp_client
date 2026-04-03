@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { message, Modal } from "antd";
-import { getAllStudentFees, getPaymentsByStudentFee, getAcademicYears } from "../fees.service";
+import { getAllStudentFees, getPaymentsByStudentFee, getAcademicYears, getStudentKitIssues } from "../fees.service";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
@@ -53,6 +53,7 @@ const FeesViewPage = () => {
   const [selectedFee, setSelectedFee] = useState(null);
   const [payments, setPayments] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [kitData, setKitData] = useState(null);
 
   // ── data ─────────────────────────────────────────────────────────────────
   const fetchAcademicYears = async () => {
@@ -79,9 +80,14 @@ const FeesViewPage = () => {
     setSelectedFee(record);
     setDetailModal(true);
     setLoadingPayments(true);
+    setKitData(null);
     try {
-      const list = await getPaymentsByStudentFee(record.id);
+      const [list, kit] = await Promise.all([
+        getPaymentsByStudentFee(record.id),
+        getStudentKitIssues(record.id).catch(() => null),
+      ]);
       setPayments(list || []);
+      setKitData(kit);
     } catch { setPayments([]); }
     setLoadingPayments(false);
   };
@@ -648,6 +654,39 @@ const FeesViewPage = () => {
               </div>
             )}
 
+            {/* Kit / Book Balance */}
+            {kitData && (
+              <div>
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Kit / Book Balance</p>
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  {[
+                    { label: "Book Fee", val: kitData.bookFee },
+                    { label: "Kit Issued", val: kitData.kitAmount, warn: true },
+                    { label: "Book Balance", val: kitData.bookBalance, highlight: true },
+                  ].map(({ label, val, warn, highlight }) => (
+                    <div key={label} className="text-center p-3 bg-surface-container-low rounded-xl">
+                      <p className="text-[10px] text-on-surface-variant font-medium">{label}</p>
+                      <p className={`text-sm font-extrabold mt-0.5 ${highlight ? "text-[#005145]" : warn ? "text-error" : "text-primary"}`}>{fmt(val)}</p>
+                    </div>
+                  ))}
+                </div>
+                {(kitData.kitIssues || []).length > 0 && (
+                  <div className="space-y-1.5">
+                    {kitData.kitIssues.map((ki) => (
+                      <div key={ki.id} className="flex items-center justify-between p-2.5 bg-surface-container-low rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-primary text-sm">inventory_2</span>
+                          <span className="text-xs font-bold text-primary">{ki.storeItem?.name || "Item"}</span>
+                          <span className="text-[10px] text-on-surface-variant">×{ki.quantity || 1}</span>
+                        </div>
+                        <span className="text-xs font-bold text-primary">{fmt(ki.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Discounts */}
             {selectedFee.discounts?.length > 0 && (
               <div>
@@ -668,19 +707,31 @@ const FeesViewPage = () => {
                 <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2">Term-wise Breakdown</p>
                 <div className="space-y-2">
                   {selectedFee.terms.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between p-3 bg-surface-container-low rounded-xl">
-                      <div>
-                        <p className="text-sm font-bold text-primary">{t.termName}</p>
-                        {t.dueDate && <p className="text-[10px] text-on-surface-variant">Due: {new Date(t.dueDate).toLocaleDateString()}</p>}
+                    <div key={t.id} className="p-3 bg-surface-container-low rounded-xl">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="text-sm font-bold text-primary">{t.termName}</p>
+                          {t.dueDate && <p className="text-[10px] text-on-surface-variant">Due: {new Date(t.dueDate).toLocaleDateString()}</p>}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-sm">{fmt(t.amount)}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            t.status === "PAID" ? "bg-[#44ddc1]/20 text-on-tertiary-container"
+                              : t.status === "PARTIAL" ? "bg-secondary-fixed text-on-secondary-fixed-variant"
+                              : "bg-error-container text-error"
+                          }`}>{t.status}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold text-sm">{fmt(t.amount)}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          t.status === "PAID" ? "bg-[#44ddc1]/20 text-on-tertiary-container"
-                            : t.status === "PARTIAL" ? "bg-secondary-fixed text-on-secondary-fixed-variant"
-                            : "bg-error-container text-error"
-                        }`}>{t.status}</span>
-                      </div>
+                      {/* Component-wise split */}
+                      {(t.tuitionAmount > 0 || t.transportAmount > 0 || t.bookAmount > 0 || t.hostelAmount > 0 || t.otherAmount > 0) && (
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {t.tuitionAmount > 0 && <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold">Tuition: {fmt(t.tuitionAmount)}</span>}
+                          {t.transportAmount > 0 && <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold">Transport: {fmt(t.transportAmount)}</span>}
+                          {t.bookAmount > 0 && <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold">Book: {fmt(t.bookAmount)}</span>}
+                          {t.hostelAmount > 0 && <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold">Hostel: {fmt(t.hostelAmount)}</span>}
+                          {t.otherAmount > 0 && <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold">Other: {fmt(t.otherAmount)}</span>}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
