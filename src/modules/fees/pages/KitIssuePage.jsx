@@ -1,38 +1,41 @@
 import React, { useEffect, useState } from "react";
 import { Select, message } from "antd";
-import { getAllStudentFees, getStudentKitIssues, issueKitItem, removeKitIssue } from "../fees.service";
-import { getAllStoreItems } from "../../pos/pos.service";
+import { getAllStudentFees, getStudentKitIssues, issueKitItem, removeKitIssue, getAcademicYears } from "../fees.service";
 import instance from "../../../utils/axios";
 
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN");
 
 const KitIssuePage = () => {
   const [students, setStudents] = useState([]);
-  const [storeItems, setStoreItems] = useState([]);
   const [studentFees, setStudentFees] = useState([]);
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState("");
+  const [academicYearOptions, setAcademicYearOptions] = useState([]);
   const [studentId, setStudentId] = useState(null);
   const [selectedFee, setSelectedFee] = useState(null);
   const [kitData, setKitData] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  // issue form
-  const [issueItemId, setIssueItemId] = useState(null);
-  const [issueQty, setIssueQty] = useState(1);
-  const [issueAmount, setIssueAmount] = useState(0);
   const [issuing, setIssuing] = useState(false);
 
+  // load academic years on mount
   useEffect(() => {
     Promise.all([
+      getAcademicYears(),
       instance.get("/admissions").then((r) => r.data || []),
-      getAllStoreItems(),
-      getAllStudentFees(academicYear),
-    ]).then(([admissions, items, fees]) => {
+    ]).then(([years, admissions]) => {
+      const yearList = years || [];
+      setAcademicYearOptions(yearList);
+      if (yearList.length > 0) setAcademicYear(yearList[0]);
       const active = (admissions || []).filter((s) => s.users?.isActive !== false && s.admission?.isApproved);
       setStudents(active);
-      setStoreItems(items || []);
-      setStudentFees(fees || []);
     }).catch(() => {});
+  }, []);
+
+  // load student fees when academic year changes
+  useEffect(() => {
+    if (!academicYear) return;
+    getAllStudentFees(academicYear).then((fees) => {
+      setStudentFees(fees || []);
+    }).catch(() => setStudentFees([]));
   }, [academicYear]);
 
   const onStudentChange = async (id) => {
@@ -46,25 +49,24 @@ const KitIssuePage = () => {
         const data = await getStudentKitIssues(fee.id);
         setKitData(data);
       } catch { /* no kit data */ }
+    } else {
+      message.warning("No fee record found for this student in " + academicYear);
     }
   };
 
-  const handleIssue = async () => {
-    if (!selectedFee || !issueItemId) { message.error("Select a student and item"); return; }
+  const handleIssue = async (storeItemId, amount) => {
+    if (!selectedFee) return;
     setIssuing(true);
     try {
       await issueKitItem({
         studentFeeId: selectedFee.id,
-        storeItemId: issueItemId,
-        quantity: issueQty,
-        amount: issueAmount,
+        storeItemId,
+        quantity: 1,
+        amount,
       });
       message.success("Kit item issued");
       const data = await getStudentKitIssues(selectedFee.id);
       setKitData(data);
-      setIssueItemId(null);
-      setIssueQty(1);
-      setIssueAmount(0);
     } catch (err) {
       message.error(err?.response?.data?.message || "Failed to issue kit item");
     }
@@ -124,7 +126,19 @@ const KitIssuePage = () => {
               </div>
             </div>
 
-            {/* Student selector */}
+            {/* Academic year + Student selector */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-primary ml-1">Academic Year</label>
+              <Select
+                value={academicYear || undefined}
+                onChange={(val) => { setAcademicYear(val); setStudentId(null); setSelectedFee(null); setKitData(null); }}
+                options={academicYearOptions.map((y) => ({ label: y, value: y }))}
+                placeholder="Select academic year"
+                size="large"
+                className="w-full"
+              />
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-primary ml-1">Student</label>
               <Select
@@ -156,64 +170,67 @@ const KitIssuePage = () => {
               </div>
             )}
 
-            {/* Issue form */}
-            {selectedFee && (
-              <div className="space-y-4 bg-surface-container-low p-5 rounded-xl">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider ml-1">POS Item</label>
-                  <select
-                    value={issueItemId || ""}
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      setIssueItemId(id || null);
-                      const item = storeItems.find((s) => s.id === id);
-                      if (item) setIssueAmount(item.sellingPrice || 0);
-                    }}
-                    className="w-full px-4 py-3 bg-white border-none rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 appearance-none"
-                  >
-                    <option value="">Select an item</option>
-                    {storeItems.map((si) => (
-                      <option key={si.id} value={si.id}>
-                        {si.name} — {fmt(si.sellingPrice || 0)} (Stock: {si.currentStock ?? "—"})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            {/* Kit Items — toggle cards */}
+            {selectedFee && kitData && (kitData.allowedKitItems || []).length > 0 && (
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider ml-1">Kit Items from Fee Structure</p>
+                {(kitData.allowedKitItems || []).map((item) => {
+                  const issued = (kitData.kitIssues || []).find((ki) => ki.storeItem?.id === item.storeItemId);
+                  const isIssued = !!issued;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-center justify-between p-4 rounded-xl transition-all ${isIssued ? "bg-[#e8f5e9] ring-1 ring-[#4caf50]/30" : "bg-surface-container-low"}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isIssued ? "bg-[#4caf50]/15" : "bg-primary-fixed"}`}>
+                          <span className={`material-symbols-outlined text-lg ${isIssued ? "text-[#2e7d32]" : "text-primary"}`} style={{ fontVariationSettings: "'FILL' 1" }}>
+                            {isIssued ? "check_circle" : "inventory_2"}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-primary">{item.storeItem?.name || "Item"}</p>
+                          <p className="text-[10px] text-on-surface-variant">
+                            {item.storeItem?.category || "—"} · Qty: {item.quantity || 1} · {fmt(item.amount || item.storeItem?.sellingPrice || 0)}
+                          </p>
+                        </div>
+                      </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider ml-1">Quantity</label>
-                    <input
-                      type="number" min={1}
-                      value={issueQty}
-                      onChange={(e) => setIssueQty(Number(e.target.value) || 1)}
-                      className="w-full px-4 py-3 bg-white border-none rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider ml-1">Amount</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-3 text-on-surface-variant text-sm font-bold">₹</span>
-                      <input
-                        type="number" min={0}
-                        value={issueAmount}
-                        onChange={(e) => setIssueAmount(Number(e.target.value) || 0)}
-                        className="w-full px-4 py-3 pl-7 bg-white border-none rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20"
-                      />
+                      <button
+                        onClick={() =>
+                          isIssued
+                            ? handleRemove(issued.id)
+                            : handleIssue(item.storeItemId, item.amount || item.storeItem?.sellingPrice || 0)
+                        }
+                        disabled={issuing}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 disabled:opacity-50 ${
+                          isIssued
+                            ? "bg-white text-error hover:bg-error-container"
+                            : "text-white hover:opacity-90 active:scale-[0.97]"
+                        }`}
+                        style={!isIssued ? { background: "linear-gradient(to right, #00152a, #102a43)" } : undefined}
+                      >
+                        <span className="material-symbols-outlined text-sm">{isIssued ? "remove_circle" : "add_circle"}</span>
+                        {isIssued ? "Remove" : "Issue"}
+                      </button>
                     </div>
-                  </div>
-                </div>
+                  );
+                })}
+              </div>
+            )}
 
-                <button
-                  onClick={handleIssue}
-                  disabled={issuing || !issueItemId}
-                  style={{ background: "linear-gradient(to right, #00152a, #102a43)" }}
-                  className="w-full py-3.5 px-6 text-white font-headline font-bold text-sm rounded-xl shadow-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {issuing && <span className="material-symbols-outlined text-sm animate-spin">refresh</span>}
-                  Issue Item
-                  {!issuing && <span className="material-symbols-outlined text-sm">arrow_forward</span>}
-                </button>
+            {selectedFee && kitData && (kitData.allowedKitItems || []).length === 0 && (
+              <div className="text-center py-6 text-on-surface-variant bg-surface-container-low rounded-xl">
+                <span className="material-symbols-outlined text-3xl block mb-2 opacity-25">info</span>
+                <p className="text-sm font-medium">No kit items mapped in fee structure</p>
+                <p className="text-xs mt-1 opacity-70">Map POS items in the Fee Structure page first</p>
+              </div>
+            )}
+
+            {selectedFee && !kitData && (
+              <div className="text-center py-6 text-on-surface-variant bg-surface-container-low rounded-xl">
+                <span className="material-symbols-outlined text-3xl block mb-2 opacity-25">warning</span>
+                <p className="text-sm font-medium">No fee data found</p>
               </div>
             )}
           </div>
