@@ -157,6 +157,8 @@ const AdminSettings = () => {
   }, []);
 
   const onFinish = async (values) => {
+      console.log("SENDING:", values); // 👈 ADD HERE (FIRST LINE)
+
     try {
       setSaving(true);
       await updateAdminSettings(values);
@@ -256,7 +258,19 @@ const AdminSettings = () => {
             <h4 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 18, fontWeight: 800, color: '#00152a', margin: 0 }}>School Configuration</h4>
           </div>
           <Spin spinning={loading}>
-          <Form form={form} layout="vertical" onFinish={onFinish}>
+         <Form
+  form={form}
+  layout="vertical"
+  onFinish={onFinish}
+  initialValues={{
+    requireApprovalForAdmission: false,
+    allowAdmissionEditAfterApproval: false,
+    admissionNoAutoGenerate: true,
+    enableFeesModule: true,
+    enableTransportModule: true,
+    enableStaffModule: true,
+  }}
+>
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item name="schoolName" label="School Name" rules={[{ required: true, message: 'Required' }]}>
