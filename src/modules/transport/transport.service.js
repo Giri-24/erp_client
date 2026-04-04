@@ -80,3 +80,25 @@ export const getLiveDriverLocations = async () => {
   const res = await axios.get('/location/live/drivers');
   return res.data;
 };
+
+// ─── DRIVERS ────────────────────────────────
+
+export const getAllDrivers = async () => {
+  const res = await axios.get('/transport/drivers');
+  return res.data;
+};
+
+export const createDriver = async (data) => {
+  const res = await axios.post('/transport/drivers', data);
+  return res.data;
+};
+
+export const updateDriver = async (id, data) => {
+  const res = await axios.put(`/transport/drivers/${id}`, data);
+  return res.data;
+};
+
+export const deleteDriver = async (id) => {
+  const res = await axios.delete(`/transport/drivers/${id}`);
+  return res.data;
+};

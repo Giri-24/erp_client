@@ -403,6 +403,26 @@ const StaffManagementPage = () => {
               <DatePicker />
             </Form.Item>
           </Space>
+          <div style={{ borderTop: '1px solid #f0f0f0', margin: '16px 0 12px', paddingTop: 12 }}>
+            <p style={{ fontWeight: 600, fontSize: 13, color: '#43474d', marginBottom: 8 }}>Address (Optional)</p>
+          </div>
+          <Space size="large" wrap style={{ width: "100%" }}>
+            <Form.Item name="doorNo" label="Door No">
+              <Input placeholder="Door / Flat No" />
+            </Form.Item>
+            <Form.Item name="area" label="Area / Street">
+              <Input placeholder="Area or street name" />
+            </Form.Item>
+            <Form.Item name="city" label="City">
+              <Input placeholder="City" />
+            </Form.Item>
+            <Form.Item name="state" label="State">
+              <Input placeholder="State" />
+            </Form.Item>
+            <Form.Item name="pincode" label="Pincode">
+              <Input placeholder="Pincode" maxLength={6} />
+            </Form.Item>
+          </Space>
         </Form>
       </Modal>
 
@@ -435,6 +455,11 @@ const StaffManagementPage = () => {
                   {selectedStaff.isActive ? "Active" : "Inactive"}
                 </Tag>
               </Descriptions.Item>
+              {(selectedStaff.doorNo || selectedStaff.area || selectedStaff.city || selectedStaff.state || selectedStaff.pincode) && (
+                <Descriptions.Item label="Address" span={2}>
+                  {[selectedStaff.doorNo, selectedStaff.area, selectedStaff.city, selectedStaff.state, selectedStaff.pincode].filter(Boolean).join(", ")}
+                </Descriptions.Item>
+              )}
             </Descriptions>
             {selectedStaff.children?.length > 0 && (
               <div style={{ marginTop: 16 }}>

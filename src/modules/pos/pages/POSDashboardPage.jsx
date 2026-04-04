@@ -11,17 +11,23 @@ const POSDashboardPage = ({ onNavigate }) => {
   const [stores, setStores] = useState([]);
   const [lowStock, setLowStock] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const { hasPermission } = usePermissionHelpers();
 
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    loadData();
+  }, [fromDate, toDate]);
+
   const loadData = async () => {
     setLoading(true);
     try {
       const [dash, storeList, stock] = await Promise.all([
-        getPosDashboard(),
+        getPosDashboard(fromDate || undefined, toDate || undefined),
         getAllStores(),
         getStockOverview(),
       ]);
@@ -60,6 +66,26 @@ const POSDashboardPage = ({ onNavigate }) => {
         <h2 className="font-headline text-3xl font-extrabold text-primary tracking-tight">
           POS Dashboard
         </h2>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-on-surface-variant font-bold">From</span>
+          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+            className="bg-surface-container-high rounded-xl py-2.5 px-3 text-sm border-none outline-none" />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-on-surface-variant font-bold">To</span>
+          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
+            className="bg-surface-container-high rounded-xl py-2.5 px-3 text-sm border-none outline-none" />
+        </div>
+        {(fromDate || toDate) && (
+          <button onClick={() => { setFromDate(""); setToDate(""); }}
+            className="text-error text-xs font-bold hover:underline flex items-center gap-1">
+            <span className="material-symbols-outlined text-sm">close</span>Clear
+          </button>
+        )}
       </div>
 
       {/* Stats Cards */}

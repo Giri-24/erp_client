@@ -235,7 +235,7 @@ const SalesPage = () => {
                           <span className="material-symbols-outlined text-sm">remove</span>
                         </button>
                         <input type="number" value={c.quantity} onChange={(e) => updateCartQty(c.itemId, Number(e.target.value))} min={1}
-                          className="w-10 text-center text-sm font-bold bg-transparent outline-none" />
+                          className="w-10 text-center text-sm font-bold bg-surface-container-high text-on-surface rounded-lg outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                         <button onClick={() => updateCartQty(c.itemId, c.quantity + 1)} className="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:bg-primary-container/30 transition-colors">
                           <span className="material-symbols-outlined text-sm">add</span>
                         </button>
