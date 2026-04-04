@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Form, message, Select, Modal, InputNumber, Radio } from "antd";
+import { useMemo } from "react";
+
 import {
   assignFeeToStudent,
   assignFeeToClass,
@@ -139,25 +141,44 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
     (fees.otherFee || 0) +
     customItems.reduce((s, c) => s + (Number(c.amount) || 0), 0);
 
-  const autoDiscountAmount = (() => {
-    if (!discountEligibility) return 0;
-    let total = 0;
-    if (discountToggles.autoTeacherDiscount && discountEligibility.teacherDiscount?.eligible)
-      total += grossFee * ((discountEligibility.teacherDiscount.percentage || 0) / 100);
-    if (discountToggles.autoSiblingDiscount && discountEligibility.siblingDiscount?.eligible)
-      total += grossFee * ((discountEligibility.siblingDiscount.percentage || 0) / 100);
-    if (discountToggles.autoRteDiscount && discountEligibility.rteDiscount?.eligible)
-      total += grossFee * ((discountEligibility.rteDiscount.percentage || 0) / 100);
-    return total;
-  })();
+  // const autoDiscountAmount = (() => {
+  //   if (!discountEligibility) return 0;
+  //   let total = 0;
+  //   if (discountToggles.autoTeacherDiscount && discountEligibility.teacherDiscount?.eligible)
+  //     total += grossFee * ((discountEligibility.teacherDiscount.percentage || 0) / 100);
+  //   if (discountToggles.autoSiblingDiscount && discountEligibility.siblingDiscount?.eligible)
+  //     total += grossFee * ((discountEligibility.siblingDiscount.percentage || 0) / 100);
+  //   if (discountToggles.autoRteDiscount && discountEligibility.rteDiscount?.eligible)
+  //     total += grossFee * ((discountEligibility.rteDiscount.percentage || 0) / 100);
+  //   return total;
+  // })();
 
   const manualDiscountAmount = manualDiscounts.reduce((s, d) => {
-    if (d.type === "FLAT") return s + (Number(d.value) || 0);
-    if (d.type === "PERCENTAGE") return s + grossFee * ((Number(d.value) || 0) / 100);
-    return s;
-  }, 0);
+  if (d.type === "FLAT") {
+    return s + (Number(d.value) || 0);
+  }
 
-  const totalDiscount = autoDiscountAmount + manualDiscountAmount;
+  if (d.type === "PERCENTAGE") {
+    return s + grossFee * ((Number(d.value) || 0) / 100);
+  }
+
+  // ✅ ADD THIS BLOCK
+  if (d.type === "TEACHER_DISCOUNT") {
+    return s + grossFee * ((Number(d.value) || 0) / 100);
+  }
+
+  if (d.type === "SIBLING_DISCOUNT") {
+    return s + (Number(d.value) || 0);
+  }
+
+  if (d.type === "RTE_COMMUNITY") {
+    return s + (Number(d.value) || 0);
+  }
+
+  return s;
+}, 0);
+
+  const totalDiscount = manualDiscountAmount;
   const netFee = Math.max(grossFee - totalDiscount, 0);
 
   // ── student change ────────────────────────────────────────────────────────
@@ -256,8 +277,12 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
         autoTeacherDiscount: discountToggles.autoTeacherDiscount,
         autoSiblingDiscount: discountToggles.autoSiblingDiscount,
         autoRteDiscount: discountToggles.autoRteDiscount,
-        discounts: manualDiscounts.filter((d) => d.type && d.value),
-      });
+discounts: manualDiscounts
+  .filter((d) => d.type && d.value !== "" && d.value !== null)
+  .map((d) => ({
+    ...d,
+    value: Number(d.value) || 0, // ✅ FORCE NUMBER
+  })),      });
       message.success("Fee assigned successfully!");
       // reset
       setSelectedStudent(null);
@@ -832,7 +857,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
           {/* Discount card */}
           <div className="bg-surface-container rounded-2xl p-7">
             <h4 className="font-headline font-bold text-lg text-primary mb-5">
-              Auto Discounts
+               Discounts Eligibility
             </h4>
             <div className="space-y-5">
               <DiscountRow
@@ -881,18 +906,24 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                     <option value="SIBLING_DISCOUNT">Sibling</option>
                     <option value="RTE_COMMUNITY">RTE</option>
                   </select>
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder="Value"
-                    value={d.value}
-                    onChange={(e) => {
-                      const next = [...manualDiscounts];
-                      next[idx] = { ...next[idx], value: e.target.value };
-                      setManualDiscounts(next);
-                    }}
-                    className="w-20 bg-surface-container-high border-none rounded-lg py-2 px-3 text-sm outline-none"
-                  />
+                  <div className="relative w-20">
+  <span className="absolute left-2 top-2 text-xs font-bold">
+    {d.type === "TEACHER_DISCOUNT" ? "%" : "₹"}
+  </span>
+
+  <input
+    type="number"
+    min={0}
+    placeholder={d.type === "TEACHER_DISCOUNT" ? "%" : "₹"}
+    value={d.value}
+    onChange={(e) => {
+      const next = [...manualDiscounts];
+      next[idx] = { ...next[idx], value: e.target.value || 0 };
+      setManualDiscounts(next);
+    }}
+    className="w-full bg-surface-container-high border-none rounded-lg py-2 pl-6 pr-2 text-sm outline-none"
+  />
+</div>
                   <button
                     type="button"
                     onClick={() => setManualDiscounts(manualDiscounts.filter((_, i) => i !== idx))}

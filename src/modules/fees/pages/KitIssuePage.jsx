@@ -15,6 +15,8 @@ const KitIssuePage = () => {
   const [kitData, setKitData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [issuing, setIssuing] = useState(false);
+  const [standardFilter, setStandardFilter] = useState("");
+const [sectionFilter, setSectionFilter] = useState("");
 
   // load academic years on mount
   useEffect(() => {
@@ -86,11 +88,17 @@ const KitIssuePage = () => {
     }
   };
 
-  const studentOptions = students.map((s) => ({
-    value: s.id,
-    label: `${s.name} — ${s.standardLabel || s.standard || ""} — ${s.admission?.admissionNo || "-"}`,
-    searchText: `${s.name} ${s.standard} ${s.admission?.admissionNo || ""}`.toLowerCase(),
-  }));
+ const filteredStudents = students.filter((s) => {
+  if (standardFilter && s.standard !== standardFilter) return false;
+  if (sectionFilter && s.section !== sectionFilter) return false;
+  return true;
+});
+
+const studentOptions = filteredStudents.map((s) => ({
+  value: s.id,
+  label: `${s.name} — ${s.standardLabel || s.standard || ""} — ${s.admission?.admissionNo || "-"}`,
+  searchText: `${s.name} ${s.standard} ${s.admission?.admissionNo || ""}`.toLowerCase(),
+}));
 
   const bookFee = kitData?.bookFee ?? selectedFee?.bookFee ?? 0;
   const kitAmount = kitData?.kitAmount ?? 0;
@@ -138,6 +146,28 @@ const KitIssuePage = () => {
                 className="w-full"
               />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+  {/* Standard */}
+  <Select
+    placeholder="Filter by Standard"
+    value={standardFilter || undefined}
+    onChange={(v) => setStandardFilter(v || "")}
+    allowClear
+    options={[
+      "LKG","UKG","STD_1","STD_2","STD_3","STD_4","STD_5",
+      "STD_6","STD_7","STD_8","STD_9","STD_10","STD_11","STD_12",
+    ].map((s) => ({ label: s.replace("STD_", "Std "), value: s }))}
+  />
+
+  {/* Section */}
+  <Select
+    placeholder="Filter by Section"
+    value={sectionFilter || undefined}
+    onChange={(v) => setSectionFilter(v || "")}
+    allowClear
+    options={["A","B","C","D"].map((s) => ({ label: s, value: s }))}
+  />
+</div>
 
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-primary ml-1">Student</label>
