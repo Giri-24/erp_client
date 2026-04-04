@@ -378,9 +378,12 @@ const PurchasesPage = () => {
                   <span className="font-bold text-sm text-primary">{fmt(pr.totalAmount)}</span>
                   <div className="flex gap-2">
                     <button onClick={() => setSelectedPurchase(pr)} className="text-primary text-xs font-bold hover:underline">View</button>
+                    {pr.receiptUrl && (
+                      <a href={`${import.meta.env.VITE_API_URL || ""}/${pr.receiptUrl}`} target="_blank" rel="noopener noreferrer" className="text-[#44ddc1] text-xs font-bold hover:underline">Receipt</a>
+                    )}
                     {canManage && (
                       <label className="text-secondary text-xs font-bold hover:underline cursor-pointer">
-                        Receipt
+                        {pr.receiptUrl ? "Re-upload" : "Upload"}
                         <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleReceiptUpload(pr.id, e)} />
                       </label>
                     )}
@@ -465,6 +468,14 @@ const PurchasesPage = () => {
             <div className="flex justify-between font-extrabold text-xl">
               <span>Total</span><span className="text-primary">{fmt(selectedPurchase.totalAmount)}</span>
             </div>
+            {selectedPurchase.receiptUrl && (
+              <div className="mt-4 pt-4 border-t border-outline-variant/10">
+                <a href={`${import.meta.env.VITE_API_URL || ""}/${selectedPurchase.receiptUrl}`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-primary/90 transition-all">
+                  <span className="material-symbols-outlined text-lg">visibility</span>View Receipt
+                </a>
+              </div>
+            )}
           </div>
         )}
       </Modal>

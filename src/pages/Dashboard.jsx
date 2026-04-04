@@ -29,6 +29,7 @@ import RouteManagementPage from "../modules/transport/pages/RouteManagementPage"
 import AssignTransportPage from "../modules/transport/pages/AssignTransportPage";
 import TransportViewPage from "../modules/transport/pages/TransportViewPage";
 import LiveTrackingPage from "../modules/transport/pages/LiveTrackingPage";
+import DriverListingPage from "../modules/transport/pages/DriverListingPage";
 
 import StaffManagementPage from "../modules/staff/pages/StaffManagementPage";
 import ApprovalsView from "./ApprovalsView";
@@ -170,6 +171,7 @@ const Dashboard = () => {
         { key: "transport-assign", label: "Assign Transport", icon: "transfer_within_a_station", permission: canTransportAssign },
         { key: "transport-view", label: "View Transport", icon: "manage_search", permission: canTransportRead },
         { key: "transport-live", label: "Live Tracking", icon: "location_on", permission: canLocationRead },
+        { key: "transport-drivers", label: "Drivers", icon: "person", permission: canTransportRouteAccess },
       ],
     },
     { key: "staff-management", label: "Staff", icon: "badge", permission: canStaffAccess },
@@ -256,6 +258,7 @@ case "fees-collect":
       case "transport-assign":    return <AssignTransportPage />;
       case "transport-view":      return <TransportViewPage />;
       case "transport-live":      return <LiveTrackingPage />;
+      case "transport-drivers":   return <DriverListingPage />;
       case "staff-management":    return <StaffManagementPage />;
       case "hr-dashboard":        return <HRDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
       case "hr-attendance":       return <AttendancePage />;

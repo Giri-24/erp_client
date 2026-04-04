@@ -3,18 +3,21 @@ import { message, Modal } from "antd";
 import {
   getAllStoreItems, giveTeacherFreeItem, returnTeacherFreeItem, getTeacherFreeItems, getTeacherFreeItemSummary,
 } from "../pos.service";
+import { getAllStaff } from "../../staff/staff.service";
 import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
 import { exportToCSV } from "../exportCsv";
 
 const StaffAllowancePage = () => {
   const [items, setItems] = useState([]);
   const [freeItems, setFreeItems] = useState([]);
+  const [allStaff, setAllStaff] = useState([]);
   const [summary, setSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("give"); // give | records | summary
 
   // Give form
   const [giveForm, setGiveForm] = useState({ staffId: "", itemId: "", academicYear: new Date().getFullYear().toString(), quantity: 1 });
+  const [staffSearch, setStaffSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // Return modal
@@ -39,9 +42,10 @@ const StaffAllowancePage = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [itemList, freeList] = await Promise.all([getAllStoreItems(), getTeacherFreeItems()]);
+      const [itemList, freeList, staffList] = await Promise.all([getAllStoreItems(), getTeacherFreeItems(), getAllStaff()]);
       setItems(itemList || []);
       setFreeItems(freeList || []);
+      setAllStaff((staffList || []).filter((s) => s.isActive !== false));
     } catch { message.error("Failed to load data"); }
     setLoading(false);
   };
@@ -49,7 +53,7 @@ const StaffAllowancePage = () => {
   const freeEligibleItems = items.filter((i) => i.isFreeEligible);
 
   const handleGive = async () => {
-    if (!giveForm.staffId.trim()) { message.error("Enter staff ID"); return; }
+    if (!giveForm.staffId) { message.error("Select a staff member"); return; }
     if (!giveForm.itemId) { message.error("Select an item"); return; }
     setSubmitting(true);
     try {
@@ -78,7 +82,7 @@ const StaffAllowancePage = () => {
   };
 
   const loadSummary = async () => {
-    if (!summaryStaffId.trim()) { message.error("Enter staff ID"); return; }
+    if (!summaryStaffId) { message.error("Select a staff member"); return; }
     try {
       const data = await getTeacherFreeItemSummary(summaryStaffId, summaryYear);
       setSummary(data || []);
@@ -147,9 +151,35 @@ const StaffAllowancePage = () => {
               <span className="material-symbols-outlined text-primary">redeem</span>Give Free Item
             </h3>
             <div>
-              <label className="text-xs font-bold text-on-surface-variant uppercase">Staff ID *</label>
-              <input value={giveForm.staffId} onChange={(e) => setGiveForm({ ...giveForm, staffId: e.target.value })}
-                className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1" placeholder="Enter staff ID" />
+              <label className="text-xs font-bold text-on-surface-variant uppercase">Staff *</label>
+              <div className="relative mt-1">
+                <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-lg">search</span>
+                <input value={staffSearch} onChange={(e) => { setStaffSearch(e.target.value); setGiveForm({ ...giveForm, staffId: "" }); }}
+                  placeholder="Search staff by name or ID..."
+                  className="w-full bg-surface-container-high rounded-xl py-2.5 pl-10 pr-4 text-sm border-none outline-none focus:ring-2 focus:ring-primary/30" />
+                {staffSearch && !giveForm.staffId && (
+                  <div className="absolute z-10 mt-1 w-full bg-white rounded-xl shadow-lg max-h-48 overflow-y-auto border border-outline-variant/20">
+                    {allStaff.filter((s) => {
+                      const q = staffSearch.toLowerCase();
+                      return (s.name || "").toLowerCase().includes(q) || (s.employeeId || "").toLowerCase().includes(q);
+                    }).slice(0, 20).map((s) => (
+                      <button key={s.id} type="button" onClick={() => { setGiveForm({ ...giveForm, staffId: s.id }); setStaffSearch(`${s.name} (${s.employeeId})`); }}
+                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary-container/20 transition-colors flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+                          <span className="material-symbols-outlined text-primary text-sm">person</span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-on-surface">{s.name}</p>
+                          <p className="text-[10px] text-on-surface-variant">{s.employeeId} · {s.designation || ""}</p>
+                        </div>
+                      </button>
+                    ))}
+                    {allStaff.filter((s) => { const q = staffSearch.toLowerCase(); return (s.name || "").toLowerCase().includes(q) || (s.employeeId || "").toLowerCase().includes(q); }).length === 0 && (
+                      <p className="px-4 py-3 text-sm text-on-surface-variant text-center">No staff found</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <label className="text-xs font-bold text-on-surface-variant uppercase">Item *</label>
@@ -271,11 +301,14 @@ const StaffAllowancePage = () => {
       {/* ── SUMMARY ── */}
       {tab === "summary" && (
         <div className="space-y-5">
-          <div className="flex gap-3 items-end">
-            <div>
-              <label className="text-xs font-bold text-on-surface-variant uppercase">Staff ID</label>
-              <input value={summaryStaffId} onChange={(e) => setSummaryStaffId(e.target.value)}
-                className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1" placeholder="Enter staff ID" />
+          <div className="flex gap-3 items-end flex-wrap">
+            <div className="min-w-[250px]">
+              <label className="text-xs font-bold text-on-surface-variant uppercase">Staff</label>
+              <select value={summaryStaffId} onChange={(e) => setSummaryStaffId(e.target.value)}
+                className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1 appearance-none">
+                <option value="">Select staff...</option>
+                {allStaff.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.employeeId})</option>)}
+              </select>
             </div>
             <div>
               <label className="text-xs font-bold text-on-surface-variant uppercase">Year</label>

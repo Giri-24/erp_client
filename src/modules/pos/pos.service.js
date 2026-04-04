@@ -169,7 +169,7 @@ export const createPosTransaction = async (data) => {
   return res.data;
 };
 
-export const getAllPosTransactions = async (type, from, to) => {
+export const getAllPosTransactions = async ({ type, from, to } = {}) => {
   const res = await axios.get('/pos/transactions', { params: { type, from, to } });
   return res.data;
 };
