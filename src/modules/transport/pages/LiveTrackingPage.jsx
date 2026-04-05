@@ -12,6 +12,7 @@ import {
   removeVehicleDriver,
   pushTripEvents,
 } from "../transport.service";
+import { getLiveDriverBusStatus } from "../transport.service";
 
 // ── School center (PSF campus) ────────────────────────────────────────────
 const SCHOOL_CENTER = [11.4648, 77.9264];
@@ -69,6 +70,7 @@ const LiveTrackingPage = () => {
   const [assignForm] = Form.useForm();
   const mapRef = useRef(null);
   const prevIgnitionRef = useRef({});  // { deviceId: boolean } — tracks previous ignition states
+  const [driverBusStatus, setDriverBusStatus] = useState(null);
 
   // ── Driver-Vehicle mapping (backend with localStorage fallback) ─────────
   const loadDriverMap = useCallback(async () => {
@@ -247,6 +249,19 @@ const LiveTrackingPage = () => {
     try { return new Date(dt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); }
     catch { return "—"; }
   };
+
+  // Enhanced: driver+bus live status
+  useEffect(() => {
+    const fetchDriverBusStatus = async () => {
+      try {
+        const status = await getLiveDriverBusStatus();
+        setDriverBusStatus(status);
+      } catch {}
+    };
+    fetchDriverBusStatus();
+    const interval = setInterval(fetchDriverBusStatus, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="flex gap-6 h-[calc(100vh-8rem)]">

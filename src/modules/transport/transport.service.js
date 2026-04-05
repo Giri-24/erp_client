@@ -81,6 +81,12 @@ export const getLiveDriverLocations = async () => {
   return res.data;
 };
 
+// Enhanced: Get live driver+bus status (in-bus/outside, distance)
+export const getLiveDriverBusStatus = async () => {
+  const res = await axios.get('/location/live/drivers');
+  return res.data;
+};
+
 // ─── DRIVERS ────────────────────────────────
 
 export const getAllDrivers = async () => {
@@ -198,4 +204,26 @@ export const getDailyTripSummary = async (date) => {
     const res = await axios.get('/transport/trip-summary', { params: { date } });
     return res.data;
   } catch { return []; }
+};
+
+// ─── BUSES ────────────────────────────────
+
+export const getAllBuses = async () => {
+  const res = await axios.get('/transport/buses');
+  return res.data;
+};
+
+export const createBus = async (data) => {
+  const res = await axios.post('/transport/buses', data);
+  return res.data;
+};
+
+export const updateBus = async (id, data) => {
+  const res = await axios.put(`/transport/buses/${id}`, data);
+  return res.data;
+};
+
+export const deleteBus = async (id) => {
+  const res = await axios.delete(`/transport/buses/${id}`);
+  return res.data;
 };

@@ -24,6 +24,7 @@ import RefundCancellationReportPage from "../modules/fees/pages/RefundCancellati
 import StudentFeeLedgerPage from "../modules/fees/pages/StudentFeeLedgerPage";
 import ClassFeeSummaryPage from "../modules/fees/pages/ClassFeeSummaryPage";
 import KitIssuePage from "../modules/fees/pages/KitIssuePage";
+import BusManagementPage from "../modules/transport/pages/BusManagementPage";
 
 import RouteManagementPage from "../modules/transport/pages/RouteManagementPage";
 import AssignTransportPage from "../modules/transport/pages/AssignTransportPage";
@@ -185,6 +186,7 @@ const Dashboard = () => {
         { key: "transport-view", label: "View Transport", icon: "manage_search", permission: canTransportRead },
         { key: "transport-live", label: "Live Tracking", icon: "location_on", permission: canLocationRead },
         { key: "transport-drivers", label: "Drivers", icon: "person", permission: canTransportRouteAccess },
+        { key: "transport-buses", label: "Buses", icon: "directions_bus_filled", permission: canTransportRouteAccess },
       ],
     },
     { key: "staff-management", label: "Staff", icon: "badge", permission: canStaffAccess },
