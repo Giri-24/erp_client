@@ -309,6 +309,11 @@ const AdminSettings = () => {
                   <Switch />
                 </Form.Item>
               </Col>
+              <Col span={8}>
+                <Form.Item name="enableIndividualDemotion" label="Enable Individual Demotion" valuePropName="checked">
+                  <Switch />
+                </Form.Item>
+              </Col>
             </Row>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0 16px' }}>

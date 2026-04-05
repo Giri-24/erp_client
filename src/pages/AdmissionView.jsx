@@ -1,67 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { Table, Input, Button, Space, message, Popconfirm, DatePicker, Tag, Select, Modal } from "antd";
+import { Table, Input, Button, Space, message, Popconfirm, DatePicker, Tag, Select, Modal, Row } from "antd";
 import "./AdmissionView.css";
 import { SearchOutlined, EditOutlined, DownloadOutlined, DeleteOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-// Print PDF for a single admission
-const handlePrintPDF = (record) => {
-  const doc = new jsPDF();
-  // Add logo if available
-  const logoImg = new Image();
-  logoImg.src = "/images/logo.png";
-  logoImg.onload = () => {
-    doc.addImage(logoImg, "PNG", 80, 10, 50, 25);
-    addContent();
-  };
-  logoImg.onerror = () => {
-    addContent();
-  };
-  function addContent() {
-    let y = 40;
-    doc.setFontSize(18);
-    doc.text("Admission Form", 105, y, { align: "center" });
-    y += 10;
-    doc.setFontSize(12);
-    // Student Info Table
-    const fields = [
-      ["Admission No", record.admission?.admissionNo || ""],
-      ["Student Name", record.name || ""],
-      ["Standard", formatStandardLabel(record.standard || record.admission?.standard)],
-      ["Gender", record.gender || ""],
-      ["DOB", record.dob ? dayjs(record.dob).format("YYYY-MM-DD") : ""],
-      ["Religion", record.religion || ""],
-      ["Community", record.community || ""],
-      ["Caste", record.caste || ""],
-      ["Mother Tongue", record.motherTongue || ""],
-      ["Aadhar No", record.aadharNo || ""],
-      ["Blood Group", record.bloodGroup || ""],
-      ["Identification 1", record.identification1 || ""],
-      ["Identification 2", record.identification2 || ""],
-      ["Previous School", record.previousSchool || ""],
-      ["Transport Mode", record.transportMode || ""],
-      ["RTE", record.rte ? "Yes" : "No"],
-      ["App Approved", record.admission?.isApproved ? "Yes" : "No"],
-      ["Admission Date", record.admission?.admissionDate ? dayjs(record.admission.admissionDate).format("YYYY-MM-DD") : ""],
-      ["Admission From", record.admission?.admissionFrom ? dayjs(record.admission.admissionFrom).format("YYYY-MM-DD") : ""],
-      ["Admission To", record.admission?.admissionTo ? dayjs(record.admission.admissionTo).format("YYYY-MM-DD") : ""],
-      ["Admission Status", (record.users?.isActive ?? 1) ? "Active" : "Inactive"],
-    ];
-    autoTable(doc, {
-      startY: y + 5,
-      head: [["Field", "Value"]],
-      body: fields,
-      theme: "grid",
-      headStyles: { fillColor: [22, 160, 133] },
-      styles: { fontSize: 10 },
-    });
-    doc.save(`admission_${record.admission?.admissionNo || record.id}.pdf`);
-  }
-};
+import html2canvas from "html2canvas";
+import logo from "../assets/logo.jpeg";
+
+// Redesigned handlePrintPDF logic will be moved inside the component
 import instance from "../utils/axios";
 import dayjs from "dayjs";
 import { getPendingAdmissions, setAdmissionApproval, bulkApproval } from "../modules/admission/admission.service";
 import { getAcademicYears, getAcademicYear as fetchCurrentYear } from "../modules/fees/fees.service";
+import { getAdminSettings } from "../modules/settings/settings.service";
 import { PERMISSIONS, usePermissionHelpers } from "../utils/permissions";
 
 const normalizeStandardValue = (value) => {
@@ -96,6 +46,174 @@ const formatStandardLabel = (value) => {
   return value || "";
 };
 
+const pdfStyles = {
+  pdfWrapper: {
+    width: "800px",
+    background: "white",
+    fontFamily: "'Public Sans', sans-serif",
+    color: "#222",
+  },
+  header: {
+    backgroundColor: "#F59E0B",
+    padding: "5px 10px",
+    textAlign: "center",
+    color: "white",
+    position: "relative",
+    // marginBottom: "30px",
+  },
+  institutionName: {
+    fontSize: "28px",
+    fontWeight: "900",
+    margin: 0,
+    textTransform: "uppercase",
+  },
+  tagline: {
+    fontSize: "12px",
+    fontWeight: "500",
+    opacity: 0.9,
+    margin: "4px 0",
+  },
+  formTitle: {
+    fontSize: "20px",
+    fontWeight: "800",
+    marginTop: "20px",
+    padding: "6px 24px",
+    border: "2px solid white",
+    display: "inline-block",
+    textTransform: "uppercase",
+  },
+  photoBox: {
+    position: "absolute",
+    right: "40px",
+    top: "30px",
+    width: "100px",
+    height: "120px",
+    border: "1px dashed rgba(255,255,255,0.6)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "10px",
+    color: "rgba(255,255,255,0.8)",
+  },
+  content: {
+    padding: "0 40px 40px",
+  },
+  row: {
+    display: "flex",
+    gap: "20px",
+    marginBottom: "18px",
+    alignItems: "flex-end",
+  },
+  field: {
+    display: "flex",
+    flex: 1,
+    alignItems: "flex-end",
+    gap: "10px",
+  },
+  label: {
+    fontSize: "13px",
+    fontWeight: "700",
+    color: "#444",
+    whiteSpace: "nowrap",
+  },
+  value: {
+    flex: 1,
+    borderBottom: "1px dotted #999",
+    fontSize: "14px",
+    paddingBottom: "2px",
+    color: "#000",
+    fontWeight: "500",
+    minHeight: "20px"
+  },
+  addressSection: {
+    border: "1px dashed #cbd5e1",
+    padding: "20px",
+    marginTop: "25px",
+    marginBottom: "20px",
+    position: "relative",
+  },
+  addressLabel: {
+    position: "absolute",
+    top: "-10px",
+    left: "20px",
+    background: "white",
+    padding: "0 10px",
+    fontSize: "11px",
+    fontWeight: "800",
+    color: "#F59E0B",
+    textTransform: "uppercase",
+  },
+  declaration: {
+    textAlign: "center",
+    marginTop: "40px",
+    padding: "0 20px",
+  },
+  declTitle: {
+    fontSize: "14px",
+    fontWeight: "900",
+    textTransform: "uppercase",
+    marginBottom: "10px",
+  },
+  declText: {
+    fontSize: "12px",
+    color: "#555",
+    lineHeight: "1.6",
+    marginBottom: "60px",
+  },
+  signatureRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    padding: "0 40px",
+  },
+  sigLine: {
+    width: "200px",
+    borderTop: "1px dotted #666",
+    textAlign: "center",
+    paddingTop: "8px",
+    fontSize: "12px",
+    fontWeight: "700",
+  },
+  academicSection: {
+    marginTop: "25px",
+    marginBottom: "20px",
+  },
+  academicTitle: {
+    fontSize: "13px",
+    fontWeight: "800",
+    color: "#F59E0B",
+    textTransform: "uppercase",
+    marginBottom: "12px",
+    borderBottom: "2px solid #F59E0B",
+    paddingBottom: "4px",
+    display: "inline-block",
+  },
+  academicTable: {
+    width: "100%",
+    borderCollapse: "collapse",
+    marginTop: "10px",
+  },
+  academicTh: {
+    backgroundColor: "#fff9f2",
+    border: "1px solid #fed7aa",
+    padding: "8px",
+    fontSize: "11px",
+    fontWeight: "800",
+    color: "#9a3412",
+    textAlign: "center",
+  },
+  academicTd: {
+    border: "1px solid #fed7aa",
+    padding: "8px",
+    fontSize: "11px",
+    textAlign: "center",
+  },
+  footer: {
+    height: "15px",
+    backgroundColor: "#F59E0B",
+    marginTop: "40px",
+  }
+};
+
 const AdmissionView = ({ onEdit, mode = "all" }) => {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -108,20 +226,111 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
   const [approvalReason, setApprovalReason] = useState("");
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [bulkApprovalLoading, setBulkApprovalLoading] = useState(false);
-  const { hasPermission } = usePermissionHelpers();
-  const canApprove = hasPermission(PERMISSIONS.ADMISSION_APPROVE);
-
-  // Filter states
-  const [filterStandard, setFilterStandard] = useState(undefined);
-  const [filterGender, setFilterGender] = useState(undefined);
-  const [filterStatus, setFilterStatus] = useState(undefined);
-  const [filterApproval, setFilterApproval] = useState(undefined);
-  const [filterDate, setFilterDate] = useState([]);
-  const [filterAcademicYear, setFilterAcademicYear] = useState(undefined);
-  const [filterSection, setFilterSection] = useState(undefined);
+  const [adminSettings, setAdminSettings] = useState(null);
+  const [printingRecord, setPrintingRecord] = useState(null);
+  
+  const [filterStandard, setFilterStandard] = useState("");
+  const [filterGender, setFilterGender] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterApproval, setFilterApproval] = useState("");
+  const [filterDate, setFilterDate] = useState(null);
+  const [filterAcademicYear, setFilterAcademicYear] = useState("");
+  const [filterSection, setFilterSection] = useState("");
   const [filterFatherName, setFilterFatherName] = useState("");
-  const [filterSibling, setFilterSibling] = useState(undefined);
+  const [filterSibling, setFilterSibling] = useState("");
+  const [filterArea, setFilterArea] = useState("");
   const [availableYears, setAvailableYears] = useState([]);
+
+  const { hasPermission } = usePermissionHelpers();
+  const canApprove = hasPermission(PERMISSIONS.ADMISSION_APPROVE) && (adminSettings?.requireApprovalForAdmission ?? true);
+
+  // Re-apply filters whenever data or any filter changes
+  useEffect(() => {
+    applyFilters(
+      searchText,
+      filterStandard,
+      filterGender,
+      filterStatus,
+      filterApproval,
+      filterDate,
+      filterAcademicYear,
+      filterSection,
+      filterFatherName,
+      filterSibling,
+      filterArea,
+      data
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    data,
+    searchText,
+    filterStandard,
+    filterGender,
+    filterStatus,
+    filterApproval,
+    filterDate,
+    filterAcademicYear,
+    filterSection,
+    filterFatherName,
+    filterSibling,
+    filterArea
+  ]);
+
+  const handlePrintPDF = async (record) => {
+    setPrintingRecord(record);
+    // Wait for DOM to render hidden content
+    setTimeout(async () => {
+      try {
+        const input = document.getElementById("viewPdfContent");
+        if (!input) return;
+        
+        const canvas = await html2canvas(input, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          windowWidth: 800,
+        });
+        
+        const imgWidth = 210; // A4 width in mm
+        const pageHeight = 297; // A4 height in mm
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let heightLeft = imgHeight;
+        
+        const pdf = new jsPDF("p", "mm", "a4");
+        let position = 0;
+        
+        const imgData = canvas.toDataURL("image/png");
+        
+        // Add first page
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+        
+        // Add additional pages if needed
+        while (heightLeft >= 0) {
+          position = heightLeft - imgHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+        
+        pdf.save(`Admission_${record.admission?.admissionNo || record.id}.pdf`);
+      } catch (err) {
+        console.error("PDF Export Error:", err);
+        message.error("Failed to generate PDF");
+      } finally {
+        setPrintingRecord(null);
+      }
+    }, 100);
+  };
+
+  const loadAdminSettings = async () => {
+    try {
+      const settings = await getAdminSettings();
+      setAdminSettings(settings);
+    } catch (err) {
+      console.error("Failed to load admin settings:", err);
+    }
+  };
 
   const fetchAdmissions = async () => {
     try {
@@ -141,23 +350,21 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
 
   const loadInitialData = async () => {
     try {
-      const [years, currentYearObj] = await Promise.all([
+      const [years] = await Promise.all([
         getAcademicYears(),
         fetchCurrentYear()
       ]);
       setAvailableYears(years || []);
-      const initialYear = currentYearObj?.year || currentYearObj;
-      if (initialYear && !filterAcademicYear) {
-        setFilterAcademicYear(initialYear);
-      }
+      // Do not set filterAcademicYear by default
     } catch {
       // silent
     }
   };
 
   useEffect(() => {
-    loadInitialData();
     fetchAdmissions();
+    loadAdminSettings();
+    loadInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
@@ -174,67 +381,75 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
 
 
   // Combined filter
-  const applyFilters = (searchVal, std, gender, status, approval, dateRange, academicYear, section, fatherName, sibling, sourceData = data) => {
+  const applyFilters = (searchVal, std, gender, status, approval, dateRange, academicYear, section, fatherName, sibling, areaSearch, sourceData = data) => {
     let filtered = sourceData.filter((item) => {
       // Search
-      let matchesSearch = true;
-      if (searchVal) {
-        matchesSearch = Object.values(item).some((v) =>
+      if (searchVal && searchVal.trim() !== "") {
+        const found = Object.values(item).some((v) =>
           String(v).toLowerCase().includes(searchVal.toLowerCase())
         );
+        if (!found) return false;
       }
       // Standard
-      let matchesStd = true;
-      if (std) {
+      if (std && std !== "") {
         const itemStandard = item.admission?.standard || item.standard;
-        matchesStd = normalizeStandardValue(itemStandard) === normalizeStandardValue(std);
+        if (normalizeStandardValue(itemStandard) !== normalizeStandardValue(std)) return false;
       }
       // Gender
-      let matchesGender = true;
-      if (gender) {
-        matchesGender = item.gender === gender;
+      if (gender && gender !== "") {
+        if (item.gender !== gender) return false;
       }
       // Status
-      let matchesStatus = true;
-      if (status !== undefined) {
+      if (status && status !== "") {
         const isActive = item.users?.isActive ?? 1;
-        matchesStatus = (status === 'active' && isActive) || (status === 'inactive' && !isActive);
+        if ((status === 'active' && !isActive) || (status === 'inactive' && isActive)) return false;
       }
       // Approval
-      let matchesApproval = true;
-      if (approval !== undefined) {
+      if (approval && approval !== "") {
         const isApproved = Boolean(item.admission?.isApproved);
-        matchesApproval = (approval === 'approved' && isApproved) || (approval === 'pending' && !isApproved);
+        if ((approval === 'approved' && !isApproved) || (approval === 'pending' && isApproved)) return false;
       }
       // Academic Year
-      let matchesAcademicYear = true;
-      if (academicYear) {
-        matchesAcademicYear = item.admission?.academicYear === academicYear;
+      if (academicYear && academicYear !== "") {
+        if (item.academicYear !== academicYear) return false;
       }
       // Section
-      let matchesSection = true;
-      if (section) {
-        matchesSection = item.section === section;
+      if (section && section !== "") {
+        if (item.section !== section) return false;
       }
       // Father Name
-      let matchesFatherName = true;
-      if (fatherName) {
-        matchesFatherName = (item.family?.fatherName || "").toLowerCase().includes(fatherName.toLowerCase());
+      if (fatherName && fatherName.trim() !== "") {
+        if (!(item.family?.fatherName || "").toLowerCase().includes(fatherName.toLowerCase())) return false;
       }
       // Sibling
-      let matchesSibling = true;
-      if (sibling === 'has') matchesSibling = !!item.siblingGroupId;
-      else if (sibling === 'none') matchesSibling = !item.siblingGroupId;
+      if (sibling && sibling !== "") {
+        if (sibling === 'has' && !item.siblingGroupId) return false;
+        if (sibling === 'none' && item.siblingGroupId) return false;
+      }
+      // Area Search
+      if (areaSearch && areaSearch.trim() !== "") {
+        const areaStr = areaSearch.toLowerCase();
+        const address = item.address || {};
+        const isMatch = 
+          (address.line1 || "").toLowerCase().includes(areaStr) ||
+          (address.line2 || "").toLowerCase().includes(areaStr) ||
+          (address.line3 || "").toLowerCase().includes(areaStr) ||
+          (address.city || "").toLowerCase().includes(areaStr) ||
+          (address.state || "").toLowerCase().includes(areaStr) ||
+          String(address.pin || "").toLowerCase().includes(areaStr);
+        if (!isMatch) return false;
+      }
       // Admission Date
-      let matchesDate = true;
       if (dateRange && dateRange.length === 2 && dateRange[0] && dateRange[1]) {
         const admDate = item.admission?.admissionDate;
         if (admDate) {
           const d = dayjs(admDate);
-          matchesDate = d.isAfter(dateRange[0].startOf('day').subtract(1, 'ms')) && d.isBefore(dateRange[1].endOf('day').add(1, 'ms'));
+          if (!(d.isAfter(dateRange[0].startOf('day').subtract(1, 'ms')) && d.isBefore(dateRange[1].endOf('day').add(1, 'ms')))) return false;
+        } else {
+          return false;
         }
       }
-      return matchesSearch && matchesStd && matchesGender && matchesStatus && matchesApproval && matchesDate && matchesAcademicYear && matchesSection && matchesFatherName && matchesSibling;
+      return true;
     });
     setFilteredData(filtered);
   };
@@ -242,43 +457,47 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
   // Handlers
   const handleSearch = (value) => {
     setSearchText(value);
-    applyFilters(value, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
+    applyFilters(value, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling, filterArea);
   };
   const handleStandard = (value) => {
     setFilterStandard(value);
-    applyFilters(searchText, value, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
+    applyFilters(searchText, value, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling, filterArea);
   };
   const handleGender = (value) => {
     setFilterGender(value);
-    applyFilters(searchText, filterStandard, value, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
+    applyFilters(searchText, filterStandard, value, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling, filterArea);
   };
   const handleStatus = (value) => {
     setFilterStatus(value);
-    applyFilters(searchText, filterStandard, filterGender, value, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
+    applyFilters(searchText, filterStandard, filterGender, value, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling, filterArea);
   };
   const handleApprovalFilter = (value) => {
     setFilterApproval(value);
-    applyFilters(searchText, filterStandard, filterGender, filterStatus, value, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, value, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling, filterArea);
   };
   const handleDate = (dates) => {
     setFilterDate(dates);
-    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, dates, filterAcademicYear, filterSection, filterFatherName, filterSibling);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, dates, filterAcademicYear, filterSection, filterFatherName, filterSibling, filterArea);
   };
   const handleAcademicYear = (value) => {
     setFilterAcademicYear(value);
-    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, value, filterSection, filterFatherName, filterSibling);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, value, filterSection, filterFatherName, filterSibling, filterArea);
   };
   const handleSection = (value) => {
     setFilterSection(value);
-    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, value, filterFatherName, filterSibling);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, value, filterFatherName, filterSibling, filterArea);
   };
   const handleFatherName = (value) => {
     setFilterFatherName(value);
-    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, value, filterSibling);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, value, filterSibling, filterArea);
   };
   const handleSibling = (value) => {
     setFilterSibling(value);
-    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, value);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, value, filterArea);
+  };
+  const handleArea = (value) => {
+    setFilterArea(value);
+    applyFilters(searchText, filterStandard, filterGender, filterStatus, filterApproval, filterDate, filterAcademicYear, filterSection, filterFatherName, filterSibling, value);
   };
 
   const handleSetApproval = async (record, approved, reason) => {
@@ -547,7 +766,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
     },
     { title: "Gender", dataIndex: "gender", width: 100 },
     { title: "Section", dataIndex: "section", width: 100 },
-    { title: "Academic Year", dataIndex: ["admission", "academicYear"], width: 130 },
+    { title: "Academic Year", dataIndex: "academicYear", width: 130 },
     {
       title: "Father Name",
       width: 150,
@@ -611,7 +830,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
   ];
 
   return (
-    <div>
+    <div style={{ display: 'flex', padding: 16, flexDirection: 'column', gap: 16 }}>
       {/* Editorial page header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
         <div>
@@ -638,6 +857,9 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
               </button>
             </>
           )}
+          <button onClick={exportCSV} className="ghost-btn" style={{ display: 'flex',  gap: 6, padding: '8px 16px', borderRadius: 9999, border: '1px solid #c3c6ce', background: 'transparent', cursor: 'pointer', fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12, color: '#00152a' }}>
+            <DownloadOutlined /> CSV
+          </button>
         </Space>
       </div>
       <div className="admission-filter-bar">
@@ -712,6 +934,14 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
           onChange={(e) => handleFatherName(e.target.value)}
           style={{ width: 160, borderRadius: 9999, background: '#f0f4f8', border: 'none' }}
         />
+        <Input
+          allowClear
+          placeholder="Area Search (City/Street/Pin)"
+          value={filterArea}
+          onChange={(e) => handleArea(e.target.value)}
+          style={{ width: 180, borderRadius: 9999, background: '#f0f4f8', border: 'none' }}
+          prefix={<SearchOutlined style={{ color: '#43474d' }} />}
+        />
         <Select
           allowClear
           placeholder="Sibling"
@@ -729,9 +959,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
           onChange={handleDate}
           placeholder={["From", "To"]}
         />
-        <button onClick={exportCSV} className="ghost-btn" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9999, border: '1px solid #c3c6ce', background: 'transparent', cursor: 'pointer', fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12, color: '#00152a' }}>
-          <DownloadOutlined /> CSV
-        </button>
+       
         {mode === "approval" && (
           <button onClick={fetchAdmissions} className="ghost-btn" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9999, border: '1px solid #c3c6ce', background: 'transparent', cursor: 'pointer', fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12, color: '#00152a' }}>
             <ReloadOutlined /> Refresh
@@ -752,6 +980,189 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
         pagination={{ pageSize: 10 }}
         className="custom-ant-table-header"
       />
+
+      {/* ── HIDDEN PDF TEMPLATE FOR VIEW LIST ── */}
+      {printingRecord && (
+        <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
+          <div id="viewPdfContent" style={pdfStyles.pdfWrapper}>
+            <div style={pdfStyles.header}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', justifyContent: 'center' }}>
+                <img src={logo} alt="logo" style={{ width: "80px", filter: "brightness(0) invert(1)" }} />
+                <div style={{ textAlign: 'left' }}>
+                  <h1 style={pdfStyles.institutionName}>Matric Hr Sec School</h1>
+                  <p style={pdfStyles.tagline}>Excellence in Education - Vadugappatti, Salem</p>
+                </div>
+              </div>
+            </div>
+
+            <div style={pdfStyles.content}>
+               <div style={pdfStyles.row}>
+                  <div style={pdfStyles.field}>
+                    <span style={pdfStyles.label}>Student's Name :</span>
+                    <span style={pdfStyles.value}>{printingRecord.name}</span>
+                  </div>
+               </div>
+
+               <div style={pdfStyles.row}>
+                  <div style={pdfStyles.field}>
+                    <span style={pdfStyles.label}>Father's Name :</span>
+                    <span style={pdfStyles.value}>{printingRecord.family?.fatherName}</span>
+                  </div>
+               </div>
+
+               <div style={pdfStyles.row}>
+                  <div style={pdfStyles.field}>
+                    <span style={pdfStyles.label}>Mother's Name :</span>
+                    <span style={pdfStyles.value}>{printingRecord.family?.motherName}</span>
+                  </div>
+               </div>
+
+               <div style={pdfStyles.row}>
+                  <div style={{...pdfStyles.field, flex: 0.6}}>
+                    <span style={pdfStyles.label}>Birth Date :</span>
+                    <span style={pdfStyles.value}>{printingRecord.dob ? dayjs(printingRecord.dob).format("DD / MM / YYYY") : ".... / .... / ...."}</span>
+                  </div>
+                  <div style={{...pdfStyles.field, flex: 0.4}}>
+                    <span style={pdfStyles.label}>Gender :</span>
+                    <span style={pdfStyles.value}>{printingRecord.gender}</span>
+                  </div>
+               </div>
+
+               <div style={pdfStyles.addressSection}>
+                  <span style={pdfStyles.addressLabel}>Residential Address</span>
+                  <div style={pdfStyles.row}>
+                    <div style={pdfStyles.field}>
+                      <span style={pdfStyles.label}>Address Line 1 :</span>
+                      <span style={pdfStyles.value}>{printingRecord.address?.line1 || printingRecord.address?.street}</span>
+                    </div>
+                  </div>
+                  <div style={pdfStyles.row}>
+                    <div style={{...pdfStyles.field, flex: 0.6}}>
+                      <span style={pdfStyles.label}>City :</span>
+                      <span style={pdfStyles.value}>{printingRecord.address?.city}</span>
+                    </div>
+                    <div style={{...pdfStyles.field, flex: 0.4}}>
+                      <span style={pdfStyles.label}>Pincode :</span>
+                      <span style={pdfStyles.value}>{printingRecord.address?.pin}</span>
+                    </div>
+                  </div>
+               </div>
+
+               <div style={pdfStyles.row}>
+                  <div style={{...pdfStyles.field, flex: 0.5}}>
+                    <span style={pdfStyles.label}>Religion :</span>
+                    <span style={pdfStyles.value}>{printingRecord.religion}</span>
+                  </div>
+                  <div style={{...pdfStyles.field, flex: 0.5}}>
+                    <span style={pdfStyles.label}>Nationality :</span>
+                    <span style={pdfStyles.value}>Indian</span>
+                  </div>
+               </div>
+
+               <div style={pdfStyles.academicSection}>
+                  <div style={pdfStyles.academicTitle}>III. Academic Performance</div>
+                  <div style={{...pdfStyles.row, marginBottom: '10px'}}>
+                    <div style={{...pdfStyles.field, flex: 0.4}}>
+                      <span style={pdfStyles.label}>Exam :</span>
+                      <span style={pdfStyles.value}>{printingRecord.academics?.[0]?.examName}</span>
+                    </div>
+                    <div style={{...pdfStyles.field, flex: 0.3}}>
+                      <span style={pdfStyles.label}>Reg No :</span>
+                      <span style={pdfStyles.value}>{printingRecord.academics?.[0]?.registerNo}</span>
+                    </div>
+                    <div style={{...pdfStyles.field, flex: 0.3}}>
+                      <span style={pdfStyles.label}>Year :</span>
+                      <span style={pdfStyles.value}>{printingRecord.academics?.[0]?.monthYear}</span>
+                    </div>
+                  </div>
+                  <table style={pdfStyles.academicTable}>
+                    <thead>
+                      <tr>
+                        <th style={pdfStyles.academicTh}>SUBJECT</th>
+                        <th style={pdfStyles.academicTh}>MAX MARKS</th>
+                        <th style={pdfStyles.academicTh}>MARKS OBTAINED</th>
+                        <th style={pdfStyles.academicTh}>PERCENTAGE</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(printingRecord.academics?.[0]?.subjects || []).map((exam, idx) => (
+                        <tr key={idx}>
+                          <td style={{...pdfStyles.academicTd, textAlign: 'left'}}>{exam.subjectName}</td>
+                          <td style={pdfStyles.academicTd}>{exam.maxMarks}</td>
+                          <td style={pdfStyles.academicTd}>{exam.obtainedMarks}</td>
+                          <td style={pdfStyles.academicTd}>
+                            {exam.maxMarks > 0 ? ((exam.obtainedMarks / exam.maxMarks) * 100).toFixed(1) + '%' : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+               </div>
+
+               <div style={pdfStyles.row}>
+                  <div style={{...pdfStyles.field, flex: 0.5}}>
+                    <span style={pdfStyles.label}>Phone Number :</span>
+                    <span style={pdfStyles.value}>{printingRecord.family?.fatherPhone || printingRecord.family?.motherPhone}</span>
+                  </div>
+                  <div style={{...pdfStyles.field, flex: 0.5}}>
+                    <span style={pdfStyles.label}>Email Address :</span>
+                    <span style={pdfStyles.value}>{printingRecord.family?.parentsEmail}</span>
+                  </div>
+               </div>
+
+               <div style={pdfStyles.row}>
+                  <div style={{...pdfStyles.field, flex: 0.5}}>
+                    <span style={pdfStyles.label}>Aadhar Number :</span>
+                    <span style={pdfStyles.value}>{printingRecord.aadharNo}</span>
+                  </div>
+                  <div style={{...pdfStyles.field, flex: 0.5}}>
+                    <span style={pdfStyles.label}>Blood Group :</span>
+                    <span style={pdfStyles.value}>{printingRecord.bloodGroup}</span>
+                  </div>
+               </div>
+
+               <div style={pdfStyles.row}>
+                  <div style={{...pdfStyles.field, flex: 0.4}}>
+                    <span style={pdfStyles.label}>Admission For :</span>
+                    <span style={pdfStyles.value}>{formatStandardLabel(printingRecord.admission?.standard || printingRecord.standard)}</span>
+                  </div>
+                  <div style={{...pdfStyles.field, flex: 0.25}}>
+                    <span style={pdfStyles.label}>Section :</span>
+                    <span style={pdfStyles.value}>{printingRecord.section || printingRecord.admission?.section}</span>
+                  </div>
+                  <div style={{...pdfStyles.field, flex: 0.35}}>
+                    <span style={pdfStyles.label}>Academic Year :</span>
+                    <span style={pdfStyles.value}>{printingRecord.admission?.academicYear}</span>
+                  </div>
+               </div>
+
+               <div style={pdfStyles.row}>
+                  <div style={{...pdfStyles.field, flex: 0.5}}>
+                    <span style={pdfStyles.label}>Transport :</span>
+                    <span style={pdfStyles.value}>{printingRecord.transportMode || (printingRecord.admission?.vanNeeded ? "School Van" : "Local")}</span>
+                  </div>
+                  <div style={{...pdfStyles.field, flex: 0.5}}>
+                    <span style={pdfStyles.label}>RTE Student :</span>
+                    <span style={pdfStyles.value}>{printingRecord.rte ? "Yes" : (printingRecord.rteApplied ? "Yes" : "No")}</span>
+                  </div>
+               </div>
+
+               <div style={pdfStyles.declaration}>
+                  <h4 style={pdfStyles.declTitle}>Declaration</h4>
+                  <p style={pdfStyles.declText}>
+                    I hereby, declaring that I will obey all the rules and regulations of the institution and be fully responsible for violating the rules.
+                  </p>
+                  
+                  <div style={pdfStyles.signatureRow}>
+                    <div style={pdfStyles.sigLine}>Student's Signature</div>
+                    <div style={pdfStyles.sigLine}>Authorized's Signature</div>
+                  </div>
+               </div>
+            </div>
+            {/* <div style={pdfStyles.footer}></div> */}
+          </div>
+        </div>
+      )}
 
       <Modal
         title="Reason (Optional)"

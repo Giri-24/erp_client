@@ -10,9 +10,15 @@ export default defineConfig({
     host: true,
     proxy: {
       '/erp/api': {
-        // target: 'http://localhost:3000',
-        target: 'http://127.0.0.1:3000',
+        target: 'http://localhost:3000',
+        // target: 'http://127.0.0.1:3000',
         changeOrigin: true,
+      },
+      '/apm-api': {
+        target: 'https://apmconnect.app',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/apm-api/, '/api'),
+        secure: true,
       },
     },
   },

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { message } from "antd";
+import { message, Select } from "antd";
 import {
   getAllFeeStructures,
   createFeeStructure,
@@ -77,6 +77,17 @@ const FeeStructurePage = () => {
   const canUpdate = hasPermission(PERMISSIONS.FEES_STRUCTURE_UPDATE);
   const canDelete = hasPermission(PERMISSIONS.FEES_STRUCTURE_DELETE);
 
+  const academicYears = React.useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    // Generate from 3 years ago to 6 years in future to ensure "next year" always appears
+    for (let i = -3; i <= 6; i++) {
+      const year = currentYear + i;
+      years.push(`${year}-${year + 1}`);
+    }
+    return years;
+  }, []);
+
   // ── data ────────────────────────────────────────────────────────────────
   const fetchData = async () => {
     setLoading(true);
@@ -111,6 +122,7 @@ const FeeStructurePage = () => {
       numberOfTerms: record.numberOfTerms || 1,
       customItems: (record.customItems || []).map((c) => ({ name: c.name, amount: c.amount })),
       terms: (record.terms || []).map((t) => ({
+        
         termNumber: t.termNumber,
         termName: t.termName,
         amount: t.amount,
@@ -211,7 +223,7 @@ const FeeStructurePage = () => {
           <span className="text-primary font-bold">Structure Settings</span>
         </div>
         <h2 className="font-headline font-extrabold text-4xl text-primary tracking-tight mb-1">
-          Fee Architecture
+          Fee Structure
         </h2>
         <p className="text-on-surface-variant max-w-2xl text-sm">
           Manage academic year financial structures across all grades. Define core fees, custom levies, and automated scholarship rules from a single interface.
@@ -220,11 +232,418 @@ const FeeStructurePage = () => {
 
       {/* ── main grid ── */}
       <div className="grid grid-cols-12 gap-6">
+        
         {/* ── LEFT / CENTER (8 cols) ── */}
         <div className="col-span-12 xl:col-span-8 space-y-8">
+   <div ref={formRef} className="bg-surface-container-low rounded-2xl p-8 relative overflow-hidden">
+            <div className="relative z-10">
+              {/* Header */}
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white shadow-lg">
+                  <span className="material-symbols-outlined">{editingId ? "edit" : "add"}</span>
+                </div>
+                <div>
+                  <h3 className="font-headline font-bold text-2xl text-primary">
+                    {editingId ? "Edit Fee Structure" : "Create New Fee Structure"}
+                  </h3>
+                  <p className="text-sm text-on-surface-variant">
+                    {editingId
+                      ? "Update the fee structure details below"
+                      : "Configure a new standard or specialized course fee plan"}
+                  </p>
+                </div>
+              </div>
 
+              <div className="space-y-7">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-primary uppercase tracking-wider ml-1">
+                      Academic Standard *
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={form.standard}
+                        onChange={(e) => setField("standard", e.target.value)}
+                        className="w-full bg-white border-none rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/30 text-sm font-medium outline-none appearance-none"
+                      >
+                        <option value="">Select Grade</option>
+                        {STANDARDS.map((s) => (
+                          <option key={s} value={s}>{STANDARD_LABELS[s] || s} ({s})</option>
+                        ))}
+                      </select>
+                      <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">expand_more</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-primary uppercase tracking-wider ml-1">
+                      Session / Academic Year *
+                    </label>
+                    <div className="relative fee-structure-select-container">
+                      <Select
+                        showSearch
+                        placeholder="Select or enter year (e.g. 2026-2027)"
+                        value={form.academicYear || undefined}
+                        onChange={(val) => setField("academicYear", val)}
+                        onSearch={(val) => setField("academicYear", val)}
+                        className="w-full academic-year-select"
+                        bordered={false}
+                        options={academicYears.map(year => ({ label: year, value: year }))}
+                        filterOption={(input, option) =>
+                          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                      />
+                      <style>{`
+                        .academic-year-select .ant-select-selector {
+                          background-color: white !important;
+                          border-radius: 0.75rem !important; /* rounded-xl */
+                          padding-top: 6px !important;
+                          padding-bottom: 6px !important;
+                          padding-left: 12px !important;
+                          padding-right: 12px !important;
+                          height: 48px !important;
+                          display: flex !important;
+                          align-items: center !important;
+                          font-size: 14px !important; /* text-sm */
+                          font-weight: 500 !important; /* font-medium */
+                        }
+                        .academic-year-select .ant-select-selection-placeholder {
+                           line-height: normal !important;
+                           height: auto !important;
+                           display: flex !important;
+                           align-items: center !important;
+                        }
+                        .academic-year-select .ant-select-selection-item {
+                           line-height: normal !important;
+                           display: flex !important;
+                           align-items: center !important;
+                        }
+                        .academic-year-select {
+                          width: 100% !important;
+                        }
+                      `}</style>
+                    </div>
+                  </div>
+                </div>
+
+
+                <div className="space-y-3">
+                  <h4 className="font-headline font-bold text-primary flex items-center gap-2 text-sm">
+                    <span className="material-symbols-outlined text-sm">receipt_long</span>
+                    Core Fee Components
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { key: "tuitionFee", label: "Tuition Fee", primary: true },
+                      { key: "transportFee", label: "Transport" },
+                      { key: "hostelFee", label: "Hostel" },
+                      { key: "bookFee", label: "Books / Kit" },
+                    ].map(({ key, label, primary }) => (
+                      <div
+                        key={key}
+                        className={`bg-white p-4 rounded-xl ${primary ? "border-l-4 border-primary" : ""}`}
+                      >
+                        <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">{label}</p>
+                        <div className="relative">
+                          <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm font-bold">₹</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={form[key] || ""}
+                            onChange={(e) => setField(key, Number(e.target.value) || 0)}
+                            className="w-full border-none p-0 pl-4 focus:ring-0 text-lg font-bold text-primary bg-transparent outline-none"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white p-4 rounded-xl">
+                      <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">Other Fee</p>
+                      <div className="relative">
+                        <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm font-bold">₹</span>
+                        <input
+                          type="number" min={0}
+                          value={form.otherFee || ""}
+                          onChange={(e) => setField("otherFee", Number(e.target.value) || 0)}
+                          className="w-full border-none p-0 pl-4 focus:ring-0 text-lg font-bold text-primary bg-transparent outline-none"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl">
+                      <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">No. of Terms</p>
+                      <input
+                        type="number" min={1} max={4}
+                        value={form.numberOfTerms}
+                        onChange={(e) => setField("numberOfTerms", Number(e.target.value) || 1)}
+                        className="w-full border-none p-0 focus:ring-0 text-lg font-bold text-primary bg-transparent outline-none"
+                        placeholder="1"
+                      />
+                    </div>
+                  </div>
+
+  
+                  {form.numberOfTerms > 1 && (
+                    <div className="col-span-2 bg-white/50 border border-dashed border-outline-variant rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold text-on-surface-variant uppercase">Custom Term Split</p>
+                        <button type="button" onClick={() => {
+                          const n = form.numberOfTerms;
+                          const total = grossTotal(form);
+                          const perTerm = Math.floor(total / n);
+                          const remainder = total - perTerm * n;
+                          setField("terms", Array.from({ length: n }, (_, i) => ({
+                            termNumber: i + 1,
+                            termName: form.terms?.[i]?.termName || `Term ${i + 1}`,
+                            amount: form.terms?.[i]?.amount || (i === 0 ? perTerm + remainder : perTerm),
+                            dueDate: form.terms?.[i]?.dueDate || "",
+                          })));
+                        }} className="text-primary text-xs font-bold flex items-center gap-1 hover:underline">
+                          <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+                          Auto-split equally
+                        </button>
+                      </div>
+                      {(form.terms || []).length === 0 ? (
+                        <button type="button" onClick={() => {
+                          setField("terms", Array.from({ length: form.numberOfTerms }, (_, i) => ({
+                            termNumber: i + 1, termName: `Term ${i + 1}`, amount: 0, dueDate: "",
+                          })));
+                        }} className="w-full flex items-center justify-center gap-2 border border-dashed border-outline-variant rounded-lg py-2.5 text-xs text-on-surface-variant hover:border-primary hover:text-primary transition-all">
+                          <span className="material-symbols-outlined text-sm">add</span>
+                          Set Custom Term Amounts
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          {form.terms.map((t, i) => (
+                            <div key={i} className="grid grid-cols-3 gap-2 items-center">
+                              <input type="text" value={t.termName}
+                                onChange={(e) => {
+                                  const next = [...form.terms]; next[i] = { ...next[i], termName: e.target.value };
+                                  setField("terms", next);
+                                }}
+                                placeholder={`Term ${i + 1}`}
+                                className="bg-white border-none rounded-lg p-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20" />
+                              <div className="relative">
+                                <span className="absolute left-2 top-2.5 text-on-surface-variant text-sm">₹</span>
+                                <input type="number" min={0} value={t.amount || ""}
+                                  onChange={(e) => {
+                                    const next = [...form.terms]; next[i] = { ...next[i], amount: Number(e.target.value) || 0 };
+                                    setField("terms", next);
+                                  }}
+                                  className="w-full bg-white border-none rounded-lg p-2.5 pl-6 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" />
+                              </div>
+                              <input type="date" value={t.dueDate}
+                                onChange={(e) => {
+                                  const next = [...form.terms]; next[i] = { ...next[i], dueDate: e.target.value };
+                                  setField("terms", next);
+                                }}
+                                className="bg-white border-none rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-headline font-bold text-primary flex items-center gap-2 text-sm">
+                      <span className="material-symbols-outlined text-sm">science</span>
+                      Custom Fee Items
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={addCustomItem}
+                      className="text-primary text-xs font-bold flex items-center gap-1 hover:underline"
+                    >
+                      <span className="material-symbols-outlined text-sm">add_circle</span>
+                      Add Item
+                    </button>
+                  </div>
+
+                  {form.customItems.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={addCustomItem}
+                      className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-outline-variant rounded-xl py-3 text-xs text-on-surface-variant hover:border-primary hover:text-primary transition-all"
+                    >
+                      <span className="material-symbols-outlined text-sm">add</span>
+                      Add Lab Fee, Sports Fee, etc.
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      {form.customItems.map((ci, idx) => (
+                        <div
+                          key={idx}
+                          className="flex gap-3 items-center bg-white/60 border border-dashed border-outline-variant px-3 py-2.5 rounded-xl"
+                        >
+                          <input
+                            type="text"
+                            placeholder="Item Name (e.g. Sports Fee)"
+                            value={ci.name}
+                            onChange={(e) => updateCustomItem(idx, "name", e.target.value)}
+                            className="flex-1 bg-transparent border-none text-sm font-medium focus:ring-0 outline-none"
+                          />
+                          <div className="relative w-28">
+                            <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm">₹</span>
+                            <input
+                              type="number" min={0}
+                              placeholder="Amount"
+                              value={ci.amount || ""}
+                              onChange={(e) => updateCustomItem(idx, "amount", Number(e.target.value) || 0)}
+                              className="w-full bg-transparent border-none text-sm font-bold text-right pl-4 focus:ring-0 outline-none"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeCustomItem(idx)}
+                            className="text-error/40 hover:text-error transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-base">delete</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Kit Items (POS) ── */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-headline font-bold text-primary flex items-center gap-2 text-sm">
+                      <span className="material-symbols-outlined text-sm">inventory_2</span>
+                      Kit / Book Items (POS)
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={addKitItem}
+                      className="text-primary text-xs font-bold flex items-center gap-1 hover:underline"
+                    >
+                      <span className="material-symbols-outlined text-sm">add_circle</span>
+                      Add Kit Item
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-on-surface-variant -mt-1">
+                    Map POS items (shoes, belt, etc.) to the Books / Kit fee. Total kit value is deducted from book fee balance.
+                  </p>
+
+                  {form.kitItems.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={addKitItem}
+                      className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-outline-variant rounded-xl py-3 text-xs text-on-surface-variant hover:border-primary hover:text-primary transition-all"
+                    >
+                      <span className="material-symbols-outlined text-sm">add</span>
+                      Add Items like Shoes, Belt, Uniform, etc.
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      {form.kitItems.map((ki, idx) => {
+                        const item = storeItems.find((s) => s.id === ki.storeItemId);
+                        return (
+                          <div
+                            key={idx}
+                            className="flex gap-3 items-center bg-white/60 border border-dashed border-outline-variant px-3 py-2.5 rounded-xl"
+                          >
+                            <div className="flex-1">
+                              <select
+                                value={ki.storeItemId}
+                                onChange={(e) => {
+                                  const selected = storeItems.find((s) => s.id === e.target.value);
+                                  updateKitItem(idx, "storeItemId", e.target.value);
+                                  if (selected) updateKitItem(idx, "amount", selected.sellingPrice || 0);
+                                }}
+                                className="w-full bg-transparent border-none text-sm font-medium focus:ring-0 outline-none appearance-none"
+                              >
+                                <option value="">Select POS Item</option>
+                                {storeItems.map((si) => (
+                                  <option key={si.id} value={si.id}>
+                                    {si.name} — {fmt(si.sellingPrice || 0)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="relative w-16">
+                              <input
+                                type="number" min={1}
+                                placeholder="Qty"
+                                value={ki.quantity}
+                                onChange={(e) => updateKitItem(idx, "quantity", Number(e.target.value) || 1)}
+                                className="w-full bg-transparent border-none text-sm font-bold text-center focus:ring-0 outline-none"
+                              />
+                            </div>
+                            <div className="relative w-24">
+                              <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm">₹</span>
+                              <input
+                                type="number" min={0}
+                                placeholder="Amount"
+                                value={ki.amount || ""}
+                                onChange={(e) => updateKitItem(idx, "amount", Number(e.target.value) || 0)}
+                                className="w-full bg-transparent border-none text-sm font-bold text-right pl-4 focus:ring-0 outline-none"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeKitItem(idx)}
+                              className="text-error/40 hover:text-error transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-base">delete</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                      <div className="flex justify-between items-center bg-primary-fixed/30 rounded-xl px-4 py-2">
+                        <span className="text-xs font-bold text-on-surface-variant">Kit Total</span>
+                        <span className="text-sm font-extrabold text-primary">
+                          {fmt(form.kitItems.reduce((s, k) => s + (Number(k.amount) || 0) * (Number(k.quantity) || 1), 0))}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white rounded-xl px-5 py-4 flex justify-between items-center">
+                  <span className="text-sm font-bold text-on-surface-variant">Calculated Annual Total</span>
+                  <span className="text-xl font-extrabold text-primary">{fmt(grossTotal(form))}</span>
+                </div>
+
+
+                <div className="flex justify-end gap-3 pt-2">
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="px-7 py-2.5 rounded-full text-on-surface-variant font-bold text-sm hover:bg-surface-container-high transition-colors"
+                    >
+                      Discard
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={saving || (!canCreate && !canUpdate)}
+                    onClick={handleSubmit}
+                    className="px-10 py-2.5 bg-primary text-white rounded-full font-bold text-sm shadow-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {saving ? (
+                      <><span className="material-symbols-outlined text-base animate-spin">refresh</span> Saving...</>
+                    ) : (
+                      <><span className="material-symbols-outlined text-base">check_circle</span>
+                        {editingId ? "Update Structure" : "Publish Structure"}</>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+            {/* decorative bg */}
+            <div className="absolute -bottom-16 -right-16 w-72 h-72 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+          </div>
           {/* Bento cards: existing structures */}
-          {loading ? (
+          {/* {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {[0, 1].map((i) => (
                 <div key={i} className="bg-white rounded-2xl p-6 h-52 animate-pulse bg-surface-container-high" />
@@ -318,379 +737,10 @@ const FeeStructurePage = () => {
                 <p className="text-xs mt-1 opacity-70">Create your first structure below</p>
               </div>
             )
-          )}
+          )} */}
 
           {/* ── CREATE / EDIT form ── */}
-          <div ref={formRef} className="bg-surface-container-low rounded-2xl p-8 relative overflow-hidden">
-            <div className="relative z-10">
-              {/* Header */}
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white shadow-lg">
-                  <span className="material-symbols-outlined">{editingId ? "edit" : "add"}</span>
-                </div>
-                <div>
-                  <h3 className="font-headline font-bold text-2xl text-primary">
-                    {editingId ? "Edit Fee Structure" : "Create New Fee Structure"}
-                  </h3>
-                  <p className="text-sm text-on-surface-variant">
-                    {editingId
-                      ? "Update the fee structure details below"
-                      : "Configure a new standard or specialized course fee plan"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-7">
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-primary uppercase tracking-wider ml-1">
-                      Academic Standard *
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={form.standard}
-                        onChange={(e) => setField("standard", e.target.value)}
-                        className="w-full bg-white border-none rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/30 text-sm font-medium outline-none appearance-none"
-                      >
-                        <option value="">Select Grade</option>
-                        {STANDARDS.map((s) => (
-                          <option key={s} value={s}>{STANDARD_LABELS[s] || s} ({s})</option>
-                        ))}
-                      </select>
-                      <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">expand_more</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-primary uppercase tracking-wider ml-1">
-                      Session / Academic Year *
-                    </label>
-                    <input
-                      type="text"
-                      value={form.academicYear}
-                      onChange={(e) => setField("academicYear", e.target.value)}
-                      placeholder="e.g. 2025-26"
-                      className="w-full bg-white border-none rounded-xl py-3 px-4 focus:ring-2 focus:ring-primary/30 text-sm outline-none"
-                    />
-                  </div>
-                </div>
-
-
-                <div className="space-y-3">
-                  <h4 className="font-headline font-bold text-primary flex items-center gap-2 text-sm">
-                    <span className="material-symbols-outlined text-sm">receipt_long</span>
-                    Core Fee Components
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {[
-                      { key: "tuitionFee", label: "Tuition Fee", primary: true },
-                      { key: "transportFee", label: "Transport" },
-                      { key: "hostelFee", label: "Hostel" },
-                      { key: "bookFee", label: "Books / Kit" },
-                    ].map(({ key, label, primary }) => (
-                      <div
-                        key={key}
-                        className={`bg-white p-4 rounded-xl ${primary ? "border-l-4 border-primary" : ""}`}
-                      >
-                        <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">{label}</p>
-                        <div className="relative">
-                          <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm font-bold">₹</span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={form[key]}
-                            onChange={(e) => setField(key, Number(e.target.value) || 0)}
-                            className="w-full border-none p-0 pl-4 focus:ring-0 text-lg font-bold text-primary bg-transparent outline-none"
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-  
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-white p-4 rounded-xl">
-                      <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">Other Fee</p>
-                      <div className="relative">
-                        <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm font-bold">₹</span>
-                        <input
-                          type="number" min={0}
-                          value={form.otherFee}
-                          onChange={(e) => setField("otherFee", Number(e.target.value) || 0)}
-                          className="w-full border-none p-0 pl-4 focus:ring-0 text-lg font-bold text-primary bg-transparent outline-none"
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-                    <div className="bg-white p-4 rounded-xl">
-                      <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">No. of Terms</p>
-                      <input
-                        type="number" min={1} max={4}
-                        value={form.numberOfTerms}
-                        onChange={(e) => setField("numberOfTerms", Number(e.target.value) || 1)}
-                        className="w-full border-none p-0 focus:ring-0 text-lg font-bold text-primary bg-transparent outline-none"
-                        placeholder="1"
-                      />
-                    </div>
-                  </div>
-
-  
-                  {form.numberOfTerms > 1 && (
-                    <div className="col-span-2 bg-white/50 border border-dashed border-outline-variant rounded-xl p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-bold text-on-surface-variant uppercase">Custom Term Split</p>
-                        <button type="button" onClick={() => {
-                          const n = form.numberOfTerms;
-                          const total = grossTotal(form);
-                          const perTerm = Math.floor(total / n);
-                          const remainder = total - perTerm * n;
-                          setField("terms", Array.from({ length: n }, (_, i) => ({
-                            termNumber: i + 1,
-                            termName: form.terms?.[i]?.termName || `Term ${i + 1}`,
-                            amount: form.terms?.[i]?.amount || (i === 0 ? perTerm + remainder : perTerm),
-                            dueDate: form.terms?.[i]?.dueDate || "",
-                          })));
-                        }} className="text-primary text-xs font-bold flex items-center gap-1 hover:underline">
-                          <span className="material-symbols-outlined text-sm">auto_fix_high</span>
-                          Auto-split equally
-                        </button>
-                      </div>
-                      {(form.terms || []).length === 0 ? (
-                        <button type="button" onClick={() => {
-                          setField("terms", Array.from({ length: form.numberOfTerms }, (_, i) => ({
-                            termNumber: i + 1, termName: `Term ${i + 1}`, amount: 0, dueDate: "",
-                          })));
-                        }} className="w-full flex items-center justify-center gap-2 border border-dashed border-outline-variant rounded-lg py-2.5 text-xs text-on-surface-variant hover:border-primary hover:text-primary transition-all">
-                          <span className="material-symbols-outlined text-sm">add</span>
-                          Set Custom Term Amounts
-                        </button>
-                      ) : (
-                        <div className="space-y-2">
-                          {form.terms.map((t, i) => (
-                            <div key={i} className="grid grid-cols-3 gap-2 items-center">
-                              <input type="text" value={t.termName}
-                                onChange={(e) => {
-                                  const next = [...form.terms]; next[i] = { ...next[i], termName: e.target.value };
-                                  setField("terms", next);
-                                }}
-                                placeholder={`Term ${i + 1}`}
-                                className="bg-white border-none rounded-lg p-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20" />
-                              <div className="relative">
-                                <span className="absolute left-2 top-2.5 text-on-surface-variant text-sm">₹</span>
-                                <input type="number" min={0} value={t.amount}
-                                  onChange={(e) => {
-                                    const next = [...form.terms]; next[i] = { ...next[i], amount: Number(e.target.value) || 0 };
-                                    setField("terms", next);
-                                  }}
-                                  className="w-full bg-white border-none rounded-lg p-2.5 pl-6 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20" />
-                              </div>
-                              <input type="date" value={t.dueDate}
-                                onChange={(e) => {
-                                  const next = [...form.terms]; next[i] = { ...next[i], dueDate: e.target.value };
-                                  setField("terms", next);
-                                }}
-                                className="bg-white border-none rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20" />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-headline font-bold text-primary flex items-center gap-2 text-sm">
-                      <span className="material-symbols-outlined text-sm">science</span>
-                      Custom Fee Items
-                    </h4>
-                    <button
-                      type="button"
-                      onClick={addCustomItem}
-                      className="text-primary text-xs font-bold flex items-center gap-1 hover:underline"
-                    >
-                      <span className="material-symbols-outlined text-sm">add_circle</span>
-                      Add Item
-                    </button>
-                  </div>
-
-                  {form.customItems.length === 0 ? (
-                    <button
-                      type="button"
-                      onClick={addCustomItem}
-                      className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-outline-variant rounded-xl py-3 text-xs text-on-surface-variant hover:border-primary hover:text-primary transition-all"
-                    >
-                      <span className="material-symbols-outlined text-sm">add</span>
-                      Add Lab Fee, Sports Fee, etc.
-                    </button>
-                  ) : (
-                    <div className="space-y-2">
-                      {form.customItems.map((ci, idx) => (
-                        <div
-                          key={idx}
-                          className="flex gap-3 items-center bg-white/60 border border-dashed border-outline-variant px-3 py-2.5 rounded-xl"
-                        >
-                          <input
-                            type="text"
-                            placeholder="Item Name (e.g. Sports Fee)"
-                            value={ci.name}
-                            onChange={(e) => updateCustomItem(idx, "name", e.target.value)}
-                            className="flex-1 bg-transparent border-none text-sm font-medium focus:ring-0 outline-none"
-                          />
-                          <div className="relative w-28">
-                            <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm">₹</span>
-                            <input
-                              type="number" min={0}
-                              placeholder="Amount"
-                              value={ci.amount}
-                              onChange={(e) => updateCustomItem(idx, "amount", Number(e.target.value) || 0)}
-                              className="w-full bg-transparent border-none text-sm font-bold text-right pl-4 focus:ring-0 outline-none"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeCustomItem(idx)}
-                            className="text-error/40 hover:text-error transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-base">delete</span>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Kit Items (POS) ── */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-headline font-bold text-primary flex items-center gap-2 text-sm">
-                      <span className="material-symbols-outlined text-sm">inventory_2</span>
-                      Kit / Book Items (POS)
-                    </h4>
-                    <button
-                      type="button"
-                      onClick={addKitItem}
-                      className="text-primary text-xs font-bold flex items-center gap-1 hover:underline"
-                    >
-                      <span className="material-symbols-outlined text-sm">add_circle</span>
-                      Add Kit Item
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-on-surface-variant -mt-1">
-                    Map POS items (shoes, belt, etc.) to the Books / Kit fee. Total kit value is deducted from book fee balance.
-                  </p>
-
-                  {form.kitItems.length === 0 ? (
-                    <button
-                      type="button"
-                      onClick={addKitItem}
-                      className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-outline-variant rounded-xl py-3 text-xs text-on-surface-variant hover:border-primary hover:text-primary transition-all"
-                    >
-                      <span className="material-symbols-outlined text-sm">add</span>
-                      Add Items like Shoes, Belt, Uniform, etc.
-                    </button>
-                  ) : (
-                    <div className="space-y-2">
-                      {form.kitItems.map((ki, idx) => {
-                        const item = storeItems.find((s) => s.id === ki.storeItemId);
-                        return (
-                          <div
-                            key={idx}
-                            className="flex gap-3 items-center bg-white/60 border border-dashed border-outline-variant px-3 py-2.5 rounded-xl"
-                          >
-                            <div className="flex-1">
-                              <select
-                                value={ki.storeItemId}
-                                onChange={(e) => {
-                                  const selected = storeItems.find((s) => s.id === e.target.value);
-                                  updateKitItem(idx, "storeItemId", e.target.value);
-                                  if (selected) updateKitItem(idx, "amount", selected.sellingPrice || 0);
-                                }}
-                                className="w-full bg-transparent border-none text-sm font-medium focus:ring-0 outline-none appearance-none"
-                              >
-                                <option value="">Select POS Item</option>
-                                {storeItems.map((si) => (
-                                  <option key={si.id} value={si.id}>
-                                    {si.name} — {fmt(si.sellingPrice || 0)}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="relative w-16">
-                              <input
-                                type="number" min={1}
-                                placeholder="Qty"
-                                value={ki.quantity}
-                                onChange={(e) => updateKitItem(idx, "quantity", Number(e.target.value) || 1)}
-                                className="w-full bg-transparent border-none text-sm font-bold text-center focus:ring-0 outline-none"
-                              />
-                            </div>
-                            <div className="relative w-24">
-                              <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm">₹</span>
-                              <input
-                                type="number" min={0}
-                                placeholder="Amount"
-                                value={ki.amount}
-                                onChange={(e) => updateKitItem(idx, "amount", Number(e.target.value) || 0)}
-                                className="w-full bg-transparent border-none text-sm font-bold text-right pl-4 focus:ring-0 outline-none"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeKitItem(idx)}
-                              className="text-error/40 hover:text-error transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-base">delete</span>
-                            </button>
-                          </div>
-                        );
-                      })}
-                      <div className="flex justify-between items-center bg-primary-fixed/30 rounded-xl px-4 py-2">
-                        <span className="text-xs font-bold text-on-surface-variant">Kit Total</span>
-                        <span className="text-sm font-extrabold text-primary">
-                          {fmt(form.kitItems.reduce((s, k) => s + (Number(k.amount) || 0) * (Number(k.quantity) || 1), 0))}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-white rounded-xl px-5 py-4 flex justify-between items-center">
-                  <span className="text-sm font-bold text-on-surface-variant">Calculated Annual Total</span>
-                  <span className="text-xl font-extrabold text-primary">{fmt(grossTotal(form))}</span>
-                </div>
-
-
-                <div className="flex justify-end gap-3 pt-2">
-                  {editingId && (
-                    <button
-                      type="button"
-                      onClick={resetForm}
-                      className="px-7 py-2.5 rounded-full text-on-surface-variant font-bold text-sm hover:bg-surface-container-high transition-colors"
-                    >
-                      Discard
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={saving || (!canCreate && !canUpdate)}
-                    onClick={handleSubmit}
-                    className="px-10 py-2.5 bg-primary text-white rounded-full font-bold text-sm shadow-xl hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {saving ? (
-                      <><span className="material-symbols-outlined text-base animate-spin">refresh</span> Saving...</>
-                    ) : (
-                      <><span className="material-symbols-outlined text-base">check_circle</span>
-                        {editingId ? "Update Structure" : "Publish Structure"}</>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-            {/* decorative bg */}
-            <div className="absolute -bottom-16 -right-16 w-72 h-72 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-          </div>
+       
         </div>
 
         {/* ── RIGHT sidebar (4 cols) ── */}
@@ -737,7 +787,7 @@ const FeeStructurePage = () => {
                 <div key={label} className="p-4 rounded-xl bg-surface-container-low/50 border border-outline-variant/10">
                   <div className="flex justify-between items-center mb-1.5">
                     <span className="text-sm font-bold text-primary">{label}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-black ${badgeColor}`}>{badge}</span>
+                    {/* <span className={`text-[10px] px-2 py-0.5 rounded font-black ${badgeColor}`}>{badge}</span> */}
                   </div>
                   <p className="text-[11px] text-on-surface-variant leading-tight">{desc}</p>
                 </div>

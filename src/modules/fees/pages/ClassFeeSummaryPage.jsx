@@ -21,7 +21,7 @@ const STANDARD_LABELS = {
 
 // ── component ─────────────────────────────────────────────────────────────
 const ClassFeeSummaryPage = () => {
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState("");
   const [academicYearOptions, setAcademicYearOptions] = useState([]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -29,7 +29,7 @@ const ClassFeeSummaryPage = () => {
   useEffect(() => {
     getAcademicYears().then((years) => {
       setAcademicYearOptions(years || []);
-      if ((years || []).length > 0 && !years.includes(academicYear)) setAcademicYear(years[0]);
+      if ((years || []).length > 0) setAcademicYear(years[0]);
     }).catch(() => {});
   }, []);
 
