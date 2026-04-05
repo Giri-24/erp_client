@@ -1,0 +1,104 @@
+import React, { useEffect, useState } from 'react';
+import { Table, Button, Modal, Form, Input, message } from 'antd';
+import { getAllBuses, createBus, updateBus, deleteBus } from '../transport.service';
+
+const BusManagementPage = () => {
+  const [buses, setBuses] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingBus, setEditingBus] = useState(null);
+  const [form] = Form.useForm();
+
+  const fetchBuses = async () => {
+    setLoading(true);
+    try {
+      const data = await getAllBuses();
+      setBuses(data);
+    } catch (err) {
+      message.error('Failed to fetch buses');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchBuses();
+  }, []);
+
+  const handleAdd = () => {
+    setEditingBus(null);
+    form.resetFields();
+    setModalVisible(true);
+  };
+
+  const handleEdit = (bus) => {
+    setEditingBus(bus);
+    form.setFieldsValue(bus);
+    setModalVisible(true);
+  };
+
+  const handleDelete = async (busId) => {
+    setLoading(true);
+    try {
+      await deleteBus(busId);
+      message.success('Bus deleted');
+      fetchBuses();
+    } catch {
+      message.error('Failed to delete bus');
+    }
+    setLoading(false);
+  };
+
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+      setLoading(true);
+      if (editingBus) {
+        await updateBus(editingBus.id, values);
+        message.success('Bus updated');
+      } else {
+        await createBus(values);
+        message.success('Bus created');
+      }
+      setModalVisible(false);
+      fetchBuses();
+    } catch (err) {
+      // validation or API error
+    }
+    setLoading(false);
+  };
+
+  const columns = [
+    { title: 'Bus Number', dataIndex: 'busNo', key: 'busNo' },
+    { title: 'Plate No', dataIndex: 'plateNo', key: 'plateNo' },
+    { title: 'Capacity', dataIndex: 'capacity', key: 'capacity' },
+    { title: 'Actions', key: 'actions', render: (_, bus) => (
+      <>
+        <Button onClick={() => handleEdit(bus)} type="link">Edit</Button>
+        <Button onClick={() => handleDelete(bus.id)} type="link" danger>Delete</Button>
+      </>
+    )},
+  ];
+
+  return (
+    <div>
+      <h2>Bus Management</h2>
+      <Button type="primary" onClick={handleAdd} style={{ marginBottom: 16 }}>Add Bus</Button>
+      <Table dataSource={buses} columns={columns} rowKey="id" loading={loading} />
+      <Modal
+        title={editingBus ? 'Edit Bus' : 'Add Bus'}
+        visible={modalVisible}
+        onOk={handleOk}
+        onCancel={() => setModalVisible(false)}
+        confirmLoading={loading}
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item name="busNo" label="Bus Number" rules={[{ required: true }]}> <Input /> </Form.Item>
+          <Form.Item name="plateNo" label="Plate No" rules={[{ required: true }]}> <Input /> </Form.Item>
+          <Form.Item name="capacity" label="Capacity" rules={[{ required: true, type: 'number', min: 1 }]}> <Input type="number" /> </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+};
+
+export default BusManagementPage;
