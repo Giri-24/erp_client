@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { message, Modal } from "antd";
+import { message, Modal, Tag } from "antd";
 import {
   getAllStoreItems, getAllStores, createSale, getAllSales,
 } from "../pos.service";
@@ -43,26 +43,63 @@ const SalesPage = () => {
 
   const canSell = hasPermission(PERMISSIONS.POS_SELL);
 
-  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [storeList, itemList, salesList] = await Promise.all([getAllStores(), getAllStoreItems(), getAllSales()]);
+      const [storeList, salesList] = await Promise.all([
+        getAllStores(),
+        getAllSales()
+      ]);
       setStores(storeList || []);
-      setItems(itemList || []);
       setSales(salesList || []);
+      // Set default storeId if not set
       if (storeList?.length && !storeId) setStoreId(storeList[0].id);
-    } catch { message.error("Failed to load data"); }
+    } catch {
+      message.error("Failed to load data");
+    }
     setLoading(false);
   };
 
+  // Initial load for stores and sales
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line
+  }, []);
+
+  // Load items when storeId changes
+  useEffect(() => {
+    if (!storeId) return;
+    const loadItems = async () => {
+      setLoading(true);
+      try {
+        const itemList = await getAllStoreItems(undefined, storeId);
+        setItems(itemList || []);
+      } catch {
+        message.error("Failed to load items");
+      }
+      setLoading(false);
+    };
+    loadItems();
+  }, [storeId]);
+
+  // Handle both old and new item structure
+  const getItemId = (item) => item.item ? item.item.id : item.id;
+  const getItemName = (item) => item.item ? item.item.name : item.name;
+  const getItemPrice = (item) => item.item ? item.item.sellingPrice : item.sellingPrice;
+  const getItemImage = (item) => item.item ? item.item.image : item.image;
+  const getItemCategory = (item) => item.item ? item.item.category : item.category;
+  const getItemStock = (item) => typeof item.quantity === 'number' ? item.quantity : (item.stockItems && item.stockItems[0]?.quantity) || 0;
+
   const addToCart = (item) => {
-    const existing = cart.find((c) => c.itemId === item.id);
+    const id = getItemId(item);
+    const name = getItemName(item);
+    const price = getItemPrice(item) || 0;
+    const existing = cart.find((c) => c.itemId === id);
     if (existing) {
-      setCart(cart.map((c) => c.itemId === item.id ? { ...c, quantity: c.quantity + 1 } : c));
+      setCart(cart.map((c) => c.itemId === id ? { ...c, quantity: c.quantity + 1 } : c));
     } else {
-      setCart([...cart, { itemId: item.id, name: item.name, quantity: 1, unitPrice: item.sellingPrice || 0 }]);
+      setCart([...cart, { itemId: id, name, quantity: 1, unitPrice: price }]);
     }
   };
 
@@ -105,13 +142,18 @@ const SalesPage = () => {
       setDiscount(0);
       setRemarks("");
       loadData();
-    } catch (err) { message.error(err?.response?.data?.message || "Failed to create sale"); }
+    } catch (err) { 
+      const msg = err?.response?.data?.message;
+      message.error(Array.isArray(msg) ? msg.join(', ') : msg || "Failed to create sale"); 
+    }
     setSubmitting(false);
   };
 
   const filteredItems = items.filter((i) => {
+    const name = getItemName(i) || "";
+    const sku = i.item ? i.item.sku : i.sku || "";
     if (!searchItem) return true;
-    return i.name.toLowerCase().includes(searchItem.toLowerCase()) || (i.sku || "").toLowerCase().includes(searchItem.toLowerCase());
+    return name.toLowerCase().includes(searchItem.toLowerCase()) || sku.toLowerCase().includes(searchItem.toLowerCase());
   });
 
   const filteredSales = sales.filter((s) => {
@@ -141,7 +183,7 @@ const SalesPage = () => {
       { key: (r) => r.customerName || "Walk-in", label: "Customer" },
       { key: (r) => (r.customerType || "").replace(/_/g, " "), label: "Customer Type" },
       { key: (r) => r.store?.name || "", label: "Store" },
-      { key: (r) => r.saleItems?.length || 0, label: "Items" },
+      { key: (r) => r.items?.length || 0, label: "Items" },
       { key: "discount", label: "Discount" },
       { key: "totalAmount", label: "Total" },
       { key: "paymentMode", label: "Payment Mode" },
@@ -182,7 +224,7 @@ const SalesPage = () => {
           <div className="lg:col-span-2 space-y-4">
             <div className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
               <div className="flex gap-3 mb-4">
-                <select value={storeId} onChange={(e) => setStoreId(e.target.value)}
+                <select value={storeId} onChange={(e) => { setStoreId(e.target.value); setCart([]); }}
                   className="bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none appearance-none">
                   {stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
@@ -193,23 +235,34 @@ const SalesPage = () => {
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto pr-1">
-                {filteredItems.map((item) => (
-                  <button key={item.id} onClick={() => addToCart(item)}
-                    className="p-3 rounded-xl bg-surface-container-low hover:bg-primary-container/30 border border-outline-variant/10 transition-all text-left">
-                    <div className="flex items-center gap-2 mb-1">
-                      {item.image ? (
-                        <img src={`${import.meta.env.VITE_API_URL || ""}/${item.image}`} alt="" className="w-8 h-8 rounded-lg object-cover" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-lg bg-primary-container/30 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-primary text-sm">inventory_2</span>
-                        </div>
-                      )}
-                      <p className="font-bold text-xs text-on-surface truncate">{item.name}</p>
-                    </div>
-                    <p className="font-bold text-primary text-sm">{fmt(item.sellingPrice)}</p>
-                    <p className="text-[10px] text-on-surface-variant">{(item.category || "").replace(/_/g, " ")}</p>
-                  </button>
-                ))}
+                {filteredItems.map((item) => {
+                  const id = getItemId(item);
+                  const name = getItemName(item);
+                  const price = getItemPrice(item);
+                  const image = getItemImage(item);
+                  const category = getItemCategory(item);
+                  const stock = getItemStock(item);
+                  return (
+                    <button key={id} onClick={() => addToCart(item)}
+                      className="flex flex-col items-center p-4 rounded-2xl bg-surface-container-low hover:bg-primary-container/30 border border-outline-variant/10 transition-all text-center shadow-sm group">
+                      <div className="relative w-full flex justify-center mb-3">
+                        {image ? (
+                          <img src={`${import.meta.env.VITE_API_URL || "/erp/api"}/${image}`} alt="" className="w-20 h-20 rounded-xl object-cover border border-outline-variant/20 shadow group-hover:scale-105 transition-transform" />
+                        ) : (
+                          <div className="w-20 h-20 rounded-xl bg-primary-container/30 flex items-center justify-center border border-outline-variant/20">
+                            <span className="material-symbols-outlined text-primary text-3xl">inventory_2</span>
+                          </div>
+                        )}
+                        <Tag color="blue" style={{ position: 'absolute', top: 6, right: 6, fontSize: 11, padding: '0 8px', borderRadius: 6 }}>Stock: {stock}</Tag>
+                      </div>
+                      <div className="flex flex-col items-center w-full">
+                        <p className="font-bold text-base text-on-surface truncate w-full" title={name}>{name}</p>
+                        <p className="font-bold text-primary text-lg mt-1">{fmt(price)}</p>
+                        <p className="text-[11px] text-on-surface-variant mt-0.5">{(category || "").replace(/_/g, " ")}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -355,7 +408,7 @@ const SalesPage = () => {
                     <p className="text-sm font-bold text-on-surface">{sale.customerName || "Walk-in"}</p>
                     <p className="text-[10px] text-on-surface-variant">{(sale.customerType || "").replace(/_/g, " ")}</p>
                   </div>
-                  <span className="text-sm text-on-surface-variant">{sale.saleItems?.length || 0} items</span>
+                  <span className="text-sm text-on-surface-variant">{sale.items?.length || 0} items</span>
                   <span className="font-bold text-sm text-primary">{fmt(sale.totalAmount)}</span>
                   <span className={`px-2 py-1 rounded-full text-xs font-bold w-fit ${sale.paymentMode === "CASH" ? "bg-[#44ddc1]/20 text-[#001813]" : sale.paymentMode === "UPI" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}>
                     {sale.paymentMode}
@@ -385,7 +438,7 @@ const SalesPage = () => {
                   <span key={h} className="text-[10px] font-bold text-on-surface-variant uppercase">{h}</span>
                 ))}
               </div>
-              {(selectedSale.saleItems || []).map((si, i) => (
+              {(selectedSale.items || []).map((si, i) => (
                 <div key={i} className="grid grid-cols-4 py-1.5 border-t border-outline-variant/10">
                   <span className="text-sm font-bold text-on-surface">{si.item?.name || si.itemId}</span>
                   <span className="text-sm text-on-surface-variant">{si.quantity}</span>

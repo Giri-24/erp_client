@@ -279,7 +279,19 @@ const StockTransferPage = () => {
                   <span className="text-sm text-on-surface-variant">{new Date(tr.createdAt).toLocaleDateString("en-IN")}</span>
                   <span className="text-sm font-bold text-on-surface">{tr.fromStore?.name || "—"}</span>
                   <span className="text-sm font-bold text-on-surface">{tr.toStore?.name || "—"}</span>
-                  <span className="text-sm text-on-surface-variant">{tr.transferItems?.length || 0} items</span>
+                  <span className="text-sm text-on-surface-variant">
+                    {tr.items && tr.items.length > 0 ? (
+                      <span className="block">
+                        {tr.items.map((ti, i) => (
+                          <span key={ti.itemId || i} className="inline-block mr-2 mb-1 bg-surface-container-highest rounded px-2 py-0.5 text-xs font-medium text-on-surface-variant border border-outline-variant/10">
+                            {ti.item?.name || ti.name || ti.itemId} × {ti.quantity}
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </span>
                   <span className="text-sm text-on-surface-variant truncate">{tr.remarks || "—"}</span>
                 </div>
               ))}

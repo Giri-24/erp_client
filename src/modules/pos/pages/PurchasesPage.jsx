@@ -186,7 +186,7 @@ const PurchasesPage = () => {
       { key: (r) => r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString("en-IN") : "", label: "Invoice Date" },
       { key: (r) => r.supplier?.name || "", label: "Supplier" },
       { key: (r) => r.store?.name || "", label: "Store" },
-      { key: (r) => r.purchaseItems?.length || 0, label: "Items" },
+      { key: (r) => r.items?.length || 0, label: "Items" },
       { key: "totalAmount", label: "Total" },
       { key: "remarks", label: "Remarks" },
     ], "purchase_history");
@@ -238,7 +238,7 @@ const PurchasesPage = () => {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
               <div className="flex gap-3 mb-4 flex-wrap">
-                <select value={storeId} onChange={(e) => setStoreId(e.target.value)}
+                <select value={storeId} onChange={(e) => { setStoreId(e.target.value); setPrItems([]); }}
                   className="bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none appearance-none">
                   {stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
@@ -300,7 +300,7 @@ const PurchasesPage = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-on-surface-variant uppercase">Invoice No</label>
-                  <input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)}
+                  <input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="Leave empty for auto-generated"
                     className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1" />
                 </div>
                 <div>
@@ -378,12 +378,12 @@ const PurchasesPage = () => {
                   <span className="font-bold text-sm text-primary">{fmt(pr.totalAmount)}</span>
                   <div className="flex gap-2">
                     <button onClick={() => setSelectedPurchase(pr)} className="text-primary text-xs font-bold hover:underline">View</button>
-                    {pr.receiptUrl && (
-                      <a href={`${import.meta.env.VITE_API_URL || ""}/${pr.receiptUrl}`} target="_blank" rel="noopener noreferrer" className="text-[#44ddc1] text-xs font-bold hover:underline">Receipt</a>
+                    {pr.receiptImage && (
+                      <a href={`${import.meta.env.VITE_API_URL || "/erp/api"}/${pr.receiptImage}`} target="_blank" rel="noopener noreferrer" className="text-[#44ddc1] text-xs font-bold hover:underline">Receipt</a>
                     )}
                     {canManage && (
                       <label className="text-secondary text-xs font-bold hover:underline cursor-pointer">
-                        {pr.receiptUrl ? "Re-upload" : "Upload"}
+                        {pr.receiptImage ? "Re-upload" : "Upload"}
                         <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleReceiptUpload(pr.id, e)} />
                       </label>
                     )}
@@ -456,7 +456,7 @@ const PurchasesPage = () => {
                   <span key={h} className="text-[10px] font-bold text-on-surface-variant uppercase">{h}</span>
                 ))}
               </div>
-              {(selectedPurchase.purchaseItems || []).map((pi, i) => (
+              {(selectedPurchase.items || []).map((pi, i) => (
                 <div key={i} className="grid grid-cols-4 py-1.5 border-t border-outline-variant/10">
                   <span className="text-sm font-bold text-on-surface">{pi.item?.name || pi.itemId}</span>
                   <span className="text-sm text-on-surface-variant">{pi.quantity}</span>
@@ -468,9 +468,9 @@ const PurchasesPage = () => {
             <div className="flex justify-between font-extrabold text-xl">
               <span>Total</span><span className="text-primary">{fmt(selectedPurchase.totalAmount)}</span>
             </div>
-            {selectedPurchase.receiptUrl && (
+            {selectedPurchase.receiptImage && (
               <div className="mt-4 pt-4 border-t border-outline-variant/10">
-                <a href={`${import.meta.env.VITE_API_URL || ""}/${selectedPurchase.receiptUrl}`} target="_blank" rel="noopener noreferrer"
+                <a href={`${import.meta.env.VITE_API_URL || "/erp/api"}/${selectedPurchase.receiptImage}`} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-primary/90 transition-all">
                   <span className="material-symbols-outlined text-lg">visibility</span>View Receipt
                 </a>

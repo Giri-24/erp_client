@@ -34,8 +34,11 @@ export const updateStoreItem = async (id, data) => {
   return res.data;
 };
 
-export const getAllStoreItems = async (category) => {
-  const res = await axios.get('/pos/items', { params: { category } });
+export const getAllStoreItems = async (category, storeId) => {
+  const params = {};
+  if (category) params.category = category;
+  if (storeId) params.storeId = storeId;
+  const res = await axios.get('/pos/items', { params });
   return res.data;
 };
 

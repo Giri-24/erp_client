@@ -225,7 +225,7 @@ const StoreItemsPage = () => {
                   <div key={item.id} className={`grid grid-cols-7 px-6 py-4 items-center ${idx % 2 === 0 ? "bg-white" : "bg-surface-container-low/30"}`}>
                     <div className="flex items-center gap-3">
                       {item.image ? (
-                        <img src={`${import.meta.env.VITE_API_URL || ""}/${item.image}`} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                        <img src={`${import.meta.env.VITE_API_URL || "/erp/api"}/${item.image}`} alt="" className="w-10 h-10 rounded-lg object-cover" />
                       ) : (
                         <div className="w-10 h-10 rounded-lg bg-primary-container/30 flex items-center justify-center">
                           <span className="material-symbols-outlined text-primary text-lg">inventory_2</span>
