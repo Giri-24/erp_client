@@ -57,7 +57,7 @@ import IncomeExpensePage from "../modules/pos/pages/IncomeExpensePage";
 import DocRequestPage from "../modules/doc-request/pages/DocRequestPage";
 import HouseManagementPage from "../modules/house/pages/HouseManagementPage";
 import StaffDashboard from "./StaffDashboard";
-
+import { getAdminSettings } from "../modules/settings/settings.service";
 import { hasPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions";
 
 const Dashboard = () => {
@@ -66,9 +66,22 @@ const Dashboard = () => {
   const [editData, setEditData] = useState(null);
   const [feeStudentId, setFeeStudentId] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [adminSettings, setAdminSettings] = useState(null);
   const currentUser = getCurrentUser();
   const displayName = currentUser?.name || currentUser?.email || "User";
   const userRole = currentUser?.role || "STAFF";
+
+  React.useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await getAdminSettings();
+        setAdminSettings(settings);
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const canAdmissionRead = hasPermission(PERMISSIONS.ADMISSION_READ);
   const canStudentRead = hasPermission(PERMISSIONS.STUDENT_READ);
@@ -138,7 +151,7 @@ const Dashboard = () => {
       children: [
         { key: "admission-view", label: "All Admissions", icon: "list_alt", permission: canAdmissionRead },
         { key: "admission", label: "New Application", icon: "add_circle", permission: canAdmissionRead },
-        { key: "approval", label: "Approvals Queue", icon: "rule", permission: canAdmissionRead },
+        { key: "approval", label: "Approvals Queue", icon: "rule", permission: canAdmissionRead && (adminSettings?.requireApprovalForAdmission ?? true) },
         { key: "bulk-upload", label: "Bulk Upload", icon: "upload", permission: canAdmissionRead },
         { key: "promotion", label: "Student Promotion", icon: "swap_horiz", permission: canAdmissionRead },
       ],
@@ -241,7 +254,10 @@ const Dashboard = () => {
       case "admission-edit":      return <AdmissionEdit />;
       case "bulk-upload":         return <BulkUploadPage />;
       case "promotion":           return <PromotionPage />;
-      case "students":            return <StudentView onCollectFee={(studentId) => { setFeeStudentId(studentId); setSelectedKey("fees-collect"); }} />;
+      case "students":            return <StudentView 
+                                          onCollectFee={(studentId) => { setFeeStudentId(studentId); setSelectedKey("fees-collect"); }} 
+                                          onEdit={(record) => { setEditData(record); setSelectedKey("admission"); }}
+                                        />;
       case "approval":            return <ApprovalsView />;
       case "profile":             return <ProfilePage />;
       case "admin-settings":      return <AdminSettings />;

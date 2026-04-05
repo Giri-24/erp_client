@@ -191,17 +191,17 @@ const HRDashboardPage = ({ onNavigate }) => {
                         {leave.staffName || leave.staff?.name || "Staff Member"}
                       </p>
                       <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-tight">
-                        {leave.department || "Physics Dept."}
+                        {leave.staff?.department || leave.department || "—"}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center">
                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      leave.leaveType === "Sabbatical" ? "bg-primary-fixed text-primary" : 
-                      leave.leaveType === "Sick Leave" ? "bg-orange-100 text-orange-700" :
+                      (leave.leaveType?.name || leave.leaveType) === "Sabbatical" ? "bg-primary-fixed text-primary" : 
+                      (leave.leaveType?.name || leave.leaveType) === "Sick Leave" ? "bg-orange-100 text-orange-700" :
                       "bg-secondary-container/50 text-secondary"
                     }`}>
-                      {leave.leaveType || "Earned Leave"}
+                      {leave.leaveType?.name || leave.leaveType?.code || "Earned Leave"}
                     </span>
                   </div>
                   <div className="text-sm font-bold text-on-surface">

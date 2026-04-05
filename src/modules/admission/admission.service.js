@@ -113,3 +113,8 @@ export const bulkUploadCsv = async (rows) => {
   const res = await axios.post('/admissions/bulk-upload', { rows });
   return res.data;
 };
+
+export const demoteIndividualStudents = async (payload) => {
+  const res = await axios.post('/admissions/demote-individual', payload);
+  return res.data;
+};

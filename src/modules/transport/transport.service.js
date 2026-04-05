@@ -102,3 +102,100 @@ export const deleteDriver = async (id) => {
   const res = await axios.delete(`/transport/drivers/${id}`);
   return res.data;
 };
+
+// ─── VEHICLE MILEAGE ────────────────────────
+
+export const pushOdometerSnapshots = async (snapshots) => {
+  const res = await axios.post('/transport/mileage/snapshot', { snapshots });
+  return res.data;
+};
+
+export const getDailyMileage = async (date) => {
+  const res = await axios.get('/transport/mileage/daily', { params: { date } });
+  return res.data;
+};
+
+// ─── VEHICLE-DRIVER MAPPING (backend-first, localStorage fallback) ──────
+
+const VDM_STORAGE_KEY = "psf_vehicle_driver_map";
+
+const _readLocalMap = () => {
+  try { return JSON.parse(localStorage.getItem(VDM_STORAGE_KEY) || "{}"); }
+  catch { return {}; }
+};
+
+const _writeLocalMap = (map) => {
+  localStorage.setItem(VDM_STORAGE_KEY, JSON.stringify(map));
+};
+
+/** Get all vehicle→driver mappings. Returns { [plateNo]: { name, phone, licenseNo } } */
+export const getVehicleDriverMap = async () => {
+  try {
+    const res = await axios.get('/transport/vehicle-drivers');
+    if (Array.isArray(res.data)) {
+      const map = {};
+      res.data.forEach((d) => {
+        map[d.plateNo] = { name: d.driverName, phone: d.driverPhone || "", licenseNo: d.licenseNo || "" };
+      });
+      // Sync backend → localStorage
+      _writeLocalMap(map);
+      return map;
+    }
+  } catch { /* backend not ready, fall through */ }
+  return _readLocalMap();
+};
+
+/** Assign or update a driver for a vehicle */
+export const upsertVehicleDriver = async (plateNo, { name, phone, licenseNo }) => {
+  try {
+    await axios.post('/transport/vehicle-drivers', {
+      plateNo,
+      driverName: name,
+      driverPhone: phone || "",
+      licenseNo: licenseNo || "",
+    });
+  } catch { /* backend not ready */ }
+  // Always update localStorage as fallback / cache
+  const map = _readLocalMap();
+  map[plateNo] = { name, phone: phone || "", licenseNo: licenseNo || "" };
+  _writeLocalMap(map);
+  return map;
+};
+
+/** Remove driver from a vehicle */
+export const removeVehicleDriver = async (plateNo) => {
+  try { await axios.delete(`/transport/vehicle-drivers/${encodeURIComponent(plateNo)}`); }
+  catch { /* backend not ready */ }
+  const map = _readLocalMap();
+  delete map[plateNo];
+  _writeLocalMap(map);
+  return map;
+};
+
+// ─── TRIP / IGNITION EVENT LOG ──────────────
+
+/** Push trip events (ignition ON/OFF, etc.) — fire-and-forget to backend */
+export const pushTripEvents = async (events) => {
+  try {
+    const res = await axios.post('/transport/trip-events', { events });
+    return res.data;
+  } catch { /* backend not ready — events will be lost until backend is implemented */ }
+};
+
+/** Get trip/ignition history for a vehicle */
+export const getTripHistory = async ({ plateNo, deviceId, event, from, to, limit } = {}) => {
+  try {
+    const res = await axios.get('/transport/trip-events', {
+      params: { plateNo, deviceId, event, from, to, limit },
+    });
+    return res.data;
+  } catch { return []; }
+};
+
+/** Get daily trip summary per vehicle */
+export const getDailyTripSummary = async (date) => {
+  try {
+    const res = await axios.get('/transport/trip-summary', { params: { date } });
+    return res.data;
+  } catch { return []; }
+};
