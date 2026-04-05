@@ -122,6 +122,13 @@ export const checkDiscountEligibility = async (studentId) => {
   return res.data;
 };
 
+// ─── SIBLING FEES ───────────────────────────
+
+export const getSiblingFees = async (studentId) => {
+  const res = await axios.get(`/fees/sibling-fees/${studentId}`);
+  return res.data;
+};
+
 // ─── ACADEMIC YEARS ─────────────────────────
 
 export const getAcademicYears = async () => {

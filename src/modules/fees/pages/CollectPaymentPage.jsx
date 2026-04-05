@@ -12,6 +12,7 @@ import {
   sendPaymentLink,
   getPaymentLinks,
   checkPaymentLinkStatus,
+  getSiblingFees,
 } from "../fees.service";
 import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 
@@ -35,6 +36,31 @@ const RECEIPT_COMPONENT_LABELS = {
   hostelFee: "Hostel Fee",
   otherFee: "Other Fee",
   customItems: "Custom Items",
+};
+
+const formatStandardLabel = (value) => {
+  if (!value) return "";
+  const raw = String(value).trim();
+  const lower = raw.toLowerCase();
+  if (lower === "lkg") return "LKG";
+  if (lower === "ukg") return "UKG";
+  const stdMatch = lower.match(/^std[_\-\s]?(\d{1,2})$/);
+  if (stdMatch) {
+    const num = Number(stdMatch[1]);
+    if (num === 1) return "1st Standard";
+    if (num === 2) return "2nd Standard";
+    if (num === 3) return "3rd Standard";
+    return `${num}th Standard`;
+  }
+  const numMatch = lower.match(/^(\d{1,2})(st|nd|rd|th)?(\s*standard)?$/);
+  if (numMatch) {
+    const num = Number(numMatch[1]);
+    if (num === 1) return "1st Standard";
+    if (num === 2) return "2nd Standard";
+    if (num === 3) return "3rd Standard";
+    return `${num}th Standard`;
+  }
+  return raw;
 };
 
 const COMPONENT_FEE_FIELDS = {
@@ -118,6 +144,7 @@ const CollectPaymentPage = ({ studentId }) => {
   const [statusActionForm] = Form.useForm();
   const [linkForm] = Form.useForm();
   const printRef = useRef(null);
+  const paymentFormRef = useRef(null);
 
   const [studentFees, setStudentFees] = useState([]);
   const [selectedFee, setSelectedFee] = useState(null);
@@ -142,6 +169,8 @@ const CollectPaymentPage = ({ studentId }) => {
   const [splitPayments, setSplitPayments] = useState([]);
   const [payComponents, setPayComponents] = useState([]);  // which components to pay: ["tuition", "transport", ...] or [] = full term
   const [payingNonTerm, setPayingNonTerm] = useState(false);  // paying non-term fees (book, hostel, other, custom)
+  const [admissionNoSearch, setAdmissionNoSearch] = useState("");
+  const [siblingData, setSiblingData] = useState([]);  // sibling fees from API (cross-year)
 
   const { hasPermission } = usePermissionHelpers();
   const canCollectFee = hasPermission(PERMISSIONS.FEES_COLLECT);
@@ -178,6 +207,62 @@ const CollectPaymentPage = ({ studentId }) => {
     if (academicYear) fetchFees(academicYear);
   }, [academicYear]);
 
+  // Keep selectedFee in sync when studentFees refreshes
+  // Helper: enrich fee with virtual terms if none exist in DB
+  const enrichWithVirtualTerm = (fee) => {
+    if (!fee || (fee.terms && fee.terms.length > 0)) return fee;
+    const nTerms = Number(fee.numberOfTerms || 1);
+    const tuition = Number(fee.tuitionFee || 0);
+    const transport = Number(fee.transportFee || 0);
+    const termBase = tuition + transport; // only tuition+transport are term-distributed
+    const splitEvenly = (total, n) => {
+      const per = Math.round((total / n) * 100) / 100;
+      return Array.from({ length: n }, (_, i) =>
+        i === n - 1 ? Math.round((total - per * (n - 1)) * 100) / 100 : per
+      );
+    };
+    const tuitionSplit = splitEvenly(tuition, nTerms);
+    const transportSplit = splitEvenly(transport, nTerms);
+    const termAmounts = splitEvenly(termBase, nTerms);
+    // Calculate paid per term from existing payments
+    const paidPerTerm = {};
+    (fee.payments || payments || []).forEach((p) => {
+      if (p.status === "SUCCESS" && p.termNumber) {
+        paidPerTerm[p.termNumber] = (paidPerTerm[p.termNumber] || 0) + Number(p.amount);
+      }
+    });
+    const terms = Array.from({ length: nTerms }, (_, i) => {
+      const termNum = i + 1;
+      const amount = termAmounts[i];
+      const paid = paidPerTerm[termNum] || 0;
+      return {
+        termNumber: termNum,
+        termName: nTerms === 1 ? "Full Fee" : `Term ${termNum}`,
+        amount: Math.round(amount),
+        status: paid >= amount ? "PAID" : "UNPAID",
+        tuitionAmount: tuitionSplit[i],
+        transportAmount: transportSplit[i],
+        bookAmount: 0,
+        hostelAmount: 0,
+        otherAmount: 0,
+      };
+    });
+    return { ...fee, terms };
+  };
+
+  useEffect(() => {
+    if (selectedFee && studentFees.length > 0) {
+      const updated = studentFees.find((f) => f.id === selectedFee.id);
+      if (updated) {
+        setSelectedFee(enrichWithVirtualTerm(updated));
+      } else {
+        // Fee no longer exists in new data (e.g. academic year changed)
+        setSelectedFee(null);
+        setPayments([]);
+      }
+    }
+  }, [studentFees]);
+
   useEffect(() => {
   if (studentId && studentFees.length > 0) {
     const fee = studentFees.find(f => f.student?.id === studentId);
@@ -188,8 +273,36 @@ const CollectPaymentPage = ({ studentId }) => {
   }
 }, [studentId, studentFees]);
 
+  // siblingData is fetched from API in onSelectFee (cross-year support)
+
+  // Fetch sibling fees from API (cross-year)
+  const fetchSiblingFees = async (studentId) => {
+    if (!studentId) { setSiblingData([]); return; }
+    try {
+      const data = await getSiblingFees(studentId);
+      setSiblingData(data || []);
+    } catch {
+      setSiblingData([]);
+    }
+  };
+
+  // Search by admission number
+  const handleAdmissionNoSearch = () => {
+    if (!admissionNoSearch.trim()) return;
+    const fee = studentFees.find(
+      (f) =>
+        f.student?.admission?.admissionNo?.toLowerCase() === admissionNoSearch.trim().toLowerCase()
+    );
+    if (fee) {
+      onSelectFee(fee.id);
+    } else {
+      message.warning("No student found with this admission number in the selected academic year");
+    }
+  };
+
   const onSelectFee = async (feeId) => {
-    const fee = studentFees.find((f) => f.id === feeId);
+    let fee = studentFees.find((f) => f.id === feeId);
+    fee = enrichWithVirtualTerm(fee);
     setSelectedFee(fee);
     setAmount("");
     setTermNumber(null);
@@ -197,6 +310,9 @@ const CollectPaymentPage = ({ studentId }) => {
     setPayComponents([]);
     setReceiptComponents(getAvailableReceiptComponentOptions(fee));
     setLinkResult(null);
+
+    // Fetch sibling data
+    fetchSiblingFees(fee?.student?.id);
 
     try {
       const list = await getPaymentsByStudentFee(feeId);
@@ -289,9 +405,9 @@ const CollectPaymentPage = ({ studentId }) => {
             if (feeMap[k] !== undefined) {
               paidComps[k] = Math.round(feeMap[k]);
             } else {
-              // custom item
+              // custom item — use readable name as key
               const ci = (selectedFee.customItems || []).find((c) => `custom-${c.id || c.name}` === k);
-              if (ci) paidComps[k] = Math.round(Number(ci.amount || 0));
+              if (ci) paidComps[ci.name] = Math.round(Number(ci.amount || 0));
             }
           });
         }
@@ -349,7 +465,7 @@ const CollectPaymentPage = ({ studentId }) => {
       setPayments(paymentList || []);
       const updatedFees = await getAllStudentFees(academicYear);
       const updatedFee = updatedFees.find((f) => f.id === selectedFee.id);
-      setSelectedFee(updatedFee || null);
+      setSelectedFee(updatedFee ? enrichWithVirtualTerm(updatedFee) : null);
     } catch (err) {
       message.error(err?.response?.data?.message || "Payment failed");
     }
@@ -509,7 +625,7 @@ const CollectPaymentPage = ({ studentId }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-3 gap-5">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
                   Academic Year
@@ -530,6 +646,29 @@ const CollectPaymentPage = ({ studentId }) => {
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                  Admission No
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={admissionNoSearch}
+                    onChange={(e) => setAdmissionNoSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAdmissionNoSearch()}
+                    placeholder="e.g. ADM-001"
+                    className="flex-1 bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAdmissionNoSearch}
+                    className="px-3 rounded-xl bg-primary text-white flex items-center justify-center hover:opacity-90 transition-opacity"
+                  >
+                    <span className="material-symbols-outlined text-sm">search</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
                   Search Student
                 </label>
                 <div className="relative">
@@ -541,7 +680,7 @@ const CollectPaymentPage = ({ studentId }) => {
                     <option value="">Select student...</option>
                     {studentFees.map((f) => (
                       <option key={f.id} value={f.id}>
-                        {f.student?.name} — {f.student?.standard} — Pending: {fmt(f.pending)}
+                        {f.student?.admission?.admissionNo ? `[${f.student.admission.admissionNo}] ` : ""}{f.student?.name} — {formatStandardLabel(f.student?.standard)} — Pending: {fmt(f.pending)}
                       </option>
                     ))}
                   </select>
@@ -552,7 +691,7 @@ const CollectPaymentPage = ({ studentId }) => {
           </section>
 
           {/* Section 2: Payment transaction */}
-          <section className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
+          <section ref={paymentFormRef} className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
             <div className="flex items-center gap-4 mb-7">
               <div className="w-12 h-12 bg-tertiary-fixed rounded-xl flex items-center justify-center text-tertiary flex-shrink-0">
                 <span className="material-symbols-outlined"
@@ -613,6 +752,11 @@ const CollectPaymentPage = ({ studentId }) => {
                           >
                             <div className="flex flex-col items-start gap-0.5">
                               <span>{t.termName}</span>
+                              {t.dueDate && (
+                                <span className={`text-[10px] opacity-60 ${termNumber === t.termNumber && !payingNonTerm ? "text-white/70" : ""}`}>
+                                  Due: {new Date(t.dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                                </span>
+                              )}
                               <span className={`text-[10px] opacity-70 ${termNumber === t.termNumber && !payingNonTerm ? "text-white/80" : ""}`}>
                                 {isPaid ? "Paid" : `Bal: ${fmt(balance)}`}
                               </span>
@@ -1124,6 +1268,7 @@ const CollectPaymentPage = ({ studentId }) => {
                 </label>
                 <input
                   type="text"
+                  disabled
                   value={receiptNo}
                   onChange={(e) => setReceiptNo(e.target.value)}
                   placeholder="REC-2024-001"
@@ -1236,6 +1381,13 @@ const CollectPaymentPage = ({ studentId }) => {
 
             {selectedFee ? (
               <div className="space-y-3 text-white">
+                <div className="mb-4">
+                  <p className="text-lg font-headline font-extrabold text-white">{selectedFee.student?.name || "—"}</p>
+                  <p className="text-[11px] text-on-primary-container/70">
+                    {selectedFee.student?.admission?.admissionNo && <span className="font-bold">{selectedFee.student.admission.admissionNo} · </span>}
+                    {formatStandardLabel(selectedFee.student?.standard)}{selectedFee.student?.section ? ` - ${selectedFee.student.section}` : ""} · {selectedFee.academicYear || academicYear}
+                  </p>
+                </div>
                 {[
                   { label: "Total Fee", val: selectedFee.totalFee },
                   { label: "Discount", val: selectedFee.discount, negative: true },
@@ -1264,6 +1416,231 @@ const CollectPaymentPage = ({ studentId }) => {
               </div>
             )}
           </section>
+
+          {/* Term-Wise Summary */}
+          {selectedFee && selectedFee.terms?.length > 0 && (
+            <section className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
+              <h3 className="font-headline font-bold text-primary mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
+                Term-Wise Status
+              </h3>
+              <div className="space-y-3">
+                {selectedFee.terms.map((t) => {
+                  const paid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                  const termAmt = Number(t.amount || 0);
+                  const balance = Math.round(termAmt - paid);
+                  const isPaid = t.status === "PAID" || balance <= 0;
+                  const isPartial = paid > 0 && !isPaid;
+                  const pctPaid = termAmt > 0 ? Math.min(Math.round((paid / termAmt) * 100), 100) : 0;
+                  return (
+                    <div key={t.termNumber} className={`p-3.5 rounded-xl border ${
+                      isPaid ? "bg-[#e8f5e9]/60 border-[#4caf50]/20" : isPartial ? "bg-amber-50/60 border-amber-200" : "bg-surface-container-low border-outline-variant/20"
+                    }`}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
+                            isPaid ? "bg-[#4caf50] text-white" : isPartial ? "bg-amber-400 text-white" : "bg-surface-container-highest text-on-surface-variant"
+                          }`}>{t.termNumber}</span>
+                          <span className="text-sm font-bold text-on-surface">{t.termName}</span>
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                          isPaid ? "bg-[#4caf50]/20 text-[#2e7d32]" : isPartial ? "bg-amber-100 text-amber-700" : "bg-surface-container-highest text-on-surface-variant"
+                        }`}>
+                          {isPaid ? "Paid" : isPartial ? "Partial" : "Unpaid"}
+                        </span>
+                      </div>
+                      {t.dueDate && (
+                        <p className="text-[10px] text-on-surface-variant mb-1.5 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[10px]">event</span>
+                          Due: {new Date(t.dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                        </p>
+                      )}
+                      <div className="flex justify-between text-[11px] mb-1.5">
+                        <span className="text-on-surface-variant">Amount: <span className="font-bold text-on-surface">{fmt(termAmt)}</span></span>
+                        <span className="text-on-surface-variant">Paid: <span className="font-bold text-[#2e7d32]">{fmt(paid)}</span></span>
+                      </div>
+                      {!isPaid && (
+                        <div className="flex justify-between text-[11px] mb-1.5">
+                          <span className="text-on-surface-variant">Balance:</span>
+                          <span className="font-bold text-error">{fmt(balance)}</span>
+                        </div>
+                      )}
+                      <div className="w-full bg-surface-container-highest rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${isPaid ? "bg-[#4caf50]" : isPartial ? "bg-amber-400" : "bg-outline-variant/30"}`}
+                          style={{ width: `${pctPaid}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Non-term fees summary */}
+                {(() => {
+                  const nonTermTotal = Number(selectedFee.bookFee || 0) + Number(selectedFee.hostelFee || 0) + Number(selectedFee.otherFee || 0) +
+                    (selectedFee.customItems || []).reduce((s, ci) => s + Number(ci.amount || 0), 0);
+                  if (nonTermTotal <= 0) return null;
+                  const nonTermPaid = payments?.filter((p) => !p.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                  const nonTermBal = Math.round(nonTermTotal - nonTermPaid);
+                  return (
+                    <div className={`p-3.5 rounded-xl border ${
+                      nonTermBal <= 0 ? "bg-[#e8f5e9]/60 border-[#4caf50]/20" : "bg-tertiary-fixed/10 border-tertiary/10"
+                    }`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-bold text-tertiary flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm">shopping_bag</span>Other Fees
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                          nonTermBal <= 0 ? "bg-[#4caf50]/20 text-[#2e7d32]" : "bg-tertiary/10 text-tertiary"
+                        }`}>{nonTermBal <= 0 ? "Paid" : "Pending"}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px]">
+                        <span className="text-on-surface-variant">Total: <span className="font-bold">{fmt(nonTermTotal)}</span></span>
+                        <span className="text-on-surface-variant">Bal: <span className={`font-bold ${nonTermBal > 0 ? "text-error" : "text-[#2e7d32]"}`}>{fmt(nonTermBal)}</span></span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </section>
+          )}
+
+          {/* Sibling Fee Summary */}
+          {selectedFee && (
+            <section className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
+              <h3 className="font-headline font-bold text-primary mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
+                Sibling Fees
+              </h3>
+              {!selectedFee.student?.siblingGroupId ? (
+                <p className="text-xs text-on-surface-variant text-center py-4">
+                  <span className="material-symbols-outlined text-2xl block mb-2 opacity-30">person</span>
+                  No sibling group assigned for this student.
+                </p>
+              ) : siblingData.length === 0 ? (
+                <p className="text-xs text-on-surface-variant text-center py-4">
+                  <span className="material-symbols-outlined text-2xl block mb-2 opacity-30">group_off</span>
+                  No siblings found in this group.
+                </p>
+              ) : (
+                <p className="text-xs text-on-surface-variant mb-4">
+                  {siblingData.length} sibling{siblingData.length > 1 ? "s" : ""} found — parents can pay for siblings here.
+                </p>
+              )}
+              {siblingData.length > 0 && (
+              <div className="space-y-3">
+                {siblingData.map((sib) => {
+                  const totalNet = sib.fees.reduce((s, f) => s + Number(f.netFee || 0), 0);
+                  const totalPaid = sib.fees.reduce((s, f) => s + Number(f.totalPaid || 0), 0);
+                  const totalPending = sib.fees.reduce((s, f) => s + Number(f.pending || 0), 0);
+                  const paidPercent = totalNet > 0 ? Math.round((totalPaid / totalNet) * 100) : 0;
+                  // Find a fee record in the current academic year for "Pay" button
+                  const currentYearFee = sib.fees.find((f) => f.academicYear === academicYear);
+                  const feeInStudentFees = currentYearFee ? studentFees.find((sf) => sf.id === currentYearFee.id) : null;
+                  return (
+                    <div key={sib.id} className="p-4 bg-surface-container-low rounded-xl border border-outline-variant/20 hover:border-primary/20 transition-colors">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="text-sm font-bold text-primary">{sib.name}</p>
+                          <p className="text-[10px] text-on-surface-variant">
+                            {sib.admission?.admissionNo && <span className="font-bold">{sib.admission.admissionNo} · </span>}
+                            {formatStandardLabel(sib.standard)}{sib.section ? ` - ${sib.section}` : ""}
+                          </p>
+                        </div>
+                        {(() => {
+                          const pendingFee = sib.fees.find((f) => Number(f.pending) > 0);
+                          if (!pendingFee) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const feeYear = pendingFee.academicYear;
+                                if (feeYear !== academicYear) {
+                                  setAcademicYear(feeYear);
+                                  // Wait for fees to load with new year, then select
+                                  try {
+                                    const freshFees = await getAllStudentFees(feeYear);
+                                    setStudentFees(freshFees || []);
+                                    const match = (freshFees || []).find((sf) => sf.id === pendingFee.id);
+                                    if (match) {
+                                      const enriched = enrichWithVirtualTerm(match);
+                                      setSelectedFee(enriched);
+                                      setAmount("");
+                                      setTermNumber(null);
+                                      setPayingNonTerm(false);
+                                      setPayComponents([]);
+                                      setReceiptComponents(getAvailableReceiptComponentOptions(enriched));
+                                      fetchSiblingFees(enriched?.student?.id);
+                                      const payList = await getPaymentsByStudentFee(pendingFee.id);
+                                      setPayments(payList || []);
+                                    }
+                                  } catch { message.error("Failed to load fees for that year"); }
+                                } else if (feeInStudentFees) {
+                                  onSelectFee(feeInStudentFees.id);
+                                }
+                                setTimeout(() => {
+                                  paymentFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                }, 200);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-primary text-white text-[10px] font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
+                            >
+                              <span className="material-symbols-outlined text-xs">payments</span>
+                              Pay
+                            </button>
+                          );
+                        })()}
+                      </div>
+                      {/* Per-year fee breakdown */}
+                      {sib.fees.length > 0 ? sib.fees.map((f) => (
+                        <div key={f.id} className="flex items-center gap-3 text-[10px] mb-1">
+                          <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded font-bold">{f.academicYear}</span>
+                          <span className="text-on-surface-variant">Net: <span className="font-bold text-on-surface">{fmt(f.netFee)}</span></span>
+                          <span className="text-on-surface-variant">Paid: <span className="font-bold text-green-700">{fmt(f.totalPaid)}</span></span>
+                          <span className={`font-bold ${Number(f.pending) > 0 ? "text-error" : "text-green-700"}`}>
+                            {Number(f.pending) > 0 ? `Pending: ${fmt(f.pending)}` : "Paid"}
+                          </span>
+                        </div>
+                      )) : (
+                        <p className="text-[10px] text-on-surface-variant">No fees assigned</p>
+                      )}
+                      <div className="w-full bg-surface-container-highest rounded-full h-1.5 mt-2">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${totalPending > 0 ? "bg-primary" : "bg-green-500"}`}
+                          style={{ width: `${Math.min(paidPercent, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Family total summary */}
+                {(() => {
+                  const familyTotal = siblingData.reduce((s, sib) => s + sib.fees.reduce((ss, f) => ss + Number(f.netFee || 0), 0), 0) + Number(selectedFee.netFee || 0);
+                  const familyPaid = siblingData.reduce((s, sib) => s + sib.fees.reduce((ss, f) => ss + Number(f.totalPaid || 0), 0), 0) + Number(selectedFee.totalPaid || 0);
+                  const familyPending = siblingData.reduce((s, sib) => s + sib.fees.reduce((ss, f) => ss + Number(f.pending || 0), 0), 0) + Number(selectedFee.pending || 0);
+                  return (
+                    <div className="mt-2 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                      <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2">Family Total (All Siblings)</p>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <p className="text-[10px] text-on-surface-variant">Total Fee</p>
+                          <p className="text-sm font-bold text-primary">{fmt(familyTotal)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-on-surface-variant">Paid</p>
+                          <p className="text-sm font-bold text-green-700">{fmt(familyPaid)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-on-surface-variant">Pending</p>
+                          <p className={`text-sm font-bold ${familyPending > 0 ? "text-error" : "text-green-700"}`}>{fmt(familyPending)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              )}
+            </section>
+          )}
 
           {/* Payment links / digital invoicing */}
           <section className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
@@ -1368,7 +1745,7 @@ const CollectPaymentPage = ({ studentId }) => {
                                 <span key={k} className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
                                   k === "transport" ? "bg-tertiary-fixed/20 text-tertiary" : "bg-surface-container-high text-on-surface-variant"
                                 }`}>
-                                  {k.charAt(0).toUpperCase() + k.slice(1)} {fmt(v)}
+                                  {k.startsWith("custom-") ? k.replace(/^custom-[\w-]+/, "Custom") : k.charAt(0).toUpperCase() + k.slice(1)} {fmt(v)}
                                 </span>
                               ))}
                             </div>
@@ -1470,7 +1847,7 @@ const CollectPaymentPage = ({ studentId }) => {
                     <tbody>
                       {Object.entries(printPayment.paidComponents).map(([k, v]) => (
                         <tr key={k}>
-                          <td>{k.charAt(0).toUpperCase() + k.slice(1)} Fee</td>
+                          <td>{k.startsWith("custom-") ? k.replace(/^custom-[\w-]+/, "Custom") + " Fee" : k.charAt(0).toUpperCase() + k.slice(1) + " Fee"}</td>
                           <td>₹{Number(v).toLocaleString()}</td>
                         </tr>
                       ))}

@@ -53,6 +53,8 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
 
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedYear, setSelectedYear] = useState("");
+  const [filterStandard, setFilterStandard] = useState("");
+  const [filterSection, setFilterSection] = useState("");
   const [structurePreview, setStructurePreview] = useState(null);
   const [transportFeePreview, setTransportFeePreview] = useState(null);
   const [discountEligibility, setDiscountEligibility] = useState(null);
@@ -74,6 +76,13 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
     autoTeacherDiscount: false,
     autoSiblingDiscount: false,
     autoRteDiscount: false,
+  });
+
+  // manual override values for the eligibility toggles
+  const [discountValues, setDiscountValues] = useState({
+    autoTeacherDiscount: { type: "PERCENTAGE", value: "" },
+    autoSiblingDiscount: { type: "PERCENTAGE", value: "" },
+    autoRteDiscount: { type: "PERCENTAGE", value: "" },
   });
 
   // manual discounts
@@ -141,44 +150,33 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
     (fees.otherFee || 0) +
     customItems.reduce((s, c) => s + (Number(c.amount) || 0), 0);
 
-  // const autoDiscountAmount = (() => {
-  //   if (!discountEligibility) return 0;
-  //   let total = 0;
-  //   if (discountToggles.autoTeacherDiscount && discountEligibility.teacherDiscount?.eligible)
-  //     total += grossFee * ((discountEligibility.teacherDiscount.percentage || 0) / 100);
-  //   if (discountToggles.autoSiblingDiscount && discountEligibility.siblingDiscount?.eligible)
-  //     total += grossFee * ((discountEligibility.siblingDiscount.percentage || 0) / 100);
-  //   if (discountToggles.autoRteDiscount && discountEligibility.rteDiscount?.eligible)
-  //     total += grossFee * ((discountEligibility.rteDiscount.percentage || 0) / 100);
-  //   return total;
-  // })();
+  const autoDiscountAmount = (() => {
+    if (!discountEligibility) return 0;
+    let total = 0;
+    const calc = (field, eligible) => {
+      if (discountToggles[field] && eligible) {
+        const val = Number(discountValues[field].value) || 0;
+        return discountValues[field].type === "PERCENTAGE" ? grossFee * (val / 100) : val;
+      }
+      return 0;
+    };
+    total += calc("autoTeacherDiscount", discountEligibility.teacherDiscount?.eligible);
+    total += calc("autoSiblingDiscount", discountEligibility.siblingDiscount?.eligible);
+    total += calc("autoRteDiscount", discountEligibility.rteDiscount?.eligible);
+    return total;
+  })();
 
   const manualDiscountAmount = manualDiscounts.reduce((s, d) => {
-  if (d.type === "FLAT") {
-    return s + (Number(d.value) || 0);
-  }
+    if (d.type === "FLAT") {
+      return s + (Number(d.value) || 0);
+    }
+    if (d.type === "PERCENTAGE") {
+      return s + grossFee * ((Number(d.value) || 0) / 100);
+    }
+    return s;
+  }, 0);
 
-  if (d.type === "PERCENTAGE") {
-    return s + grossFee * ((Number(d.value) || 0) / 100);
-  }
-
-  // ✅ ADD THIS BLOCK
-  if (d.type === "TEACHER_DISCOUNT") {
-    return s + grossFee * ((Number(d.value) || 0) / 100);
-  }
-
-  if (d.type === "SIBLING_DISCOUNT") {
-    return s + (Number(d.value) || 0);
-  }
-
-  if (d.type === "RTE_COMMUNITY") {
-    return s + (Number(d.value) || 0);
-  }
-
-  return s;
-}, 0);
-
-  const totalDiscount = manualDiscountAmount;
+  const totalDiscount = autoDiscountAmount + manualDiscountAmount;
   const netFee = Math.max(grossFee - totalDiscount, 0);
 
   // ── student change ────────────────────────────────────────────────────────
@@ -204,6 +202,11 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
         autoSiblingDiscount: el.siblingDiscount?.eligible || false,
         autoRteDiscount: el.rteDiscount?.eligible || false,
       });
+      setDiscountValues({
+        autoTeacherDiscount: { type: "PERCENTAGE", value: "" },
+        autoSiblingDiscount: { type: "PERCENTAGE", value: "" },
+        autoRteDiscount: { type: "PERCENTAGE", value: "" },
+      });
     } catch {
       setDiscountEligibility(null);
     }
@@ -224,6 +227,9 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
 
   const onYearChange = async (year) => {
     setSelectedYear(year);
+    setFilterStandard("");
+    setFilterSection("");
+    setSelectedStudent(null);
     setExistingFee(null);
     setExistingPayments([]);
     if (selectedStudent && year) {
@@ -269,20 +275,39 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
 
     setLoading(true);
     try {
+      const finalDiscounts = manualDiscounts
+        .filter((d) => d.type && d.value !== "" && d.value !== null)
+        .map((d) => ({ ...d, value: Number(d.value) || 0 }));
+        
+      if (discountToggles.autoTeacherDiscount && discountEligibility?.teacherDiscount?.eligible) {
+        finalDiscounts.push({ type: discountValues.autoTeacherDiscount.type, value: Number(discountValues.autoTeacherDiscount.value) || 0, reason: "Teacher Discount" });
+      }
+      if (discountToggles.autoSiblingDiscount && discountEligibility?.siblingDiscount?.eligible) {
+        finalDiscounts.push({ type: discountValues.autoSiblingDiscount.type, value: Number(discountValues.autoSiblingDiscount.value) || 0, reason: "Sibling Discount" });
+      }
+      if (discountToggles.autoRteDiscount && discountEligibility?.rteDiscount?.eligible) {
+        finalDiscounts.push({ type: discountValues.autoRteDiscount.type, value: Number(discountValues.autoRteDiscount.value) || 0, reason: "RTE / Community Discount" });
+      }
+
+      // Pass terms from structure so backend creates them even when tuitionFee is explicit
+      const termsFromStructure = (structurePreview?.terms || []).map((t) => ({
+        termNumber: t.termNumber,
+        termName: t.termName,
+        amount: t.amount,
+        dueDate: t.dueDate ? t.dueDate.split("T")[0] : undefined,
+      }));
+
       await assignFeeToStudent({
         studentId: selectedStudent.id,
         academicYear: selectedYear,
         ...fees,
         customItems,
-        autoTeacherDiscount: discountToggles.autoTeacherDiscount,
-        autoSiblingDiscount: discountToggles.autoSiblingDiscount,
-        autoRteDiscount: discountToggles.autoRteDiscount,
-discounts: manualDiscounts
-  .filter((d) => d.type && d.value !== "" && d.value !== null)
-  .map((d) => ({
-    ...d,
-    value: Number(d.value) || 0, // ✅ FORCE NUMBER
-  })),      });
+        terms: termsFromStructure.length > 0 ? termsFromStructure : undefined,
+        autoTeacherDiscount: false, // disabled auto flags since we pass calculated manually
+        autoSiblingDiscount: false,
+        autoRteDiscount: false,
+        discounts: finalDiscounts,
+      });
       message.success("Fee assigned successfully!");
       // reset
       setSelectedStudent(null);
@@ -294,6 +319,11 @@ discounts: manualDiscounts
       setCustomItems([]);
       setManualDiscounts([]);
       setDiscountToggles({ autoTeacherDiscount: false, autoSiblingDiscount: false, autoRteDiscount: false });
+      setDiscountValues({
+        autoTeacherDiscount: { type: "PERCENTAGE", value: "" },
+        autoSiblingDiscount: { type: "PERCENTAGE", value: "" },
+        autoRteDiscount: { type: "PERCENTAGE", value: "" },
+      });
       // refresh list
       getAllStudentFees().then((data) => setRecentAssignments((data || []).slice(0, 5))).catch(() => {});
     } catch (err) {
@@ -380,6 +410,24 @@ discounts: manualDiscounts
     "STD_6","STD_7","STD_8","STD_9","STD_10","STD_11","STD_12",
   ];
 
+  // Derive unique sections from students filtered by year + standard
+  const availableSections = useMemo(() => {
+    let list = students;
+    if (selectedYear) list = list.filter((s) => s.academicYear === selectedYear);
+    if (filterStandard) list = list.filter((s) => s.standard === filterStandard);
+    const sections = [...new Set(list.map((s) => s.section).filter(Boolean))].sort();
+    return sections;
+  }, [students, selectedYear, filterStandard]);
+
+  // Filter students based on year, standard and section
+  const filteredStudents = useMemo(() => {
+    let list = students;
+    if (selectedYear) list = list.filter((s) => s.academicYear === selectedYear);
+    if (filterStandard) list = list.filter((s) => s.standard === filterStandard);
+    if (filterSection) list = list.filter((s) => s.section === filterSection);
+    return list;
+  }, [students, selectedYear, filterStandard, filterSection]);
+
   // ── fee input helper ──────────────────────────────────────────────────────
   const FeeInput = ({ label, field }) => (
     <div className="space-y-2">
@@ -399,27 +447,62 @@ discounts: manualDiscounts
     </div>
   );
 
-  // ── discount row helper ───────────────────────────────────────────────────
-  const DiscountRow = ({ label, sub, field, eligible, pct, reason }) => (
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="font-bold text-sm text-on-surface">
-          {label}
-          {eligible && pct ? (
-            <span className="ml-2 text-[10px] bg-[#44ddc1]/20 text-[#001813] px-2 py-0.5 rounded-full font-bold">
-              {pct}% off
-            </span>
-          ) : null}
+  const DiscountRow = ({ label, sub, field, eligible, reason }) => {
+    const isChecked = discountToggles[field];
+    const valState = discountValues[field];
+    const val = Number(valState.value) || 0;
+    const savings = valState.type === "PERCENTAGE" ? (grossFee * (val / 100)) : val;
+    
+    return (
+      <div className="flex flex-col gap-2 group p-4 bg-surface-container-low/50 rounded-xl border border-outline-variant/10">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-bold text-sm text-on-surface flex items-center gap-2">
+              {label}
+              {eligible && (
+                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
+                  Eligible
+                </span>
+              )}
+            </div>
+            <div className="text-[11px] text-on-surface-variant leading-tight mt-1">
+              {eligible ? reason || sub : sub}
+            </div>
+          </div>
+          <ToggleSwitch
+            checked={isChecked}
+            onChange={(v) => setDiscountToggles((prev) => ({ ...prev, [field]: v }))}
+            disabled={!eligible}
+          />
         </div>
-        <div className="text-xs text-on-surface-variant">{eligible ? reason || sub : sub}</div>
+        {isChecked && eligible && (
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-outline-variant/10 animate-fadeIn">
+            <select
+              value={valState.type}
+              onChange={(e) => setDiscountValues(prev => ({ ...prev, [field]: { ...prev[field], type: e.target.value } }))}
+              className="bg-surface-container-high border-none rounded-lg py-1.5 px-2 text-[11px] font-bold uppercase tracking-wide outline-none w-24 text-primary"
+            >
+              <option value="PERCENTAGE">% (Percent)</option>
+              <option value="FLAT">₹ (Flat)</option>
+            </select>
+            <input
+              type="number"
+              min={0}
+              placeholder="Enter amount..."
+              value={valState.value}
+              onChange={(e) => setDiscountValues(prev => ({ ...prev, [field]: { ...prev[field], value: e.target.value } }))}
+              className="flex-1 bg-surface-container-high border-none rounded-lg py-1.5 px-3 text-sm font-bold outline-none focus:ring-1 focus:ring-primary/30 transition-all"
+            />
+            {savings > 0 && (
+              <div className="text-[10px] font-bold text-[#001813] bg-[#44ddc1]/20 px-2.5 py-2 rounded items-center flex">
+                Saves {fmt(savings)}
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      <ToggleSwitch
-        checked={discountToggles[field]}
-        onChange={(v) => setDiscountToggles((prev) => ({ ...prev, [field]: v }))}
-        disabled={!eligible}
-      />
-    </div>
-  );
+    );
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -492,46 +575,86 @@ discounts: manualDiscounts
             <span className="material-symbols-outlined absolute top-6 right-6 text-8xl text-primary/5 pointer-events-none select-none">
               school
             </span>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 relative z-10">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
+              {/* Academic Year */}
               <div className="space-y-2">
-                <label className="block font-headline font-bold text-sm text-on-surface-variant/80">
-                  Student
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedStudent?.id || ""}
-                    onChange={(e) => e.target.value && onStudentChange(e.target.value)}
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/30 appearance-none transition-all outline-none font-body"
-                  >
-                    <option value="">Select student...</option>
-                    {students.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} — {s.standard}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant">
-                    expand_more
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="block font-headline font-bold text-sm text-on-surface-variant/80">
+                <label className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
                   Academic Year
                 </label>
                 <div className="relative">
                   <select
                     value={selectedYear}
                     onChange={(e) => onYearChange(e.target.value)}
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/30 appearance-none transition-all outline-none font-body"
+                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest appearance-none transition-all outline-none"
                   >
                     <option value="">Select year...</option>
                     {academicYears.map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
-                  <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant">
-                    event
+                  <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">
+                    expand_more
+                  </span>
+                </div>
+              </div>
+              {/* Standard filter */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                  Standard
+                </label>
+                <div className="relative">
+                  <select
+                    value={filterStandard}
+                    onChange={(e) => { setFilterStandard(e.target.value); setFilterSection(""); setSelectedStudent(null); setExistingFee(null); setExistingPayments([]); }}
+                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest appearance-none transition-all outline-none"
+                  >
+                    <option value="">All Standards</option>
+                    {STANDARDS_LIST.map((s) => <option key={s} value={s}>{s.replace("STD_", "Std ")}</option>)}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">
+                    expand_more
+                  </span>
+                </div>
+              </div>
+              {/* Section filter */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                  Section
+                </label>
+                <div className="relative">
+                  <select
+                    value={filterSection}
+                    onChange={(e) => { setFilterSection(e.target.value); setSelectedStudent(null); setExistingFee(null); setExistingPayments([]); }}
+                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest appearance-none transition-all outline-none"
+                  >
+                    <option value="">All Sections</option>
+                    {availableSections.map((sec) => <option key={sec} value={sec}>{sec}</option>)}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">
+                    expand_more
+                  </span>
+                </div>
+              </div>
+              {/* Student */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                  Student {filteredStudents.length > 0 && <span className="text-on-surface-variant font-medium">({filteredStudents.length})</span>}
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedStudent?.id || ""}
+                    onChange={(e) => e.target.value && onStudentChange(e.target.value)}
+                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest appearance-none transition-all outline-none"
+                  >
+                    <option value="">Select student...</option>
+                    {filteredStudents.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}{s.section ? ` — ${s.section}` : ""}{!filterStandard ? ` — ${s.standard}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">
+                    expand_more
                   </span>
                 </div>
               </div>
@@ -852,160 +975,204 @@ discounts: manualDiscounts
 
         {/* ── right: discounts + summary (only when assigning new fee) ── */}
         {!existingFee && (
-        <div className="space-y-5">
+          <div className="space-y-5">
+            {/* Discount card */}
+            <div className="bg-surface-container rounded-2xl p-7">
+              <h4 className="font-headline font-bold text-lg text-primary mb-5">
+                Discounts Eligibility
+              </h4>
+              <div className="space-y-5">
+                <DiscountRow
+                  label="Teacher Discount"
+                  sub="Eligible staff dependents"
+                  field="autoTeacherDiscount"
+                  eligible={discountEligibility?.teacherDiscount?.eligible}
+                  pct={discountEligibility?.teacherDiscount?.percentage}
+                  reason={discountEligibility?.teacherDiscount?.reason}
+                />
+                <DiscountRow
+                  label="Sibling Discount"
+                  sub="Applied via linked profiles"
+                  field="autoSiblingDiscount"
+                  eligible={discountEligibility?.siblingDiscount?.eligible}
+                  pct={discountEligibility?.siblingDiscount?.percentage}
+                  reason={discountEligibility?.siblingDiscount?.reason}
+                />
+                <DiscountRow
+                  label="RTE / Community"
+                  sub="Government mandate relief"
+                  field="autoRteDiscount"
+                  eligible={discountEligibility?.rteDiscount?.eligible}
+                  pct={discountEligibility?.rteDiscount?.percentage}
+                  reason={discountEligibility?.rteDiscount?.reason}
+                />
+              </div>
 
-          {/* Discount card */}
-          <div className="bg-surface-container rounded-2xl p-7">
-            <h4 className="font-headline font-bold text-lg text-primary mb-5">
-               Discounts Eligibility
-            </h4>
-            <div className="space-y-5">
-              <DiscountRow
-                label="Teacher Discount"
-                sub="Eligible staff dependents"
-                field="autoTeacherDiscount"
-                eligible={discountEligibility?.teacherDiscount?.eligible}
-                pct={discountEligibility?.teacherDiscount?.percentage}
-                reason={discountEligibility?.teacherDiscount?.reason}
-              />
-              <DiscountRow
-                label="Sibling Discount"
-                sub="Applied via linked profiles"
-                field="autoSiblingDiscount"
-                eligible={discountEligibility?.siblingDiscount?.eligible}
-                pct={discountEligibility?.siblingDiscount?.percentage}
-                reason={discountEligibility?.siblingDiscount?.reason}
-              />
-              <DiscountRow
-                label="RTE / Community"
-                sub="Government mandate relief"
-                field="autoRteDiscount"
-                eligible={discountEligibility?.rteDiscount?.eligible}
-                pct={discountEligibility?.rteDiscount?.percentage}
-                reason={discountEligibility?.rteDiscount?.reason}
-              />
+              {/* Manual discount section */}
+              <div className="mt-6 pt-6 border-t border-outline-variant/20 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
+                    Quick Flat Discount (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-on-surface-variant font-bold text-xs">₹</span>
+                    <input
+                      type="number"
+                      placeholder="Enter custom reduction..."
+                      value={manualDiscounts.find((d) => d.reason === "QUICK_FLAT")?.value || ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const existingIdx = manualDiscounts.findIndex((d) => d.reason === "QUICK_FLAT");
+                        let next = [...manualDiscounts];
+                        if (existingIdx > -1) {
+                          if (!val) {
+                            next = next.filter((_, i) => i !== existingIdx);
+                          } else {
+                            next[existingIdx] = { ...next[existingIdx], type: "FLAT", value: val };
+                          }
+                        } else if (val) {
+                          next.push({ type: "FLAT", value: val, reason: "QUICK_FLAT" });
+                        }
+                        setManualDiscounts(next);
+                      }}
+                      className="w-full bg-surface-container-high border-none rounded-xl py-2.5 pl-7 pr-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {manualDiscounts
+                  .filter((d) => d.reason !== "QUICK_FLAT")
+                  .map((d, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <select
+                        value={d.type}
+                        onChange={(e) => {
+                          const realIdx = manualDiscounts.indexOf(d);
+                          const next = [...manualDiscounts];
+                          next[realIdx] = { ...next[realIdx], type: e.target.value };
+                          setManualDiscounts(next);
+                        }}
+                        className="flex-1 bg-surface-container-high border-none rounded-lg py-2 px-3 text-xs outline-none font-bold"
+                      >
+                        <option value="">Select Type</option>
+                        <option value="FLAT">Flat (₹)</option>
+                        <option value="PERCENTAGE">Percentage (%)</option>
+                      </select>
+                      <div className="relative w-24">
+                        <span className="absolute left-2 top-2 text-[10px] font-bold text-on-surface-variant">
+                          {d.type === "PERCENTAGE" ? "%" : "₹"}
+                        </span>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={d.value}
+                          onChange={(e) => {
+                            const realIdx = manualDiscounts.indexOf(d);
+                            const next = [...manualDiscounts];
+                            next[realIdx] = { ...next[realIdx], value: e.target.value };
+                            setManualDiscounts(next);
+                          }}
+                          className="w-full bg-surface-container-high border-none rounded-lg py-2 pl-6 pr-2 text-sm font-bold outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setManualDiscounts(manualDiscounts.filter((item) => item !== d))}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-error-container text-error transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-sm">close</span>
+                      </button>
+                    </div>
+                  ))}
+
+                <button
+                  type="button"
+                  onClick={() => setManualDiscounts([...manualDiscounts, { type: "", value: "", reason: "CUSTOM" }])}
+                  className="w-full border border-dashed border-outline-variant hover:border-primary hover:text-primary transition-all py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+                >
+                  + Add Advanced Discount
+                </button>
+              </div>
+
+              {/* Payable Preview inside Discount Card */}
+              <div className="mt-8 pt-6 border-t-2 border-primary/10">
+                <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-1">
+                      Estimated Net Pay
+                    </p>
+                    <p className="text-2xl font-headline font-black text-primary">{fmt(netFee)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold text-[#001813] bg-[#44ddc1]/20 px-2 py-0.5 rounded-full inline-block">
+                      Total Savings: {fmt(totalDiscount)}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Manual discount section */}
-            <div className="mt-6 pt-6 border-t border-outline-variant/20 space-y-3">
-              {manualDiscounts.map((d, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <select
-                    value={d.type}
-                    onChange={(e) => {
-                      const next = [...manualDiscounts];
-                      next[idx] = { ...next[idx], type: e.target.value };
-                      setManualDiscounts(next);
-                    }}
-                    className="flex-1 bg-surface-container-high border-none rounded-lg py-2 px-3 text-sm outline-none"
-                  >
-                    <option value="">Type</option>
-                    <option value="FLAT">Flat (₹)</option>
-                    <option value="PERCENTAGE">Percentage (%)</option>
-                    <option value="TEACHER_DISCOUNT">Teacher</option>
-                    <option value="SIBLING_DISCOUNT">Sibling</option>
-                    <option value="RTE_COMMUNITY">RTE</option>
-                  </select>
-                  <div className="relative w-20">
-  <span className="absolute left-2 top-2 text-xs font-bold">
-    {d.type === "TEACHER_DISCOUNT" ? "%" : "₹"}
-  </span>
-
-  <input
-    type="number"
-    min={0}
-    placeholder={d.type === "TEACHER_DISCOUNT" ? "%" : "₹"}
-    value={d.value}
-    onChange={(e) => {
-      const next = [...manualDiscounts];
-      next[idx] = { ...next[idx], value: e.target.value || 0 };
-      setManualDiscounts(next);
-    }}
-    className="w-full bg-surface-container-high border-none rounded-lg py-2 pl-6 pr-2 text-sm outline-none"
-  />
-</div>
-                  <button
-                    type="button"
-                    onClick={() => setManualDiscounts(manualDiscounts.filter((_, i) => i !== idx))}
-                    className="w-8 h-8 mt-0.5 flex items-center justify-center rounded-lg hover:bg-error-container text-error transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-sm">close</span>
-                  </button>
+            {/* Sibling insight chip */}
+            {discountEligibility?.siblingDiscount?.eligible && (
+              <div className="bg-white px-4 py-3 rounded-2xl shadow-sm flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-[#44ddc1]/25 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-sm text-[#001813]">tips_and_updates</span>
                 </div>
-              ))}
+                <p className="text-xs font-medium text-on-surface-variant">
+                  {discountEligibility.siblingDiscount.reason || "Sibling discount eligible"}
+                </p>
+              </div>
+            )}
+
+            {/* Summary / CTA card */}
+            <div className="bg-primary-container rounded-2xl p-7 relative overflow-hidden">
+              <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+              <h4 className="font-headline font-bold text-lg text-on-primary-container mb-5">
+                Total Assignment Value
+              </h4>
+              <div className="space-y-2.5 mb-6">
+                <div className="flex justify-between text-sm text-on-primary-container/70">
+                  <span>Gross Fee</span>
+                  <span>{fmt(grossFee)}</span>
+                </div>
+                {totalDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-[#44ddc1] font-bold">
+                    <span>Total Discount</span>
+                    <span>− {fmt(totalDiscount)}</span>
+                  </div>
+                )}
+                <div className="h-px bg-white/10 my-1" />
+                <div className="flex justify-between text-2xl font-headline font-black text-white">
+                  <span>Net Total</span>
+                  <span>{fmt(netFee)}</span>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setManualDiscounts([...manualDiscounts, { type: "", value: "", reason: "" }])}
-                className="w-full bg-surface-container-highest text-primary border-none py-2.5 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-white transition-all"
+                disabled={loading || !canAssignFee}
+                onClick={handleSubmit}
+                style={{
+                  background: "linear-gradient(to right, #00152a, #102a43)",
+                }}
+                className="w-full bg-gradient-to-br from-primary to-primary-container text-white py-4 px-6 rounded-xl font-headline font-extrabold tracking-tight text-base shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                <span className="material-symbols-outlined text-lg">sell</span>
-                Add Manual Discount
+                {loading ? (
+                  <>
+                    <span className="material-symbols-outlined text-base animate-spin">refresh</span>
+                    Assigning...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-base">assignment_turned_in</span>
+                    Assign Fee
+                  </>
+                )}
               </button>
             </div>
           </div>
-
-          {/* Sibling insight chip */}
-          {discountEligibility?.siblingDiscount?.eligible && (
-            <div className="bg-white px-4 py-3 rounded-2xl shadow-sm flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#44ddc1]/25 flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-sm text-[#001813]">tips_and_updates</span>
-              </div>
-              <p className="text-xs font-medium text-on-surface-variant">
-                {discountEligibility.siblingDiscount.reason || "Sibling discount eligible"}
-              </p>
-            </div>
-          )}
-
-          {/* Summary / CTA card */}
-          <div className="bg-primary-container rounded-2xl p-7 relative overflow-hidden">
-            <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/5 rounded-full blur-2xl pointer-events-none" />
-            <h4 className="font-headline font-bold text-lg text-on-primary-container mb-5">
-              Total Assignment Value
-            </h4>
-            <div className="space-y-2.5 mb-6">
-              <div className="flex justify-between text-sm text-on-primary-container/70">
-                <span>Gross Fee</span>
-                <span>{fmt(grossFee)}</span>
-              </div>
-              {totalDiscount > 0 && (
-                <div className="flex justify-between text-sm text-[#44ddc1] font-bold">
-                  <span>Total Discount</span>
-                  <span>− {fmt(totalDiscount)}</span>
-                </div>
-              )}
-              <div className="h-px bg-white/10 my-1" />
-              <div className="flex justify-between text-2xl font-headline font-black text-white">
-                <span>Net Total</span>
-                <span>{fmt(netFee)}</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              disabled={loading || !canAssignFee}
-              onClick={handleSubmit}
-                  style={{
-  background: 'linear-gradient(to right, #00152a, #102a43)'
-}}
-              className="w-full bg-gradient-to-br from-primary to-primary-container text-white py-4 px-6 rounded-xl font-headline font-extrabold tracking-tight text-base shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <span className="material-symbols-outlined text-base animate-spin">refresh</span>
-                  Assigning...
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-base">assignment_turned_in</span>
-                  Assign Fee
-                </>
-              )}
-            </button>
-          </div>
-        </div>
         )}
       </div>
 
-      {/* ── recent assignments table ── */}
       <div className="mt-6">
         <h4 className="font-headline font-bold text-2xl text-primary mb-5">
           Recent Fee Assignments

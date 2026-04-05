@@ -2,7 +2,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Modal, Select, message } from "antd";
 import instance from "../utils/axios";
 import dayjs from "dayjs";
-import { linkSiblings } from "../modules/admission/admission.service";
+import { linkSiblings, demoteIndividualStudents } from "../modules/admission/admission.service";
+import { getAdminSettings } from "../modules/settings/settings.service";
 import { useNavigate } from "react-router-dom";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -33,7 +34,9 @@ const initials = (name = "") => {
 };
 
 // ── component ─────────────────────────────────────────────────────────────
-const StudentView = ({ onCollectFee }) => {
+const StudentView = ({ onCollectFee, onEdit }) => {
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailStudent, setDetailStudent] = useState(null);
   const [feeModalOpen, setFeeModalOpen] = useState(false);
 const [selectedStudentId, setSelectedStudentId] = useState(null);
 const [fees, setFees] = useState([]);
@@ -42,9 +45,12 @@ const [fees, setFees] = useState([]);
   const [sectionFilter, setSectionFilter] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
+  const [fatherFilter, setFatherFilter] = useState("");
+  const [siblingFilter, setSiblingFilter] = useState("");
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize] = useState(12);
+  const [adminSettings, setAdminSettings] = useState({});
 
   // row expander
   const [expandedId, setExpandedId] = useState(null);
@@ -52,7 +58,7 @@ const [fees, setFees] = useState([]);
   // sibling link modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [targetSiblingId, setTargetSiblingId] = useState(null);
+  const [targetSiblingIds, setTargetSiblingIds] = useState([]);
   const [linking, setLinking] = useState(false);
 
   // ── data ─────────────────────────────────────────────────────────────────
@@ -63,7 +69,19 @@ const [fees, setFees] = useState([]);
     });
   };
 
-  useEffect(() => { fetchStudents(); }, []);
+  const fetchAdminSettings = async () => {
+    try {
+      const data = await getAdminSettings();
+      setAdminSettings(data || {});
+    } catch (err) {
+      console.error("Failed to fetch admin settings", err);
+    }
+  };
+
+  useEffect(() => { 
+    fetchStudents(); 
+    fetchAdminSettings();
+  }, []);
 
   // ── filter / search ───────────────────────────────────────────────────────
   const classOptions = useMemo(() =>
@@ -83,9 +101,23 @@ const [fees, setFees] = useState([]);
       if (sectionFilter && (s.section || "") !== sectionFilter) return false;
       if (genderFilter && (s.gender || "").toLowerCase() !== genderFilter) return false;
       if (areaFilter) {
-        const addr = s.address;
-        const areaStr = [addr?.line1, addr?.line2, addr?.line3, addr?.pin].filter(Boolean).join(" ").toLowerCase();
-        if (!areaStr.includes(areaFilter.toLowerCase())) return false;
+        const areaStr = areaFilter.toLowerCase();
+        const addr = s.address || {};
+        const isMatch = 
+          (addr.line1 || "").toLowerCase().includes(areaStr) ||
+          (addr.line2 || "").toLowerCase().includes(areaStr) ||
+          (addr.line3 || "").toLowerCase().includes(areaStr) ||
+          (addr.city || "").toLowerCase().includes(areaStr) ||
+          (addr.state || "").toLowerCase().includes(areaStr) ||
+          (addr.landmark || "").toLowerCase().includes(areaStr) ||
+          (addr.area || "").toLowerCase().includes(areaStr) ||
+          String(addr.pin || "").toLowerCase().includes(areaStr);
+        if (!isMatch) return false;
+      }
+      if (fatherFilter && !(s.family?.fatherName || "").toLowerCase().includes(fatherFilter.toLowerCase())) return false;
+      if (siblingFilter) {
+        if (siblingFilter === "has" && !s.siblingGroupId) return false;
+        if (siblingFilter === "none" && s.siblingGroupId) return false;
       }
       if (q) {
         const blob = [
@@ -109,15 +141,15 @@ const [fees, setFees] = useState([]);
   // ── sibling link ──────────────────────────────────────────────────────────
   const openLinkModal = (student) => {
     setSelectedStudent(student);
-    setTargetSiblingId(null);
+    setTargetSiblingIds([]);
     setIsModalOpen(true);
   };
 
   const handleLink = async () => {
-    if (!targetSiblingId) { message.error("Please select a sibling to link"); return; }
+    if (!targetSiblingIds.length) { message.error("Please select at least one sibling to link"); return; }
     setLinking(true);
     try {
-      await linkSiblings({ studentIds: [selectedStudent.id, targetSiblingId] });
+      await linkSiblings({ studentIds: [selectedStudent.id, ...targetSiblingIds] });
       message.success("Siblings linked successfully!");
       setIsModalOpen(false);
       fetchStudents();
@@ -125,6 +157,25 @@ const [fees, setFees] = useState([]);
       message.error(err?.response?.data?.message || "Linking failed");
     }
     setLinking(false);
+  };
+
+  const handleDemote = (student) => {
+    Modal.confirm({
+      title: 'Confirm Demotion',
+      content: `Are you sure you want to demote ${student.name}? This will reduce their standard by one level.`,
+      okText: 'Yes, Demote',
+      okType: 'danger',
+      cancelText: 'No',
+      onOk: async () => {
+        try {
+          await demoteIndividualStudents({ studentIds: [student.id] });
+          message.success(`${student.name} demoted successfully`);
+          fetchStudents();
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Demotion failed');
+        }
+      },
+    });
   };
 
   // ────────────────────────────────────────────────────────────────────────
@@ -264,15 +315,41 @@ const [fees, setFees] = useState([]);
                 type="text"
                 value={areaFilter}
                 onChange={(e) => { setAreaFilter(e.target.value); setPage(1); }}
-                placeholder="Area / Pin..."
-                className="bg-white border-none rounded-xl py-3 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm min-w-[160px]"
+                placeholder="Area Search (City/Street/Pin)"
+                className="bg-white border-none rounded-xl py-3 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm min-w-[200px]"
               />
             </div>
 
+            {/* Father Search */}
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-3 text-on-surface-variant text-base">person</span>
+              <input
+                type="text"
+                value={fatherFilter}
+                onChange={(e) => { setFatherFilter(e.target.value); setPage(1); }}
+                placeholder="Father's Name..."
+                className="bg-white border-none rounded-xl py-3 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm min-w-[170px]"
+              />
+            </div>
+
+            {/* Sibling select */}
+            <div className="relative">
+              <select
+                value={siblingFilter}
+                onChange={(e) => { setSiblingFilter(e.target.value); setPage(1); }}
+                className="bg-white border-none rounded-xl py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm cursor-pointer appearance-none min-w-[130px]"
+              >
+                <option value="">Sibling</option>
+                <option value="has">Has Sibling</option>
+                <option value="none">No Sibling</option>
+              </select>
+              <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">expand_more</span>
+            </div>
+
             {/* Clear */}
-            {(classFilter || sectionFilter || genderFilter || areaFilter || searchText) && (
+            {(classFilter || sectionFilter || genderFilter || areaFilter || fatherFilter || siblingFilter || searchText) && (
               <button
-                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setAreaFilter(""); setSearchText(""); setPage(1); }}
+                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setAreaFilter(""); setFatherFilter(""); setSiblingFilter(""); setSearchText(""); setPage(1); }}
                 className="h-[46px] px-4 flex items-center gap-1 bg-surface-container-highest rounded-xl text-on-surface-variant hover:text-error hover:bg-error-container transition-all text-sm font-medium"
               >
                 <span className="material-symbols-outlined text-base">close</span>
@@ -379,7 +456,8 @@ const [fees, setFees] = useState([]);
                               <button
                                 title="Collect Fee"
                                 onClick={() => onCollectFee(s.id)}
-                          >
+                                className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                              >
                                 <span className="material-symbols-outlined text-lg">payments</span>
                               </button>
                             )}
@@ -392,16 +470,27 @@ const [fees, setFees] = useState([]);
                             </button>
                             <button
                               title="View"
+                              onClick={() => { setDetailStudent(s); setDetailModalOpen(true); }}
                               className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
                             >
                               <span className="material-symbols-outlined text-lg">visibility</span>
                             </button>
                             <button
                               title="Edit"
+                              onClick={() => onEdit && onEdit(s)}
                               className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
                             >
                               <span className="material-symbols-outlined text-lg">edit</span>
                             </button>
+                            {adminSettings.enableIndividualDemotion && (
+                               <button
+                               title="Demote Student"
+                               onClick={() => handleDemote(s)}
+                               className="p-2 rounded-lg text-on-surface-variant hover:bg-error-container hover:text-error transition-colors"
+                             >
+                               <span className="material-symbols-outlined text-lg">keyboard_double_arrow_down</span>
+                             </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -555,12 +644,13 @@ const [fees, setFees] = useState([]);
               Find Sibling
             </label>
             <Select
+              mode="multiple"
               showSearch
               placeholder="Search by name or admission no..."
               style={{ width: "100%" }}
               optionFilterProp="label"
-              onChange={setTargetSiblingId}
-              value={targetSiblingId}
+              onChange={setTargetSiblingIds}
+              value={targetSiblingIds}
               filterOption={(input, option) =>
                 (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
@@ -574,6 +664,88 @@ const [fees, setFees] = useState([]);
           </div>
         </div>
         
+      </Modal>
+
+      {/* ── Student Detail Modal ── */}
+      <Modal
+        open={detailModalOpen}
+        onCancel={() => { setDetailModalOpen(false); setDetailStudent(null); }}
+        footer={null}
+        width={700}
+        centered
+        title={
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">person</span>
+            <span className="font-headline font-bold text-lg">Student Profile — {detailStudent?.name}</span>
+          </div>
+        }
+      >
+        {detailStudent && (
+          <div className="py-4 max-h-[70vh] overflow-y-auto pr-2 space-y-8">
+            <div className="flex items-start gap-6 pb-6 border-b border-outline-variant/10">
+              <div className={`w-20 h-20 rounded-2xl ${avatarColor(detailStudent.name)} flex items-center justify-center text-2xl font-black shadow-lg`}>
+                {initials(detailStudent.name)}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold text-primary font-headline">{detailStudent.name}</h3>
+                <p className="text-on-surface-variant font-medium">{detailStudent.admission?.admissionNo || "NO ADMISSION NO"}</p>
+                <div className="flex gap-2 mt-3">
+                  <span className="bg-surface-container-high px-3 py-1 rounded-full text-xs font-bold">{detailStudent.standard}</span>
+                  <span className={`px-3 py-1 text-xs font-bold rounded-full ${detailStudent.admission?.isApproved ? "bg-[#44ddc1]/20 text-[#005145]" : "bg-surface-container-high text-on-surface-variant"}`}>
+                    {detailStudent.admission?.isApproved ? "Approved" : "Pending Approval"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-12 gap-y-6">
+              {[
+                { label: "Date of Birth", value: dayjs(detailStudent.dob).format("DD MMM YYYY") },
+                { label: "Gender", value: detailStudent.gender },
+                { label: "Blood Group", value: detailStudent.bloodGroup },
+                { label: "Religion / Community", value: `${detailStudent.religion || ""} / ${detailStudent.community || ""}` },
+                { label: "Father Name", value: detailStudent.family?.fatherName },
+                { label: "Father Phone", value: detailStudent.family?.fatherPhone },
+                { label: "Mother Name", value: detailStudent.family?.motherName },
+                { label: "Mother Phone", value: detailStudent.family?.motherPhone },
+                { label: "Academic Year", value: detailStudent.academicYear || detailStudent.admission?.academicYear },
+                { label: "Transport Mode", value: detailStudent.transportMode || "Local" },
+                { label: "Address", value: `${detailStudent.address?.line1 || ""}, ${detailStudent.address?.line2 || ""}, ${detailStudent.address?.city || ""}`, span: 2 },
+              ].map((item, i) => (
+                <div key={i} className={item.span === 2 ? "col-span-2" : ""}>
+                  <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-1">{item.label}</p>
+                  <p className="text-sm font-semibold text-primary">{item.value || "—"}</p>
+                </div>
+              ))}
+            </div>
+
+            {detailStudent.academics && detailStudent.academics.length > 0 && (
+              <div className="pt-6 border-t border-outline-variant/10">
+                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-4">Qualifying Examination</p>
+                <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/5">
+                  <div className="flex justify-between items-center mb-3">
+                    <p className="font-bold text-primary">{detailStudent.academics[0].examName}</p>
+                    <p className="text-xs font-bold text-on-surface-variant">Reg No: {detailStudent.academics[0].registerNo}</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-white p-3 rounded-lg border border-outline-variant/10 text-center">
+                      <p className="text-[9px] font-bold text-on-surface-variant uppercase mb-0.5">Total Marks</p>
+                      <p className="text-sm font-bold text-primary">{detailStudent.academics[0].totalObtainedMarks} / {detailStudent.academics[0].totalMaxMarks}</p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-outline-variant/10 text-center">
+                      <p className="text-[9px] font-bold text-on-surface-variant uppercase mb-0.5">Percentage</p>
+                      <p className="text-sm font-bold text-[#44ddc1]">{detailStudent.academics[0].totalPercentage}%</p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-outline-variant/10 text-center">
+                      <p className="text-[9px] font-bold text-on-surface-variant uppercase mb-0.5">Year</p>
+                      <p className="text-sm font-bold text-primary">{detailStudent.academics[0].monthYear}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
 
       
