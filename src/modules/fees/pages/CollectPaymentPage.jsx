@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import { message, Modal, Form, Input, InputNumber, Select, Radio, Alert, Space, Checkbox, Table } from "antd";
 import { WhatsAppOutlined, MessageOutlined, LinkOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import logo from "../../../assets/logo.jpeg";
 import {
   cancelPayment,
   collectPayment,
@@ -17,6 +20,9 @@ import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => "₹" + Math.round(Number(v || 0)).toLocaleString("en-IN");
+
+const fmtPdfCurrency = (v) => `Rs. ${Math.round(Number(v || 0)).toLocaleString("en-IN")}`;
+const RECEIPT_SCHOOL_NAME = "PSF Matriculation Hr Sec School";
 
 const PAYMENT_MODES = [
   { value: "CASH", label: "Cash", icon: "payments" },
@@ -103,6 +109,187 @@ const buildReceiptFeeRows = (payment) => {
   return rows;
 };
 
+const getPaidComponentLabel = (payment, key) => {
+  const labelMap = {
+    tuition: "Tuition Fee",
+    transport: "Transport Fee",
+    book: "Book Fee",
+    hostel: "Hostel Fee",
+    other: "Other Fee",
+  };
+
+  if (labelMap[key]) return labelMap[key];
+
+  if (key?.startsWith("custom-")) {
+    const customKey = key.slice("custom-".length);
+    const customItem = (payment?.customItems || []).find(
+      (item) => String(item.id || item.name) === customKey
+    );
+    if (customItem?.name) return customItem.name;
+  }
+
+  return key
+    ?.replace(/([a-z])([A-Z])/g, "$1 $2")
+    ?.replace(/^\w/, (ch) => ch.toUpperCase()) || "Component";
+};
+
+const getReceiptFileName = (payment) => {
+  const baseName = String(payment?.receiptNo || "fee-receipt")
+    .trim()
+    .replace(/[^a-zA-Z0-9-_]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${baseName || "fee-receipt"}.pdf`;
+};
+
+const getStudentAdmissionNo = (fee) =>
+  fee?.student?.admission?.admissionNo ||
+  fee?.student?.admissions?.[0]?.admissionNo ||
+  fee?.student?.admissionNo ||
+  "";
+
+const loadReceiptLogo = () =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = logo;
+  });
+
+const receiptPreviewStyles = {
+  wrapper: {
+    width: "100%",
+    display: "flex",
+    justifyContent: "center",
+  },
+  card: {
+    width: "100%",
+    maxWidth: 620,
+    margin: "0 auto",
+    border: "1px solid #dbe3ea",
+    borderRadius: 24,
+    padding: "28px 24px",
+    background: "#ffffff",
+    boxShadow: "0 18px 48px rgba(15, 23, 42, 0.08)",
+  },
+  header: {
+    textAlign: "center",
+    borderBottom: "2px solid #1f2937",
+    paddingBottom: 14,
+    marginBottom: 18,
+  },
+  logoWrapper: {
+    width: 116,
+    height: 88,
+    borderRadius: 20,
+    background: "#ffffff",
+    border: "1px solid #d8dee5",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 14px",
+    padding: 8,
+  },
+  logo: {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+  },
+  headerTitle: {
+    margin: 0,
+    fontSize: 18,
+    fontWeight: 800,
+    color: "#0b1f33",
+    lineHeight: 1.3,
+    maxWidth: 420,
+    marginInline: "auto",
+  },
+  headerSubtitle: {
+    margin: "6px 0 0",
+    fontSize: 14,
+    color: "#52606d",
+  },
+  meta: {
+    textAlign: "right",
+    fontWeight: 700,
+    fontSize: 15,
+    color: "#142235",
+    marginBottom: 6,
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    margin: "12px 0 0",
+  },
+  th: {
+    border: "1px solid #d8dee5",
+    padding: "10px 12px",
+    textAlign: "left",
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#16263a",
+    background: "#f8fafc",
+    verticalAlign: "top",
+  },
+  td: {
+    border: "1px solid #d8dee5",
+    padding: "10px 12px",
+    textAlign: "left",
+    fontSize: 13,
+    color: "#334155",
+    verticalAlign: "top",
+  },
+  amountCell: {
+    textAlign: "right",
+    fontWeight: 700,
+    whiteSpace: "nowrap",
+  },
+  sectionTitle: {
+    marginTop: 18,
+    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: 800,
+    color: "#142235",
+  },
+  totalRow: {
+    background: "#f8fafc",
+    fontWeight: 700,
+  },
+  remarks: {
+    marginTop: 14,
+    color: "#334155",
+    lineHeight: 1.6,
+  },
+  footer: {
+    marginTop: 28,
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 20,
+  },
+  footerItem: {
+    flex: 1,
+    display: "flex",
+    justifyContent: "center",
+  },
+  signLine: {
+    width: "100%",
+    maxWidth: 180,
+    borderTop: "1px solid #334155",
+    paddingTop: 8,
+    textAlign: "center",
+    fontSize: 12,
+    color: "#334155",
+  },
+  actions: {
+    margin: "20px auto 0",
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 12,
+    width: "100%",
+    maxWidth: 620,
+  },
+};
+
 const statusBadge = (status) => {
   const s = (status || "SUCCESS").toUpperCase();
   if (s === "REFUNDED")
@@ -126,6 +313,10 @@ const CollectPaymentPage = ({ studentId }) => {
   const [loading, setLoading] = useState(false);
   const [academicYear, setAcademicYear] = useState("");
   const [academicYearOptions, setAcademicYearOptions] = useState([]);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [admissionFilter, setAdmissionFilter] = useState("");
   const [printPayment, setPrintPayment] = useState(null);
   const [statusModal, setStatusModal] = useState({ open: false, action: "", payment: null, loading: false });
   const [linkModal, setLinkModal] = useState({ open: false, loading: false });
@@ -165,7 +356,18 @@ const CollectPaymentPage = ({ studentId }) => {
   const fetchFees = async (yr) => {
     try {
       const data = await getAllStudentFees(yr || academicYear);
-      setStudentFees(data || []);
+      const nextFees = data || [];
+      setStudentFees(nextFees);
+      if (!nextFees.some((f) => f.id === selectedFee?.id)) {
+        setSelectedFee(null);
+        setPayments([]);
+        setPaymentLinks([]);
+        setLinkResult(null);
+        setAmount("");
+        setTermNumber(null);
+        setPayComponents([]);
+        setPayingNonTerm(false);
+      }
     } catch { message.error("Failed to load student fees"); }
   };
 
@@ -356,10 +558,166 @@ const CollectPaymentPage = ({ studentId }) => {
     setLoading(false);
   };
 
+  const handleDownloadReceipt = async (payment = printPayment) => {
+    if (!payment) {
+      message.error("Receipt is not ready to download");
+      return;
+    }
+
+    try {
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginX = 14;
+      let cursorY = 16;
+
+      try {
+        const receiptLogo = await loadReceiptLogo();
+        const maxLogoWidth = 32;
+        const maxLogoHeight = 24;
+        const logoRatio = receiptLogo.width / receiptLogo.height;
+        let logoWidth = maxLogoWidth;
+        let logoHeight = logoWidth / logoRatio;
+        if (logoHeight > maxLogoHeight) {
+          logoHeight = maxLogoHeight;
+          logoWidth = logoHeight * logoRatio;
+        }
+        doc.addImage(receiptLogo, "JPEG", (pageWidth - logoWidth) / 2, cursorY, logoWidth, logoHeight);
+        cursorY += logoHeight + 7;
+      } catch {
+        cursorY += 4;
+      }
+
+      const paymentInfoRows = [
+        ["Student Name", payment.studentName || "N/A"],
+        ["Standard", payment.standard || "N/A"],
+        ["Payment Date", payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A"],
+        ["Payment Mode", payment.paymentMode || "N/A"],
+        ...(payment.termNumber ? [["Term", `Term ${payment.termNumber}`]] : []),
+        ["Amount Paid", fmtPdfCurrency(payment.amount)],
+      ];
+
+      const hasPaidComponents = payment.paidComponents && Object.keys(payment.paidComponents).length > 0;
+      const componentRows = hasPaidComponents
+        ? [
+            ...Object.entries(payment.paidComponents).map(([key, value]) => [
+              getPaidComponentLabel(payment, key),
+              fmtPdfCurrency(value),
+            ]),
+            ["Total Paid", fmtPdfCurrency(payment.amount)],
+          ]
+        : buildReceiptFeeRows(payment).map((row) => [row.label, fmtPdfCurrency(row.amount)]);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      const schoolNameLines = doc.splitTextToSize(RECEIPT_SCHOOL_NAME, pageWidth - marginX * 2);
+      doc.text(schoolNameLines, pageWidth / 2, cursorY, { align: "center" });
+      cursorY += schoolNameLines.length * 7;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.text("Fee Payment Receipt", pageWidth / 2, cursorY, { align: "center" });
+      cursorY += 8;
+      doc.setLineWidth(0.4);
+      doc.line(marginX, cursorY, pageWidth - marginX, cursorY);
+      cursorY += 7;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.text(`Receipt No: ${payment.receiptNo || "N/A"}`, pageWidth - marginX, cursorY, { align: "right" });
+      cursorY += 5.5;
+      doc.text(`Status: ${payment.status || "SUCCESS"}`, pageWidth - marginX, cursorY, { align: "right" });
+      cursorY += 4;
+
+      autoTable(doc, {
+        startY: cursorY + 3,
+        body: paymentInfoRows,
+        theme: "grid",
+        margin: { left: marginX, right: marginX },
+        styles: { fontSize: 10, cellPadding: 3 },
+        columnStyles: {
+          0: { cellWidth: 52, fontStyle: "bold" },
+          1: { cellWidth: "auto" },
+        },
+      });
+      cursorY = (doc.lastAutoTable?.finalY || cursorY) + 8;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text(hasPaidComponents ? "Paid Components" : "Receipt Fee Components", marginX, cursorY);
+
+      autoTable(doc, {
+        startY: cursorY + 3,
+        head: [["Component", "Amount"]],
+        body: componentRows,
+        theme: "grid",
+        margin: { left: marginX, right: marginX },
+        styles: { fontSize: 10, cellPadding: 3 },
+        headStyles: { fillColor: [0, 21, 42] },
+        columnStyles: {
+          0: { cellWidth: "auto" },
+          1: { cellWidth: 45, halign: "right" },
+        },
+      });
+      cursorY = (doc.lastAutoTable?.finalY || cursorY) + 8;
+
+      if (payment.totalFee) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.text("Fee Summary", marginX, cursorY);
+
+        autoTable(doc, {
+          startY: cursorY + 3,
+          body: [
+            ["Total Fee", fmtPdfCurrency(payment.totalFee)],
+            ["Net Fee (after discount)", fmtPdfCurrency(payment.netFee)],
+          ],
+          theme: "grid",
+          margin: { left: marginX, right: marginX },
+          styles: { fontSize: 10, cellPadding: 3 },
+          columnStyles: {
+            0: { cellWidth: 52, fontStyle: "bold" },
+            1: { cellWidth: "auto" },
+          },
+        });
+        cursorY = (doc.lastAutoTable?.finalY || cursorY) + 8;
+      }
+
+      if (payment.remarks) {
+        doc.setFont("helvetica", "bold");
+        doc.text("Remarks:", marginX, cursorY);
+        doc.setFont("helvetica", "normal");
+        const remarkLines = doc.splitTextToSize(String(payment.remarks), pageWidth - marginX * 2 - 18);
+        doc.text(remarkLines, marginX + 18, cursorY);
+        cursorY += Math.max(8, remarkLines.length * 5 + 4);
+      }
+
+      if (cursorY > pageHeight - 28) {
+        doc.addPage();
+        cursorY = 24;
+      }
+
+      const signatureY = cursorY + 16;
+      doc.line(marginX + 8, signatureY, marginX + 60, signatureY);
+      doc.line(pageWidth - marginX - 60, signatureY, pageWidth - marginX - 8, signatureY);
+      doc.setFontSize(10);
+      doc.text("Student / Parent", marginX + 34, signatureY + 6, { align: "center" });
+      doc.text("Authorized Signatory", pageWidth - marginX - 34, signatureY + 6, { align: "center" });
+
+      doc.save(getReceiptFileName(payment));
+    } catch (err) {
+      console.error("Receipt download failed", err);
+      message.error("Failed to download receipt");
+    }
+  };
+
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
     const win = window.open("", "_blank", "width=800,height=600");
+    if (!win) {
+      message.error("Popup blocked. Please allow popups or use Download Receipt.");
+      return;
+    }
     win.document.write(`<html><head><title>Fee Receipt</title>
       <style>
         body{font-family:Arial,sans-serif;margin:0;padding:20px}
@@ -376,12 +734,11 @@ const CollectPaymentPage = ({ studentId }) => {
         @media print{body{padding:0}}
       </style></head>
       <body>${content.innerHTML}</body>
-      <script>window.print();window.close();<\/script></html>`);
+      <script>window.print();window.close();</script></html>`);
     win.document.close();
   };
 
-  const handlePrintExistingPayment = (payment) => {
-    setPrintPayment({
+  const buildPrintablePayment = (payment) => ({
       ...payment,
       studentName: selectedFee?.student?.name,
       standard: selectedFee?.student?.standard,
@@ -395,7 +752,15 @@ const CollectPaymentPage = ({ studentId }) => {
       customItems: selectedFee?.customItems,
       discounts: selectedFee?.discounts,
       receiptComponents: payment?.receiptComponents,
-    });
+    status: payment?.status || "SUCCESS",
+  });
+
+  const handlePrintExistingPayment = (payment) => {
+    setPrintPayment(buildPrintablePayment(payment));
+  };
+
+  const handleDownloadExistingPayment = (payment) => {
+    handleDownloadReceipt(buildPrintablePayment(payment));
   };
 
   const openStatusModal = (action, payment) => {
@@ -466,6 +831,34 @@ const CollectPaymentPage = ({ studentId }) => {
     ? payments
     : payments.filter((p) => (p.status || "SUCCESS") === paymentStatusFilter);
 
+  const classOptions = Array.from(
+    new Set(studentFees.map((f) => f.student?.standard).filter(Boolean))
+  ).sort();
+
+  const sectionOptions = Array.from(
+    new Set(
+      studentFees
+        .filter((f) => !classFilter || f.student?.standard === classFilter)
+        .map((f) => f.student?.section)
+        .filter(Boolean)
+    )
+  ).sort();
+
+  const filteredStudentFees = studentFees.filter((f) => {
+    const studentName = (f.student?.name || "").toLowerCase();
+    const admissionNo = getStudentAdmissionNo(f).toLowerCase();
+    const standard = f.student?.standard || "";
+    const section = f.student?.section || "";
+    const studentQuery = studentSearch.trim().toLowerCase();
+    const admissionQuery = admissionFilter.trim().toLowerCase();
+
+    if (studentQuery && !studentName.includes(studentQuery) && !admissionNo.includes(studentQuery)) return false;
+    if (classFilter && standard !== classFilter) return false;
+    if (sectionFilter && section !== sectionFilter) return false;
+    if (admissionQuery && !admissionNo.includes(admissionQuery)) return false;
+    return true;
+  });
+
   const modeIcon = (mode) => {
     if (mode === "CASH") return "payments";
     if (mode === "UPI" || mode === "BANK") return "language";
@@ -505,11 +898,153 @@ const CollectPaymentPage = ({ studentId }) => {
               </div>
               <div>
                 <h3 className="font-headline font-bold text-lg text-primary">Select Recipient</h3>
-                <p className="text-sm text-on-surface-variant">Identify the student and academic session</p>
+                <p className="text-sm text-on-surface-variant">Find the student by name, class, section, or admission number</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+              <p className="text-xs text-on-surface-variant">
+                Showing records for <span className="font-bold text-primary">{academicYear || "latest academic year"}</span>
+              </p>
+              {(studentSearch || classFilter || sectionFilter || admissionFilter) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStudentSearch("");
+                    setClassFilter("");
+                    setSectionFilter("");
+                    setAdmissionFilter("");
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-outline-variant text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                  Academic Year
+                </label>
+                <div className="relative">
+                  <select
+                    value={academicYear}
+                    onChange={(e) => setAcademicYear(e.target.value)}
+                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
+                  >
+                    {academicYearOptions.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-3 text-on-surface-variant pointer-events-none text-base">expand_more</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                  Search Student
+                </label>
+                <div className="relative">
+                  <input
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    placeholder="Student name"
+                    className="w-full bg-surface-container-high border-none rounded-xl py-3 pl-11 pr-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                  />
+                  <span className="material-symbols-outlined absolute left-3 top-3 text-on-surface-variant pointer-events-none text-base">search</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                  Class
+                </label>
+                <div className="relative">
+                  <select
+                    value={classFilter}
+                    onChange={(e) => {
+                      setClassFilter(e.target.value);
+                      setSectionFilter("");
+                    }}
+                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
+                  >
+                    <option value="">All Classes</option>
+                    {classOptions.map((standard) => (
+                      <option key={standard} value={standard}>{standard}</option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-3 text-on-surface-variant pointer-events-none text-base">expand_more</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                  Section
+                </label>
+                <div className="relative">
+                  <select
+                    value={sectionFilter}
+                    onChange={(e) => setSectionFilter(e.target.value)}
+                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
+                  >
+                    <option value="">All Sections</option>
+                    {sectionOptions.map((section) => (
+                      <option key={section} value={section}>{section}</option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-3 text-on-surface-variant pointer-events-none text-base">expand_more</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                  Admission Number
+                </label>
+                <div className="relative">
+                  <input
+                    value={admissionFilter}
+                    onChange={(e) => setAdmissionFilter(e.target.value)}
+                    placeholder="Admission no"
+                    className="w-full bg-surface-container-high border-none rounded-xl py-3 pl-11 pr-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                  />
+                  <span className="material-symbols-outlined absolute left-3 top-3 text-on-surface-variant pointer-events-none text-base">badge</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
+                  Select Student
+                </label>
+                <span className="text-[11px] font-medium text-on-surface-variant">
+                  {filteredStudentFees.length} match{filteredStudentFees.length !== 1 ? "es" : ""}
+                </span>
+              </div>
+              <div className="relative">
+                <select
+                  value={selectedFee?.id || ""}
+                  onChange={(e) => e.target.value && onSelectFee(e.target.value)}
+                  className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
+                >
+                  <option value="">Select student...</option>
+                  {filteredStudentFees.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.student?.name} - {f.student?.standard || "-"}{f.student?.section ? `-${f.student.section}` : ""} - {getStudentAdmissionNo(f) || "No Admission No"} - Pending: {fmt(f.pending)}
+                    </option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined absolute right-3 top-3 text-primary/40 pointer-events-none text-base">expand_more</span>
+              </div>
+              {filteredStudentFees.length === 0 && (
+                <p className="text-xs text-error font-medium px-1">
+                  No students found for the selected filters.
+                </p>
+              )}
+            </div>
+
+            <div className="hidden grid grid-cols-2 gap-5">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
                   Academic Year
@@ -1384,6 +1919,13 @@ const CollectPaymentPage = ({ studentId }) => {
                         <td className="px-5 py-4">
                           <div className="flex items-center justify-center gap-2">
                             <button
+                              onClick={() => handleDownloadExistingPayment(p)}
+                              title="Download Receipt"
+                              className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all"
+                            >
+                              <span className="material-symbols-outlined text-sm">download</span>
+                            </button>
+                            <button
                               onClick={() => handlePrintExistingPayment(p)}
                               title="Print Receipt"
                               className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all"
@@ -1433,62 +1975,70 @@ const CollectPaymentPage = ({ studentId }) => {
         open={!!printPayment}
         title="Fee Receipt Preview"
         onCancel={() => setPrintPayment(null)}
-        width={700}
-        footer={[
-          <button key="close" onClick={() => setPrintPayment(null)} className="px-6 py-2 rounded-xl border border-outline-variant font-bold text-sm mr-2 hover:bg-surface-container-low transition-colors">
-            Close
-          </button>,
-          <button key="print" onClick={handlePrint} className="px-6 py-2 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <span className="material-symbols-outlined text-sm">print</span>Print Receipt
-          </button>,
-        ]}
+        width={820}
+        centered
+        footer={null}
       >
         {printPayment && (
-          <div ref={printRef}>
-            <div className="receipt">
-              <div className="header">
-                <h2>School ERP</h2>
-                <p>Fee Payment Receipt</p>
-              </div>
-              <div className="receipt-no">Receipt No: {printPayment.receiptNo || "N/A"}</div>
-              <div className="receipt-no" style={{ marginTop: -4 }}>Status: {printPayment.status || "SUCCESS"}</div>
-              <table>
+          <div>
+            <div ref={printRef} style={receiptPreviewStyles.wrapper}>
+              <div className="receipt" style={receiptPreviewStyles.card}>
+                <div className="header" style={receiptPreviewStyles.header}>
+                  <div style={receiptPreviewStyles.logoWrapper}>
+                    <img src={logo} alt="School Logo" style={receiptPreviewStyles.logo} />
+                  </div>
+                  <h2 style={receiptPreviewStyles.headerTitle}>{RECEIPT_SCHOOL_NAME}</h2>
+                  <p style={receiptPreviewStyles.headerSubtitle}>Fee Payment Receipt</p>
+                </div>
+              <div className="receipt-no" style={receiptPreviewStyles.meta}>Receipt No: {printPayment.receiptNo || "N/A"}</div>
+              <div className="receipt-no" style={{ ...receiptPreviewStyles.meta, marginTop: -2, marginBottom: 14 }}>Status: {printPayment.status || "SUCCESS"}</div>
+              <table style={receiptPreviewStyles.table}>
                 <tbody>
-                  <tr><th width="35%">Student Name</th><td>{printPayment.studentName}</td></tr>
-                  <tr><th>Standard</th><td>{printPayment.standard}</td></tr>
-                  <tr><th>Payment Date</th><td>{new Date(printPayment.paymentDate).toLocaleDateString()}</td></tr>
-                  <tr><th>Payment Mode</th><td>{printPayment.paymentMode}</td></tr>
-                  {printPayment.termNumber && <tr><th>Term</th><td>Term {printPayment.termNumber}</td></tr>}
-                  <tr><th>Amount Paid</th><td style={{ fontSize: "16px", fontWeight: "bold" }}>₹{printPayment.amount?.toLocaleString()}</td></tr>
+                  <tr><th width="35%" style={receiptPreviewStyles.th}>Student Name</th><td style={receiptPreviewStyles.td}>{printPayment.studentName}</td></tr>
+                  <tr><th style={receiptPreviewStyles.th}>Standard</th><td style={receiptPreviewStyles.td}>{printPayment.standard}</td></tr>
+                  <tr><th style={receiptPreviewStyles.th}>Payment Date</th><td style={receiptPreviewStyles.td}>{printPayment.paymentDate ? new Date(printPayment.paymentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "N/A"}</td></tr>
+                  <tr><th style={receiptPreviewStyles.th}>Payment Mode</th><td style={receiptPreviewStyles.td}>{printPayment.paymentMode}</td></tr>
+                  {printPayment.termNumber && <tr><th style={receiptPreviewStyles.th}>Term</th><td style={receiptPreviewStyles.td}>Term {printPayment.termNumber}</td></tr>}
+                  <tr><th style={receiptPreviewStyles.th}>Amount Paid</th><td style={{ ...receiptPreviewStyles.td, fontSize: 18, fontWeight: 800, color: "#0b1f33" }}>{fmt(printPayment.amount)}</td></tr>
                 </tbody>
               </table>
               {printPayment.paidComponents && Object.keys(printPayment.paidComponents).length > 0 ? (
                 <>
-                  <h4 style={{ marginTop: 16, marginBottom: 8 }}>Paid Components</h4>
-                  <table>
-                    <thead><tr><th>Component</th><th>Amount</th></tr></thead>
+                  <h4 style={receiptPreviewStyles.sectionTitle}>Paid Components</h4>
+                  <table style={receiptPreviewStyles.table}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...receiptPreviewStyles.th, width: "70%" }}>Component</th>
+                        <th style={{ ...receiptPreviewStyles.th, textAlign: "right" }}>Amount</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {Object.entries(printPayment.paidComponents).map(([k, v]) => (
                         <tr key={k}>
-                          <td>{k.charAt(0).toUpperCase() + k.slice(1)} Fee</td>
-                          <td>₹{Number(v).toLocaleString()}</td>
+                          <td style={receiptPreviewStyles.td}>{getPaidComponentLabel(printPayment, k)}</td>
+                          <td style={{ ...receiptPreviewStyles.td, ...receiptPreviewStyles.amountCell }}>{fmt(v)}</td>
                         </tr>
                       ))}
-                      <tr className="total-row">
-                        <td>Total Paid</td>
-                        <td>₹{printPayment.amount?.toLocaleString()}</td>
+                      <tr className="total-row" style={receiptPreviewStyles.totalRow}>
+                        <td style={{ ...receiptPreviewStyles.td, fontWeight: 800 }}>Total Paid</td>
+                        <td style={{ ...receiptPreviewStyles.td, ...receiptPreviewStyles.amountCell, fontWeight: 800 }}>{fmt(printPayment.amount)}</td>
                       </tr>
                     </tbody>
                   </table>
                 </>
               ) : (
                 <>
-                  <h4 style={{ marginTop: 16, marginBottom: 8 }}>Receipt Fee Components</h4>
-                  <table>
-                    <thead><tr><th>Component</th><th>Amount</th></tr></thead>
+                  <h4 style={receiptPreviewStyles.sectionTitle}>Receipt Fee Components</h4>
+                  <table style={receiptPreviewStyles.table}>
+                    <thead>
+                      <tr>
+                        <th style={{ ...receiptPreviewStyles.th, width: "70%" }}>Component</th>
+                        <th style={{ ...receiptPreviewStyles.th, textAlign: "right" }}>Amount</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {buildReceiptFeeRows(printPayment).map((row) => (
-                        <tr key={row.key}><td>{row.label}</td><td>₹{row.amount?.toLocaleString()}</td></tr>
+                        <tr key={row.key}><td style={receiptPreviewStyles.td}>{row.label}</td><td style={{ ...receiptPreviewStyles.td, ...receiptPreviewStyles.amountCell }}>{fmt(row.amount)}</td></tr>
                       ))}
                     </tbody>
                   </table>
@@ -1496,20 +2046,32 @@ const CollectPaymentPage = ({ studentId }) => {
               )}
               {printPayment.totalFee && (
                 <>
-                  <h4 style={{ marginTop: 16, marginBottom: 8 }}>Fee Summary</h4>
-                  <table>
+                  <h4 style={receiptPreviewStyles.sectionTitle}>Fee Summary</h4>
+                  <table style={receiptPreviewStyles.table}>
                     <tbody>
-                      <tr><th width="35%">Total Fee</th><td>₹{printPayment.totalFee?.toLocaleString()}</td></tr>
-                      <tr><th>Net Fee (after discount)</th><td>₹{printPayment.netFee?.toLocaleString()}</td></tr>
+                      <tr><th width="35%" style={receiptPreviewStyles.th}>Total Fee</th><td style={{ ...receiptPreviewStyles.td, ...receiptPreviewStyles.amountCell }}>{fmt(printPayment.totalFee)}</td></tr>
+                      <tr><th style={receiptPreviewStyles.th}>Net Fee (after discount)</th><td style={{ ...receiptPreviewStyles.td, ...receiptPreviewStyles.amountCell }}>{fmt(printPayment.netFee)}</td></tr>
                     </tbody>
                   </table>
                 </>
               )}
-              {printPayment.remarks && <p style={{ marginTop: 12 }}><strong>Remarks:</strong> {printPayment.remarks}</p>}
-              <div className="footer">
-                <div><div className="sign-line">Student / Parent</div></div>
-                <div><div className="sign-line">Authorized Signatory</div></div>
+              {printPayment.remarks && <p style={receiptPreviewStyles.remarks}><strong>Remarks:</strong> {printPayment.remarks}</p>}
+              <div className="footer" style={receiptPreviewStyles.footer}>
+                <div style={receiptPreviewStyles.footerItem}><div className="sign-line" style={receiptPreviewStyles.signLine}>Student / Parent</div></div>
+                <div style={receiptPreviewStyles.footerItem}><div className="sign-line" style={receiptPreviewStyles.signLine}>Authorized Signatory</div></div>
               </div>
+            </div>
+            </div>
+            <div style={receiptPreviewStyles.actions}>
+              <button onClick={() => handleDownloadReceipt()} className="flex-1 min-w-[180px] px-6 py-3 rounded-xl border border-primary text-primary font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary hover:text-white transition-colors">
+                <span className="material-symbols-outlined text-sm">download</span>Download Receipt
+              </button>
+              <button onClick={handlePrint} className="flex-1 min-w-[180px] px-6 py-3 rounded-xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+                <span className="material-symbols-outlined text-sm">print</span>Print Receipt
+              </button>
+              <button onClick={() => setPrintPayment(null)} className="flex-1 min-w-[180px] px-6 py-3 rounded-xl border border-outline-variant font-bold text-sm flex items-center justify-center hover:bg-surface-container-low transition-colors">
+                Close
+              </button>
             </div>
           </div>
         )}

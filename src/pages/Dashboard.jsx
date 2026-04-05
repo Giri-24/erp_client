@@ -241,7 +241,7 @@ const Dashboard = () => {
       case "admission-edit":      return <AdmissionEdit />;
       case "bulk-upload":         return <BulkUploadPage />;
       case "promotion":           return <PromotionPage />;
-      case "students":            return <StudentView onCollectFee={(studentId) => { setFeeStudentId(studentId); setSelectedKey("fees-collect"); }} />;
+      case "students":            return <StudentView onCollectFee={(studentId) => { setFeeStudentId(studentId); setSelectedKey("fees-collect"); }} onEditStudent={(record) => { setEditData(record); setSelectedKey("admission"); }} />;
       case "approval":            return <ApprovalsView />;
       case "profile":             return <ProfilePage />;
       case "admin-settings":      return <AdminSettings />;
