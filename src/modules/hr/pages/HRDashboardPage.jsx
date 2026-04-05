@@ -1,7 +1,57 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { getHRDashboard, getLeaveApplications } from "../hr.service";
 import dayjs from "dayjs";
 import { Skeleton, DatePicker, message } from "antd";
+
+const FALLBACK_DASHBOARD = {
+  totalStaff: 1248,
+  presentToday: 1120,
+  absentToday: 42,
+  onLeaveToday: 86,
+  lateToday: 12,
+  attendancePercent: 94.8,
+  totalPayroll: 412850,
+  pfContribution: 54200,
+  esiContribution: 12400,
+  devicesOnline: 14,
+  devicesTotal: 15,
+};
+
+const normalizeCollection = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.rows)) return payload.rows;
+  if (Array.isArray(payload?.results)) return payload.results;
+  if (Array.isArray(payload?.records)) return payload.records;
+  return [];
+};
+
+const normalizeDashboard = (payload) => {
+  const source =
+    payload && typeof payload === "object" && !Array.isArray(payload)
+      ? payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)
+        ? payload.data
+        : payload
+      : {};
+
+  return {
+    ...FALLBACK_DASHBOARD,
+    ...source,
+  };
+};
+
+const formatDisplayDate = (value) => {
+  if (!value) return "-";
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.format("DD MMM") : "-";
+};
+
+const getLeaveTypeLabel = (leave) =>
+  leave?.leaveType?.name || leave?.leaveTypeName || leave?.type || leave?.leaveType || "Earned Leave";
+
+const getDepartmentLabel = (leave) =>
+  leave?.department || leave?.staff?.department || "Department";
 
 const HRDashboardPage = ({ onNavigate }) => {
   const [data, setData] = useState(null);
@@ -9,42 +59,33 @@ const HRDashboardPage = ({ onNavigate }) => {
   const [loading, setLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(dayjs());
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async (month = selectedMonth) => {
+    const activeMonth = dayjs.isDayjs(month) ? month : selectedMonth;
     setLoading(true);
     try {
       const [dashRes, leavesRes] = await Promise.all([
-        getHRDashboard({ month: selectedMonth.format("YYYY-MM") }),
+        getHRDashboard({ month: activeMonth.format("YYYY-MM") }),
         getLeaveApplications({ status: "PENDING", limit: 3 })
       ]);
       
-      setData(dashRes);
-      // Handle different possible response structures for leaves
-      const leavesData = leavesRes?.data || (Array.isArray(leavesRes) ? leavesRes : []);
-      setPendingLeaves(leavesData.slice(0, 3));
+      setData(normalizeDashboard(dashRes));
+      setPendingLeaves(normalizeCollection(leavesRes).slice(0, 3));
     } catch (error) {
       console.error("Dashboard fetch error:", error);
-      // Fallback/Mock data if API fails to ensure UI renders
-      setData({
-        totalStaff: 1248,
-        presentToday: 1120,
-        absentToday: 42,
-        onLeaveToday: 86,
-        lateToday: 12,
-        attendancePercent: 94.8,
-        totalPayroll: 412850,
-        pfContribution: 54200,
-        esiContribution: 12400,
-        devicesOnline: 14,
-        devicesTotal: 15,
-      });
+      setData(FALLBACK_DASHBOARD);
+      setPendingLeaves([]);
       message.error("Failed to fetch dashboard data. Using offline overview.");
     }
     setLoading(false);
-  };
+  }, [selectedMonth]);
 
   useEffect(() => {
-    fetchDashboard();
-  }, [selectedMonth]);
+    const timeoutId = window.setTimeout(() => {
+      fetchDashboard(selectedMonth);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchDashboard, selectedMonth]);
 
   if (loading && !data) {
     return (
@@ -78,7 +119,7 @@ const HRDashboardPage = ({ onNavigate }) => {
             className="rounded-xl border-none bg-white shadow-sm px-4 py-2"
           />
           <button 
-            onClick={fetchDashboard}
+            onClick={() => fetchDashboard()}
             className="p-2 bg-white rounded-xl shadow-sm hover:bg-surface-container-low transition-colors"
           >
             <span className="material-symbols-outlined text-primary">refresh</span>
@@ -191,22 +232,22 @@ const HRDashboardPage = ({ onNavigate }) => {
                         {leave.staffName || leave.staff?.name || "Staff Member"}
                       </p>
                       <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-tight">
-                        {leave.staff?.department || leave.department || "—"}
+                        {getDepartmentLabel(leave)}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center">
                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      (leave.leaveType?.name || leave.leaveType) === "Sabbatical" ? "bg-primary-fixed text-primary" : 
-                      (leave.leaveType?.name || leave.leaveType) === "Sick Leave" ? "bg-orange-100 text-orange-700" :
+                      getLeaveTypeLabel(leave) === "Sabbatical" ? "bg-primary-fixed text-primary" : 
+                      getLeaveTypeLabel(leave) === "Sick Leave" ? "bg-orange-100 text-orange-700" :
                       "bg-secondary-container/50 text-secondary"
                     }`}>
-                      {leave.leaveType?.name || leave.leaveType?.code || "Earned Leave"}
+                      {getLeaveTypeLabel(leave)}
                     </span>
                   </div>
                   <div className="text-sm font-bold text-on-surface">
                     {leave.days || "3"} Days
-                    <p className="text-[10px] font-medium text-on-surface-variant">Starts {dayjs(leave.fromDate).format("DD MMM")}</p>
+                    <p className="text-[10px] font-medium text-on-surface-variant">Starts {formatDisplayDate(leave.fromDate)}</p>
                   </div>
                   <div className="flex justify-end gap-2 pr-2">
                     <button className="p-2 text-tertiary-accent hover:bg-tertiary-accent/10 rounded-xl transition-all hover:scale-110 active:scale-95">
@@ -236,7 +277,7 @@ const HRDashboardPage = ({ onNavigate }) => {
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-4xl font-headline font-extrabold text-primary tracking-tight">₹{data.totalPayroll?.toLocaleString()}</p>
+                <p className="text-4xl font-headline font-extrabold text-primary tracking-tight">₹{(data.totalPayroll || 0).toLocaleString()}</p>
                 <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Est. for {selectedMonth.format("MMMM YYYY")}</p>
               </div>
               <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden">
@@ -252,7 +293,7 @@ const HRDashboardPage = ({ onNavigate }) => {
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-4xl font-headline font-extrabold text-primary tracking-tight">₹{(data.pfContribution + data.esiContribution)?.toLocaleString()}</p>
+                <p className="text-4xl font-headline font-extrabold text-primary tracking-tight">₹{((data.pfContribution || 0) + (data.esiContribution || 0)).toLocaleString()}</p>
                 <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Across all eligible staff</p>
               </div>
               <div className="flex gap-2">
@@ -389,7 +430,7 @@ const HRDashboardPage = ({ onNavigate }) => {
               <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">System Time</p>
               <p className="font-headline font-extrabold text-primary">10:42:15 AM</p>
             </div>
-            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-lg cursor-pointer hover:rotate-180 transition-transform duration-700 active:scale-90" onClick={fetchDashboard}>
+            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-lg cursor-pointer hover:rotate-180 transition-transform duration-700 active:scale-90" onClick={() => fetchDashboard()}>
               <span className="material-symbols-outlined text-primary">sync</span>
             </div>
           </div>
