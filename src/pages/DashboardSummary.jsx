@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { message, Spin, Select } from "antd";
+import { Form, message, Spin, Avatar, Select } from "antd";
 import {
   getAdmissionDashboardSummary,
   exportAdmissionsCsv,
+  getPendingAdmissions,
 } from "../modules/admission/admission.service";
 import { getAcademicYears } from "../modules/fees/fees.service";
-import instance from "../utils/axios";
 
 const formatSignedPercent = (value) => {
   const numeric = Number(value || 0);
@@ -18,45 +18,25 @@ const formatMilestoneTitle = (milestone) => {
   return milestone.label || `${milestone.threshold}% milestone`;
 };
 
-const getApplicantAcademicYear = (applicant) =>
-  applicant?.academicYear || applicant?.admission?.academicYear || "";
-
-const getApplicantDate = (applicant) =>
-  applicant?.createdAt || applicant?.admission?.admissionDate || applicant?.updatedAt || "";
-
-const formatApplicantDate = (value) => {
-  if (!value) return "No date";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "No date";
-  return parsed.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
-
-const getRecentApplicants = (rows = [], academicYear = "") =>
-  rows
-    .filter((applicant) => !academicYear || getApplicantAcademicYear(applicant) === academicYear)
-    .sort((left, right) => new Date(getApplicantDate(right)).getTime() - new Date(getApplicantDate(left)).getTime())
-    .slice(0, 5);
-
 const DashboardSummary = ({ onNavigate }) => {
   const [summary, setSummary] = useState(null);
-  const [recentApplicants, setRecentApplicants] = useState([]);
+  const [pendingApplicants, setPendingApplicants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [academicYear, setAcademicYear] = useState("");
   const [availableYears, setAvailableYears] = useState([]);
+  const [seatForm] = Form.useForm();
+  const [siblingForm] = Form.useForm();
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [summaryData, admissionsResponse] = await Promise.all([
+      const [summaryData, pendingData] = await Promise.all([
         getAdmissionDashboardSummary(academicYear),
-        instance.get("/admissions"),
+        getPendingAdmissions()
       ]);
       setSummary(summaryData);
-      setRecentApplicants(getRecentApplicants(admissionsResponse?.data || [], academicYear));
+      setPendingApplicants(pendingData.slice(0, 5)); // Show top 5 recent
+      seatForm.setFieldsValue(summaryData.standardSeats || {});
     } catch (err) {
       console.error(err);
       message.error("Failed to load dashboard data");
@@ -110,7 +90,8 @@ const DashboardSummary = ({ onNavigate }) => {
 
   if (!summary) return <div className="text-on-surface-variant">No dashboard data available.</div>;
 
-  const { total, pending } = summary;
+  const { total, approved, pending } = summary;
+  const approvalRate = total ? Math.round((approved / total) * 100) : 0;
   const yearComparison = summary.yearComparison || {};
   const admissionProgress = summary.admissionProgress || {};
   const milestoneItems = (summary.upcomingMilestones?.length ? summary.upcomingMilestones : summary.milestones || []).slice(0, 3);
@@ -168,7 +149,7 @@ const DashboardSummary = ({ onNavigate }) => {
       </div>
 
       {/* Bento Stats Grid */}
-      <div className="max-w-[360px]">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Total Applicants */}
         <div className="bg-surface-container-lowest p-6 rounded-xl shadow-ambient-sm relative overflow-hidden group">
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
@@ -185,6 +166,44 @@ const DashboardSummary = ({ onNavigate }) => {
               {formatSignedPercent(yearComparison.percentageChange)}
             </span>
             <span className="text-on-surface-variant text-[10px]">{comparisonText}</span>
+          </div>
+        </div>
+
+        {/* Approved */}
+        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-ambient-sm relative overflow-hidden group">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-tertiary-fixed-dim/5 rounded-full blur-2xl group-hover:bg-tertiary-fixed-dim/10 transition-colors"></div>
+          <div className="flex justify-between items-start relative z-10">
+            <div>
+              <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Approved</p>
+              <h3 className="text-4xl font-extrabold font-headline text-primary">{approved.toLocaleString()}</h3>
+            </div>
+            <span className="p-3 bg-tertiary-fixed rounded-full text-on-tertiary-fixed-variant material-symbols-outlined">verified</span>
+          </div>
+          <div className="mt-4 flex items-center gap-2">
+            <span className="text-on-surface-variant text-xs font-semibold">{approvalRate}% Approval Rate</span>
+            <div className="flex-1 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+              <div className="h-full bg-tertiary-fixed-dim rounded-full" style={{ width: `${approvalRate}%` }}></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Pending Review */}
+        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-ambient-sm relative overflow-hidden group">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-secondary-fixed-dim/5 rounded-full blur-2xl group-hover:bg-secondary-fixed-dim/10 transition-colors"></div>
+          <div className="flex justify-between items-start relative z-10">
+            <div>
+              <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Pending Review</p>
+              <h3 className="text-4xl font-extrabold font-headline text-primary">{pending.toLocaleString()}</h3>
+            </div>
+            <span className="p-3 bg-secondary-fixed rounded-full text-on-secondary-fixed-variant material-symbols-outlined">pending_actions</span>
+          </div>
+          <div className="mt-4 flex items-center gap-2">
+            <div className="flex -space-x-2">
+              <div className="w-6 h-6 rounded-full bg-surface-container-high border-2 border-white flex items-center justify-center text-[8px] font-bold text-primary">+{nextMilestone?.remainingCount || pending}</div>
+            </div>
+            <span className="text-on-surface-variant text-[10px]">
+              {nextMilestone ? `${nextMilestone.remainingCount} more for ${nextMilestone.threshold}% milestone` : "Require immediate action"}
+            </span>
           </div>
         </div>
       </div>
@@ -205,55 +224,82 @@ const DashboardSummary = ({ onNavigate }) => {
         </div>
       </div>
 
-      <div className="bg-surface-container-lowest rounded-xl shadow-ambient-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-surface-container-low flex items-center justify-between gap-4">
-          <div>
-            <h4 className="text-lg font-bold font-headline text-primary">Recent Applicants</h4>
-            <p className="text-xs text-on-surface-variant mt-1">Latest admissions for the selected academic year.</p>
+      {/* Recent Applicants Table */}
+      <div className="bg-surface-container-lowest rounded-xl shadow-ambient overflow-hidden">
+        <div className="p-6 border-b border-surface-container-low flex justify-between items-center">
+          <h4 className="text-xl font-bold font-headline text-primary">Recent Applicants</h4>
+          <div className="flex items-center gap-2">
+            <button className="p-2 hover:bg-surface-container-high rounded-lg transition-colors">
+              <span className="material-symbols-outlined text-on-surface-variant">filter_list</span>
+            </button>
+            <button className="p-2 hover:bg-surface-container-high rounded-lg transition-colors">
+              <span className="material-symbols-outlined text-on-surface-variant">more_vert</span>
+            </button>
           </div>
-          <button
-            onClick={() => onNavigate("admission-view")}
-            className="px-4 py-2 rounded-xl bg-surface-container-high text-primary text-sm font-bold hover:bg-surface-variant transition-colors"
-          >
-            View All
-          </button>
         </div>
-        <div className="divide-y divide-surface-container-low">
-          {recentApplicants.length === 0 ? (
-            <div className="px-6 py-8 text-sm text-on-surface-variant text-center">
-              No recent applicants found for {academicYear}.
-            </div>
-          ) : (
-            recentApplicants.map((applicant) => {
-              const applicantName = [applicant.firstName, applicant.lastName].filter(Boolean).join(" ") || applicant.name || "Unnamed Applicant";
-              const admissionNo = applicant.admission?.admissionNo || applicant.id || "No ID";
-              const standard = applicant.standard || applicant.admission?.standard || "Not assigned";
-              const status = applicant.status || (applicant.admission?.isApproved ? "APPROVED" : "PENDING");
-
-              return (
-                <div key={applicant.id || admissionNo} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-primary truncate">{applicantName}</p>
-                    <p className="text-xs text-on-surface-variant truncate">
-                      {admissionNo} · {standard}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 sm:justify-end">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide ${
-                      status === "APPROVED"
-                        ? "bg-tertiary-fixed text-on-tertiary-fixed-variant"
-                        : "bg-surface-container-high text-on-surface-variant"
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-surface-container-low/50 text-on-surface-variant text-[11px] uppercase tracking-widest font-bold">
+                <th className="px-6 py-4">Applicant Profile</th>
+                <th className="px-6 py-4">ID / Reference</th>
+                <th className="px-6 py-4">Course Applied</th>
+                <th className="px-6 py-4">Applied Date</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-container-low">
+              {pendingApplicants.map((applicant) => (
+                <tr key={applicant.studentId} className="hover:bg-surface/60 transition-colors group">
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-3">
+                      <Avatar 
+                        src={applicant.photo} 
+                        size={36} 
+                        className="bg-primary-fixed text-primary font-bold"
+                      >
+                        {applicant.firstName?.charAt(0)}
+                      </Avatar>
+                      <div>
+                        <p className="font-bold text-sm text-primary">{applicant.firstName} {applicant.lastName}</p>
+                        <p className="text-[10px] text-on-surface-variant">{applicant.email || "No email"}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <span className="text-sm font-medium">{applicant.admission?.admissionNo}</span>
+                  </td>
+                  <td className="px-6 py-5 text-sm">
+                    {applicant.standard}
+                  </td>
+                  <td className="px-6 py-5 text-sm text-on-surface-variant">
+                    {new Date(applicant.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-5">
+                    <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-tighter ${
+                      applicant.status === 'APPROVED' ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant' : 'bg-surface-container-high text-on-surface-variant'
                     }`}>
-                      {status}
+                      {applicant.status || 'PENDING'}
                     </span>
-                    <span className="text-xs text-on-surface-variant whitespace-nowrap">
-                      {formatApplicantDate(getApplicantDate(applicant))}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <button 
+                      onClick={() => onNavigate("approval")}
+                      className="text-primary hover:bg-primary-fixed p-2 rounded-lg transition-all"
+                    >
+                      <span className="material-symbols-outlined text-lg">visibility</span>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {pendingApplicants.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="px-6 py-10 text-center text-on-surface-variant italic">No recent applicants found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -287,7 +333,21 @@ const DashboardSummary = ({ onNavigate }) => {
         </div>
 
         {/* Quick Actions Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
+          <button 
+            onClick={() => onNavigate("bulk-upload")}
+            className="bg-white hover:bg-primary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
+          >
+            <span className="p-4 bg-primary-fixed group-hover:bg-white rounded-full text-primary transition-colors material-symbols-outlined">mail</span>
+            <span className="font-bold text-sm font-headline">Bulk Upload</span>
+          </button>
+          <button 
+            onClick={() => onNavigate("approval")}
+            className="bg-white hover:bg-tertiary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
+          >
+            <span className="p-4 bg-tertiary-fixed group-hover:bg-white rounded-full text-on-tertiary-fixed-variant transition-colors material-symbols-outlined">edit_calendar</span>
+            <span className="font-bold text-sm font-headline">Review Apps</span>
+          </button>
           <button 
             onClick={onExportCsv}
             className="bg-white hover:bg-secondary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
