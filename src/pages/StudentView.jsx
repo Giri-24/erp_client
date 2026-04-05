@@ -2,9 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Modal, Select, message } from "antd";
 import instance from "../utils/axios";
 import dayjs from "dayjs";
-import { linkSiblings, demoteIndividualStudents } from "../modules/admission/admission.service";
-import { getAdminSettings } from "../modules/settings/settings.service";
-import { useNavigate } from "react-router-dom";
+import { linkSiblings } from "../modules/admission/admission.service";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
@@ -14,15 +12,6 @@ const AVATAR_COLORS = [
   "bg-surface-container-highest text-on-surface",
   "bg-error-container text-error",
 ];
-
-
-
-const formatLabel = (text) => {
-  return text
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (str) => str.toUpperCase());
-};
-
 const avatarColor = (name = "") =>
   AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
 
@@ -33,24 +22,67 @@ const initials = (name = "") => {
     : name.slice(0, 2).toUpperCase();
 };
 
+const normalizeFilterText = (value = "") =>
+  String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const collectAddressParts = (value) => {
+  if (value === null || value === undefined) return [];
+  if (typeof value === "string" || typeof value === "number") return [String(value)];
+  if (Array.isArray(value)) return value.flatMap(collectAddressParts);
+  if (typeof value === "object") return Object.values(value).flatMap(collectAddressParts);
+  return [];
+};
+
+const getStudentAddress = (student) => {
+  const address = student?.address;
+  if (!address) return {};
+  if (typeof address === "string") return { fullText: address, pin: "" };
+
+  return {
+    line1: address.line1 || address.doorNo || address.houseNo || "",
+    line2: address.line2 || address.street || address.area || address.locality || "",
+    line3: address.line3 || address.district || address.taluk || address.village || "",
+    landmark: address.landmark || "",
+    city: address.city || address.town || "",
+    state: address.state || "",
+    pin: address.pin || address.pincode || address.zipCode || address.postalCode || "",
+    searchParts: collectAddressParts(address),
+  };
+};
+
+const formatStudentAddress = (student) => {
+  const address = getStudentAddress(student);
+  const parts = [
+    address.fullText,
+    address.line1,
+    address.line2,
+    address.line3,
+    address.landmark,
+    address.city,
+    address.state,
+  ]
+    .filter(Boolean)
+    .map((part) => String(part).trim())
+    .filter(Boolean);
+
+  const uniqueParts = [...new Set(parts)];
+  const joined = uniqueParts.join(", ");
+  return [joined, address.pin].filter(Boolean).join(" - ");
+};
+
 // ── component ─────────────────────────────────────────────────────────────
-const StudentView = ({ onCollectFee, onEdit }) => {
-  const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [detailStudent, setDetailStudent] = useState(null);
-  const [feeModalOpen, setFeeModalOpen] = useState(false);
-const [selectedStudentId, setSelectedStudentId] = useState(null);
-const [fees, setFees] = useState([]);
+const StudentView = ({ onCollectFee, onEditStudent }) => {
   const [students, setStudents] = useState([]);
   const [classFilter, setClassFilter] = useState("");
   const [sectionFilter, setSectionFilter] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
-  const [areaFilter, setAreaFilter] = useState("");
-  const [fatherFilter, setFatherFilter] = useState("");
-  const [siblingFilter, setSiblingFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize] = useState(12);
-  const [adminSettings, setAdminSettings] = useState({});
 
   // row expander
   const [expandedId, setExpandedId] = useState(null);
@@ -58,8 +90,9 @@ const [fees, setFees] = useState([]);
   // sibling link modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [targetSiblingIds, setTargetSiblingIds] = useState([]);
+  const [targetSiblingId, setTargetSiblingId] = useState(null);
   const [linking, setLinking] = useState(false);
+  const [viewStudent, setViewStudent] = useState(null);
 
   // ── data ─────────────────────────────────────────────────────────────────
   const fetchStudents = () => {
@@ -69,19 +102,7 @@ const [fees, setFees] = useState([]);
     });
   };
 
-  const fetchAdminSettings = async () => {
-    try {
-      const data = await getAdminSettings();
-      setAdminSettings(data || {});
-    } catch (err) {
-      console.error("Failed to fetch admin settings", err);
-    }
-  };
-
-  useEffect(() => { 
-    fetchStudents(); 
-    fetchAdminSettings();
-  }, []);
+  useEffect(() => { fetchStudents(); }, []);
 
   // ── filter / search ───────────────────────────────────────────────────────
   const classOptions = useMemo(() =>
@@ -96,28 +117,25 @@ const [fees, setFees] = useState([]);
 
   const filtered = useMemo(() => {
     const q = searchText.trim().toLowerCase();
+    const normalizedLocation = normalizeFilterText(locationFilter);
     return students.filter((s) => {
       if (classFilter && (s.standard || s.admission?.standard) !== classFilter) return false;
       if (sectionFilter && (s.section || "") !== sectionFilter) return false;
       if (genderFilter && (s.gender || "").toLowerCase() !== genderFilter) return false;
-      if (areaFilter) {
-        const areaStr = areaFilter.toLowerCase();
-        const addr = s.address || {};
-        const isMatch = 
-          (addr.line1 || "").toLowerCase().includes(areaStr) ||
-          (addr.line2 || "").toLowerCase().includes(areaStr) ||
-          (addr.line3 || "").toLowerCase().includes(areaStr) ||
-          (addr.city || "").toLowerCase().includes(areaStr) ||
-          (addr.state || "").toLowerCase().includes(areaStr) ||
-          (addr.landmark || "").toLowerCase().includes(areaStr) ||
-          (addr.area || "").toLowerCase().includes(areaStr) ||
-          String(addr.pin || "").toLowerCase().includes(areaStr);
-        if (!isMatch) return false;
-      }
-      if (fatherFilter && !(s.family?.fatherName || "").toLowerCase().includes(fatherFilter.toLowerCase())) return false;
-      if (siblingFilter) {
-        if (siblingFilter === "has" && !s.siblingGroupId) return false;
-        if (siblingFilter === "none" && s.siblingGroupId) return false;
+      const address = getStudentAddress(s);
+      if (normalizedLocation) {
+        const locationStr = normalizeFilterText([
+          address.fullText,
+          address.line1,
+          address.line2,
+          address.line3,
+          address.landmark,
+          address.city,
+          address.state,
+          address.pin,
+          ...(address.searchParts || []),
+        ].filter(Boolean).join(" "));
+        if (!locationStr.includes(normalizedLocation)) return false;
       }
       if (q) {
         const blob = [
@@ -128,11 +146,19 @@ const [fees, setFees] = useState([]);
       }
       return true;
     });
-  }, [students, classFilter, sectionFilter, genderFilter, areaFilter, searchText]);
+  }, [students, classFilter, sectionFilter, genderFilter, locationFilter, searchText]);
 
   // ── summary stats ─────────────────────────────────────────────────────────
   const totalEnrollment = students.length;
   const activeStudents = students.filter((s) => s.users?.isActive !== false).length;
+  const hasActiveFilters = Boolean(
+    classFilter ||
+    sectionFilter ||
+    genderFilter ||
+    locationFilter.trim() ||
+    searchText.trim()
+  );
+  const filteredResultsCount = hasActiveFilters ? filtered.length : 0;
 
   // ── pagination ────────────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -141,15 +167,15 @@ const [fees, setFees] = useState([]);
   // ── sibling link ──────────────────────────────────────────────────────────
   const openLinkModal = (student) => {
     setSelectedStudent(student);
-    setTargetSiblingIds([]);
+    setTargetSiblingId(null);
     setIsModalOpen(true);
   };
 
   const handleLink = async () => {
-    if (!targetSiblingIds.length) { message.error("Please select at least one sibling to link"); return; }
+    if (!targetSiblingId) { message.error("Please select a sibling to link"); return; }
     setLinking(true);
     try {
-      await linkSiblings({ studentIds: [selectedStudent.id, ...targetSiblingIds] });
+      await linkSiblings({ studentIds: [selectedStudent.id, targetSiblingId] });
       message.success("Siblings linked successfully!");
       setIsModalOpen(false);
       fetchStudents();
@@ -159,25 +185,6 @@ const [fees, setFees] = useState([]);
     setLinking(false);
   };
 
-  const handleDemote = (student) => {
-    Modal.confirm({
-      title: 'Confirm Demotion',
-      content: `Are you sure you want to demote ${student.name}? This will reduce their standard by one level.`,
-      okText: 'Yes, Demote',
-      okType: 'danger',
-      cancelText: 'No',
-      onOk: async () => {
-        try {
-          await demoteIndividualStudents({ studentIds: [student.id] });
-          message.success(`${student.name} demoted successfully`);
-          fetchStudents();
-        } catch (err) {
-          message.error(err?.response?.data?.message || 'Demotion failed');
-        }
-      },
-    });
-  };
-
   // ────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8">
@@ -185,7 +192,7 @@ const [fees, setFees] = useState([]);
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="font-headline font-extrabold text-4xl text-primary tracking-tight mb-2">
-            Student Registry
+            Student Management
           </h2>
           <p className="text-on-surface-variant max-w-md text-sm">
             Comprehensive database of enrolled students. Manage admissions, academic standing, and biographical records.
@@ -226,7 +233,7 @@ const [fees, setFees] = useState([]);
             iconBg: "bg-error-container/50",
             iconColor: "text-error",
             label: "Filtered Results",
-            value: filtered.length,
+            value: filteredResultsCount,
             decoration: "bg-error/5",
           },
         ].map(({ icon, iconBg, iconColor, label, value, decoration }) => (
@@ -308,48 +315,22 @@ const [fees, setFees] = useState([]);
               <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">expand_more</span>
             </div>
 
-            {/* Area / Pin */}
+            {/* Location */}
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-3 text-on-surface-variant text-base">location_on</span>
               <input
                 type="text"
-                value={areaFilter}
-                onChange={(e) => { setAreaFilter(e.target.value); setPage(1); }}
-                placeholder="Area Search (City/Street/Pin)"
-                className="bg-white border-none rounded-xl py-3 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm min-w-[200px]"
+                value={locationFilter}
+                onChange={(e) => { setLocationFilter(e.target.value); setPage(1); }}
+                placeholder="Area / City / State / Pincode..."
+                className="bg-white border-none rounded-xl py-3 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm min-w-[220px]"
               />
-            </div>
-
-            {/* Father Search */}
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-3 top-3 text-on-surface-variant text-base">person</span>
-              <input
-                type="text"
-                value={fatherFilter}
-                onChange={(e) => { setFatherFilter(e.target.value); setPage(1); }}
-                placeholder="Father's Name..."
-                className="bg-white border-none rounded-xl py-3 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm min-w-[170px]"
-              />
-            </div>
-
-            {/* Sibling select */}
-            <div className="relative">
-              <select
-                value={siblingFilter}
-                onChange={(e) => { setSiblingFilter(e.target.value); setPage(1); }}
-                className="bg-white border-none rounded-xl py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm cursor-pointer appearance-none min-w-[130px]"
-              >
-                <option value="">Sibling</option>
-                <option value="has">Has Sibling</option>
-                <option value="none">No Sibling</option>
-              </select>
-              <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">expand_more</span>
             </div>
 
             {/* Clear */}
-            {(classFilter || sectionFilter || genderFilter || areaFilter || fatherFilter || siblingFilter || searchText) && (
+            {(classFilter || sectionFilter || genderFilter || locationFilter || searchText) && (
               <button
-                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setAreaFilter(""); setFatherFilter(""); setSiblingFilter(""); setSearchText(""); setPage(1); }}
+                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setLocationFilter(""); setSearchText(""); setPage(1); }}
                 className="h-[46px] px-4 flex items-center gap-1 bg-surface-container-highest rounded-xl text-on-surface-variant hover:text-error hover:bg-error-container transition-all text-sm font-medium"
               >
                 <span className="material-symbols-outlined text-base">close</span>
@@ -456,8 +437,7 @@ const [fees, setFees] = useState([]);
                               <button
                                 title="Collect Fee"
                                 onClick={() => onCollectFee(s.id)}
-                                className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
-                              >
+                          >
                                 <span className="material-symbols-outlined text-lg">payments</span>
                               </button>
                             )}
@@ -470,27 +450,18 @@ const [fees, setFees] = useState([]);
                             </button>
                             <button
                               title="View"
-                              onClick={() => { setDetailStudent(s); setDetailModalOpen(true); }}
+                              onClick={() => setViewStudent(s)}
                               className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
                             >
                               <span className="material-symbols-outlined text-lg">visibility</span>
                             </button>
                             <button
                               title="Edit"
-                              onClick={() => onEdit && onEdit(s)}
+                              onClick={() => onEditStudent?.(s)}
                               className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
                             >
                               <span className="material-symbols-outlined text-lg">edit</span>
                             </button>
-                            {adminSettings.enableIndividualDemotion && (
-                               <button
-                               title="Demote Student"
-                               onClick={() => handleDemote(s)}
-                               className="p-2 rounded-lg text-on-surface-variant hover:bg-error-container hover:text-error transition-colors"
-                             >
-                               <span className="material-symbols-outlined text-lg">keyboard_double_arrow_down</span>
-                             </button>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -619,6 +590,68 @@ const [fees, setFees] = useState([]);
         </div>
       </div>
 
+      <Modal
+        open={!!viewStudent}
+        onCancel={() => setViewStudent(null)}
+        footer={null}
+        centered
+        width={760}
+        title={
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary">visibility</span>
+            <span className="font-headline font-bold">Student Details</span>
+          </div>
+        }
+      >
+        {viewStudent && (
+          <div className="space-y-6 pt-2">
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-surface-container-low">
+              <div className={`h-14 w-14 rounded-full ${avatarColor(viewStudent.name || "")} flex items-center justify-center font-black text-sm flex-shrink-0`}>
+                {initials(viewStudent.name || "")}
+              </div>
+              <div>
+                <h3 className="font-headline font-extrabold text-xl text-primary">{viewStudent.name || "—"}</h3>
+                <p className="text-sm text-on-surface-variant">
+                  {viewStudent.admission?.admissionNo || "No Admission No"} • {viewStudent.standard || viewStudent.admission?.standard || "—"}{viewStudent.section ? `-${viewStudent.section}` : ""}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { label: "Academic Year", value: viewStudent.academicYear || "—" },
+                { label: "Gender", value: viewStudent.gender || "—" },
+                { label: "Date of Birth", value: viewStudent.dob ? dayjs(viewStudent.dob).format("DD MMM YYYY") : "—" },
+                { label: "Approval Status", value: viewStudent.admission?.isApproved ? "Approved" : "Pending" },
+                { label: "Father Name", value: viewStudent.family?.fatherName || "—" },
+                { label: "Father Phone", value: viewStudent.family?.fatherPhone || "—" },
+                { label: "Mother Name", value: viewStudent.family?.motherName || "—" },
+                { label: "Mother Phone", value: viewStudent.family?.motherPhone || "—" },
+              ].map((item) => (
+                <div key={item.label} className="rounded-xl border border-outline-variant/20 bg-white p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">{item.label}</p>
+                  <p className="text-sm font-semibold text-primary break-words">{item.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-outline-variant/20 bg-white p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Address</p>
+              <p className="text-sm font-medium text-primary break-words">{formatStudentAddress(viewStudent) || "—"}</p>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setViewStudent(null)}
+                className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* ── Link Sibling Modal ── */}
       <Modal
         open={isModalOpen}
@@ -644,13 +677,12 @@ const [fees, setFees] = useState([]);
               Find Sibling
             </label>
             <Select
-              mode="multiple"
               showSearch
               placeholder="Search by name or admission no..."
               style={{ width: "100%" }}
               optionFilterProp="label"
-              onChange={setTargetSiblingIds}
-              value={targetSiblingIds}
+              onChange={setTargetSiblingId}
+              value={targetSiblingId}
               filterOption={(input, option) =>
                 (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
@@ -664,88 +696,6 @@ const [fees, setFees] = useState([]);
           </div>
         </div>
         
-      </Modal>
-
-      {/* ── Student Detail Modal ── */}
-      <Modal
-        open={detailModalOpen}
-        onCancel={() => { setDetailModalOpen(false); setDetailStudent(null); }}
-        footer={null}
-        width={700}
-        centered
-        title={
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-primary">person</span>
-            <span className="font-headline font-bold text-lg">Student Profile — {detailStudent?.name}</span>
-          </div>
-        }
-      >
-        {detailStudent && (
-          <div className="py-4 max-h-[70vh] overflow-y-auto pr-2 space-y-8">
-            <div className="flex items-start gap-6 pb-6 border-b border-outline-variant/10">
-              <div className={`w-20 h-20 rounded-2xl ${avatarColor(detailStudent.name)} flex items-center justify-center text-2xl font-black shadow-lg`}>
-                {initials(detailStudent.name)}
-              </div>
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold text-primary font-headline">{detailStudent.name}</h3>
-                <p className="text-on-surface-variant font-medium">{detailStudent.admission?.admissionNo || "NO ADMISSION NO"}</p>
-                <div className="flex gap-2 mt-3">
-                  <span className="bg-surface-container-high px-3 py-1 rounded-full text-xs font-bold">{detailStudent.standard}</span>
-                  <span className={`px-3 py-1 text-xs font-bold rounded-full ${detailStudent.admission?.isApproved ? "bg-[#44ddc1]/20 text-[#005145]" : "bg-surface-container-high text-on-surface-variant"}`}>
-                    {detailStudent.admission?.isApproved ? "Approved" : "Pending Approval"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-              {[
-                { label: "Date of Birth", value: dayjs(detailStudent.dob).format("DD MMM YYYY") },
-                { label: "Gender", value: detailStudent.gender },
-                { label: "Blood Group", value: detailStudent.bloodGroup },
-                { label: "Religion / Community", value: `${detailStudent.religion || ""} / ${detailStudent.community || ""}` },
-                { label: "Father Name", value: detailStudent.family?.fatherName },
-                { label: "Father Phone", value: detailStudent.family?.fatherPhone },
-                { label: "Mother Name", value: detailStudent.family?.motherName },
-                { label: "Mother Phone", value: detailStudent.family?.motherPhone },
-                { label: "Academic Year", value: detailStudent.academicYear || detailStudent.admission?.academicYear },
-                { label: "Transport Mode", value: detailStudent.transportMode || "Local" },
-                { label: "Address", value: `${detailStudent.address?.line1 || ""}, ${detailStudent.address?.line2 || ""}, ${detailStudent.address?.city || ""}`, span: 2 },
-              ].map((item, i) => (
-                <div key={i} className={item.span === 2 ? "col-span-2" : ""}>
-                  <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-1">{item.label}</p>
-                  <p className="text-sm font-semibold text-primary">{item.value || "—"}</p>
-                </div>
-              ))}
-            </div>
-
-            {detailStudent.academics && detailStudent.academics.length > 0 && (
-              <div className="pt-6 border-t border-outline-variant/10">
-                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-4">Qualifying Examination</p>
-                <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/5">
-                  <div className="flex justify-between items-center mb-3">
-                    <p className="font-bold text-primary">{detailStudent.academics[0].examName}</p>
-                    <p className="text-xs font-bold text-on-surface-variant">Reg No: {detailStudent.academics[0].registerNo}</p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-white p-3 rounded-lg border border-outline-variant/10 text-center">
-                      <p className="text-[9px] font-bold text-on-surface-variant uppercase mb-0.5">Total Marks</p>
-                      <p className="text-sm font-bold text-primary">{detailStudent.academics[0].totalObtainedMarks} / {detailStudent.academics[0].totalMaxMarks}</p>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg border border-outline-variant/10 text-center">
-                      <p className="text-[9px] font-bold text-on-surface-variant uppercase mb-0.5">Percentage</p>
-                      <p className="text-sm font-bold text-[#44ddc1]">{detailStudent.academics[0].totalPercentage}%</p>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg border border-outline-variant/10 text-center">
-                      <p className="text-[9px] font-bold text-on-surface-variant uppercase mb-0.5">Year</p>
-                      <p className="text-sm font-bold text-primary">{detailStudent.academics[0].monthYear}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </Modal>
 
       

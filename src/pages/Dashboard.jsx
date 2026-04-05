@@ -255,7 +255,7 @@ const Dashboard = () => {
       case "bulk-upload":         return <BulkUploadPage />;
       case "promotion":           return <PromotionPage />;
       case "students":            return <StudentView 
-                                          onCollectFee={(studentId) => { setFeeStudentId(studentId); setSelectedKey("fees-collect"); }} 
+                                          onCollectFee={(studentId) => { setFeeStudentId(studentId); setSelectedKey("fees-collect"); }} onEditStudent={(record) => { setEditData(record); setSelectedKey("admission"); }} 
                                           onEdit={(record) => { setEditData(record); setSelectedKey("admission"); }}
                                         />;
       case "approval":            return <ApprovalsView />;
