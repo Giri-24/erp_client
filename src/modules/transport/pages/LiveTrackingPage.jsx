@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { notification, Modal, Input, Form, message } from "antd";
@@ -156,6 +156,12 @@ const LiveTrackingPage = () => {
               odometer: v.odometer,
             });
           } else if (!isOn && wasOn === true) {
+            notification.warning({
+              message: `🔑 Ignition OFF`,
+              description: `${v.plateNo || "Unknown"} just turned off`,
+              placement: "topRight",
+              duration: 6,
+            });
             tripEvents.push({
               plateNo: v.plateNo || "",
               deviceId: v.deviceId,
@@ -176,7 +182,8 @@ const LiveTrackingPage = () => {
 
       // Push ignition events to backend (fire-and-forget)
       if (tripEvents.length > 0) {
-        pushTripEvents(tripEvents).catch(() => {});
+        // Just log the push intentionally swallowing the error since backend schema doesn't exist yet for trip events
+        pushTripEvents(tripEvents).catch(() => console.log("Ignition Events Triggered:", tripEvents));
       }
 
       setVehicles(list);
@@ -250,6 +257,22 @@ const LiveTrackingPage = () => {
     catch { return "—"; }
   };
 
+  const haversineDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  };
+
+  const formatDistance = (meters) => {
+    if (meters === null || meters === undefined) return "—";
+    if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;
+    return `${meters} m`;
+  };
+
   // Enhanced: driver+bus live status
   useEffect(() => {
     const fetchDriverBusStatus = async () => {
@@ -262,6 +285,40 @@ const LiveTrackingPage = () => {
     const interval = setInterval(fetchDriverBusStatus, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  const enrichedDrivers = useMemo(() => {
+    if (!driverBusStatus?.drivers) return [];
+    return driverBusStatus.drivers.map(d => {
+      let assignedBus = null;
+      const plateNo = Object.keys(driverMap).find(pl => driverMap[pl].phone === d.driver?.phone || driverMap[pl].name === d.driver?.name) || d.driver?.bus?.number;
+      
+      if (plateNo) {
+         assignedBus = vehicles.find(v => v.plateNo === plateNo);
+      }
+      
+      let distanceToBusMeters = d.distanceToBusMeters;
+      let isInsideBus = d.driverBusStatus === 'in-bus';
+      
+      // If we have actual APM GPS vehicle data, we override the backend's default Location table assumption
+      if (assignedBus && assignedBus.latitude && assignedBus.longitude && d.latitude && d.longitude) {
+         const R = 6371000;
+         const dLat = (assignedBus.latitude - d.latitude) * Math.PI / 180;
+         const dLon = (assignedBus.longitude - d.longitude) * Math.PI / 180;
+         const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                   Math.cos(d.latitude * Math.PI / 180) * Math.cos(assignedBus.latitude * Math.PI / 180) *
+                   Math.sin(dLon/2) * Math.sin(dLon/2);
+         distanceToBusMeters = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+         isInsideBus = distanceToBusMeters <= 50; 
+      }
+      
+      return {
+        ...d,
+        distanceToBusMeters,
+        driverBusStatus: isInsideBus ? 'in-bus' : 'outside',
+        assignedBus
+      };
+    });
+  }, [driverBusStatus, vehicles, driverMap]);
 
   return (
     <div className="flex gap-6 h-[calc(100vh-8rem)]">
@@ -285,7 +342,7 @@ const LiveTrackingPage = () => {
               <MapRecenter center={mapCenter} zoom={mapZoom} />
 
               {/* Vehicle markers */}
-              {filtered.map((v) => {
+              {filtered.filter(v => selectedVehicle ? selectedVehicle.deviceId === v.deviceId : true).map((v) => {
                 const driver = getDriver(v);
                 return (
                 <Marker
@@ -308,6 +365,75 @@ const LiveTrackingPage = () => {
                   </Popup>
                 </Marker>
                 );
+              })}
+
+              {/* Driver markers */}
+              {enrichedDrivers.filter(d => {
+                  if (selectedVehicle) {
+                      const drv = getDriver(selectedVehicle);
+                      if (!drv) return false;
+                      // Match by phone, name or bus number
+                      return (d.driver?.phone && drv.phone && d.driver.phone === drv.phone) || 
+                             (d.driver?.name && drv.name && d.driver.name === drv.name) ||
+                             (d.driver?.bus?.number && selectedVehicle.plateNo === d.driver.bus.number);
+                  }
+                  return true;
+              }).map((d) => (
+                  <Marker
+                    key={`driver-${d.id}`}
+                    position={[d.latitude, d.longitude]}
+                    icon={L.divIcon({
+                      className: "",
+                      iconSize: [30, 30],
+                      iconAnchor: [15, 15],
+                      popupAnchor: [0, -15],
+                      html: `<div style="width:30px;height:30px;border-radius:50%;background:#3b82f6;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(59,130,246,0.6);border:2px solid white;z-index:1000;"><span class="material-symbols-outlined" style="color:white;font-size:16px;">person_pin</span></div>`,
+                    })}
+                  >
+                    <Popup>
+                      <div className="text-sm space-y-1 min-w-[160px]">
+                        <p className="font-bold text-base text-blue-700">👤 {d.driver?.name || "Driver"}</p>
+                        {d.driver?.phone && <p className="text-xs">📞 {d.driver.phone}</p>}
+                        {d.driver?.bus?.number && <p className="text-xs font-semibold text-gray-700">Bus: {d.driver.bus.number}</p>}
+                        {d.driverBusStatus && (
+                          <p className={`text-xs font-bold ${d.driverBusStatus === 'in-bus' ? 'text-green-600' : 'text-amber-600'}`}>
+                            {d.driverBusStatus === 'in-bus' ? '✓ Inside Bus' : '⚠ Outside Bus'}
+                          </p>
+                        )}
+                        {d.distanceToBusMeters !== null && <p className="text-xs">Distance to Bus: {formatDistance(d.distanceToBusMeters)}</p>}
+                        <p className="text-xs">Distance to School: {formatDistance(d.distanceToSchoolMeters)}</p>
+                        <p className="text-xs mt-1 text-gray-500">🕐 {formatDate(d.createdAt)}</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+              ))}
+
+              {/* Driver-Bus connecting lines */}
+              {enrichedDrivers.filter(d => {
+                  if (selectedVehicle) {
+                      const drv = getDriver(selectedVehicle);
+                      if (!drv) return false;
+                      // Match by phone, name or bus number
+                      return (d.driver?.phone && drv.phone && d.driver.phone === drv.phone) || 
+                             (d.driver?.name && drv.name && d.driver.name === drv.name) ||
+                             (d.driver?.bus?.number && selectedVehicle.plateNo === d.driver.bus.number);
+                  }
+                  return true;
+              }).map((d) => {
+                  if (!d.latitude || !d.longitude || !d.assignedBus?.latitude || !d.assignedBus?.longitude) return null;
+                  return (
+                    <Polyline
+                      key={`line-${d.id}`}
+                      positions={[
+                        [d.latitude, d.longitude],
+                        [d.assignedBus.latitude, d.assignedBus.longitude]
+                      ]}
+                      color="#3b82f6"
+                      weight={3}
+                      dashArray="6, 8"
+                      opacity={0.8}
+                    />
+                  );
               })}
 
               {/* School marker */}
@@ -541,11 +667,20 @@ const LiveTrackingPage = () => {
             </div>
 
             {/* Driver info card */}
-            {driver ? (
+            {driver ? (() => {
+              const liveStatus = enrichedDrivers.find(d => 
+                (d.driver?.phone && driver.phone && d.driver.phone === driver.phone) || 
+                (d.driver?.name && driver.name && d.driver.name === driver.name) ||
+                (d.driver?.bus?.number && selectedVehicle.plateNo === d.driver.bus.number)
+              );
+              return (
               <div className="mb-3 p-3 rounded-xl bg-primary-container/30 border border-primary/10">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 relative">
                     <span className="material-symbols-outlined text-primary">person</span>
+                    {liveStatus && (
+                      <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${liveStatus.driverBusStatus === 'in-bus' ? 'bg-green-500' : 'bg-amber-500'}`} title={liveStatus.driverBusStatus === 'in-bus' ? 'Inside Bus' : 'Outside Bus'}></div>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-primary">{driver.name}</p>
@@ -553,6 +688,20 @@ const LiveTrackingPage = () => {
                       {driver.phone || "No phone"}
                       {driver.licenseNo ? ` • DL: ${driver.licenseNo}` : ""}
                     </p>
+                    {liveStatus && (
+                      <div className="mt-0.5">
+                        <p className={`text-[10px] font-semibold ${liveStatus.driverBusStatus === 'in-bus' ? 'text-green-600' : 'text-amber-600'}`}>
+                          {liveStatus.driverBusStatus === 'in-bus' ? '✓ Inside Bus' : '⚠ Outside Bus'}
+                          {liveStatus.distanceToBusMeters !== null && liveStatus.driverBusStatus !== 'in-bus' ? ` (${formatDistance(liveStatus.distanceToBusMeters)} away)` : ''}
+                        </p>
+                        {liveStatus.driverBusStatus !== 'in-bus' && (
+                          <p className="text-[10px] text-gray-500 mt-0.5 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[10px]">pin_drop</span>
+                            {liveStatus.latitude?.toFixed(5)}, {liveStatus.longitude?.toFixed(5)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <button
@@ -572,7 +721,8 @@ const LiveTrackingPage = () => {
                   </div>
                 </div>
               </div>
-            ) : (
+              );
+            })() : (
               <button
                 onClick={(e) => openAssignModal(selectedVehicle, e)}
                 className="w-full mb-3 p-3 rounded-xl border-2 border-dashed border-primary/30 bg-primary-container/10 flex items-center justify-center gap-2 text-xs font-bold text-primary hover:bg-primary-container/20 transition-colors"

@@ -247,7 +247,7 @@ const SalesPage = () => {
                       className="flex flex-col items-center p-4 rounded-2xl bg-surface-container-low hover:bg-primary-container/30 border border-outline-variant/10 transition-all text-center shadow-sm group">
                       <div className="relative w-full flex justify-center mb-3">
                         {image ? (
-                          <img src={`${import.meta.env.VITE_API_URL || "/erp/api"}/${image}`} alt="" className="w-20 h-20 rounded-xl object-cover border border-outline-variant/20 shadow group-hover:scale-105 transition-transform" />
+                          <img src={`${"/erp/api"}/${image}`} alt="" className="w-20 h-20 rounded-xl object-cover border border-outline-variant/20 shadow group-hover:scale-105 transition-transform" />
                         ) : (
                           <div className="w-20 h-20 rounded-xl bg-primary-container/30 flex items-center justify-center border border-outline-variant/20">
                             <span className="material-symbols-outlined text-primary text-3xl">inventory_2</span>

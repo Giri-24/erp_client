@@ -270,16 +270,16 @@ const RouteManagementPage = () => {
                   </div>
                 )}
                 {inlineStops.map((stop, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-3 items-center bg-surface-container-low p-4 rounded-xl hover:shadow-sm transition-shadow">
+                  <div key={idx} className="flex flex-wrap md:flex-nowrap gap-4 items-center bg-surface-container-low p-4 rounded-xl hover:shadow-sm transition-shadow">
                     {/* number */}
-                    <div className="col-span-1 flex justify-center">
-                      <span className="h-6 w-6 rounded-full bg-primary text-white text-[10px] flex items-center justify-center font-bold flex-shrink-0">
+                    <div className="shrink-0 w-6 flex justify-center">
+                      <span className="h-6 w-6 rounded-full bg-primary text-white text-[10px] flex items-center justify-center font-bold">
                         {String(idx + 1).padStart(2, "0")}
                       </span>
                     </div>
 
                     {/* stop name */}
-                    <div className="col-span-4">
+                    <div className="flex-[2] min-w-[120px]">
                       <input
                         type="text"
                         value={stop.stopName}
@@ -291,7 +291,7 @@ const RouteManagementPage = () => {
                     </div>
 
                     {/* distance */}
-                    <div className="col-span-2">
+                    <div className="flex-1 min-w-[70px]">
                       <input
                         type="number"
                         value={stop.distanceKm}
@@ -302,8 +302,20 @@ const RouteManagementPage = () => {
                       <p className="text-[10px] text-on-surface-variant mt-0.5">Distance (km)</p>
                     </div>
 
+                    {/* fee */}
+                    <div className="flex-1 min-w-[70px]">
+                      <input
+                        type="number"
+                        value={stop.fee}
+                        onChange={(e) => updateStop(idx, "fee", e.target.value)}
+                        placeholder="—"
+                        className="bg-transparent border-none text-sm font-semibold w-full focus:ring-0 outline-none p-0 text-amber-600"
+                      />
+                      <p className="text-[10px] text-on-surface-variant mt-0.5" title="Leave blank for base fee">Override Fee (₹)</p>
+                    </div>
+
                     {/* pickup */}
-                    <div className="col-span-2">
+                    <div className="flex-1 min-w-[80px]">
                       <input
                         type="text"
                         value={stop.pickupTime}
@@ -315,7 +327,7 @@ const RouteManagementPage = () => {
                     </div>
 
                     {/* drop */}
-                    <div className="col-span-2">
+                    <div className="flex-1 min-w-[80px]">
                       <input
                         type="text"
                         value={stop.dropTime}
@@ -327,7 +339,7 @@ const RouteManagementPage = () => {
                     </div>
 
                     {/* delete */}
-                    <div className="col-span-1 flex justify-end">
+                    <div className="shrink-0 w-8 flex justify-end">
                       <button
                         onClick={() => removeStop(idx)}
                         className="text-on-surface-variant/40 hover:text-error transition-colors"
