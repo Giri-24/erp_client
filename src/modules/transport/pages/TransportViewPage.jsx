@@ -158,6 +158,10 @@ const TransportViewPage = () => {
       render: (_, r) => r.student?.siblingGroupId ? <Tag color="blue">Yes</Tag> : <Tag>No</Tag>,
     },
     {
+      title: "Bus No",
+      render: (_, r) => r.busno || "-",
+    },
+    {
       title: "Route",
       render: (_, r) => r.route?.routeName || "-",
       sorter: (a, b) => (a.route?.routeName || "").localeCompare(b.route?.routeName || ""),

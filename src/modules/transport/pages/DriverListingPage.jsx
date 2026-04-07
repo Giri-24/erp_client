@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Input, message, Tag, Drawer, Modal, Form, Select, Popconfirm } from "antd";
 import { SearchOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import { getAllDrivers, getAllTransportRoutes, createDriver, updateDriver, deleteDriver } from "../transport.service";
+import { getAllDrivers, getAllTransportRoutes, getAllBuses, createDriver, updateDriver, deleteDriver } from "../transport.service";
 import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 
 const DriverListingPage = () => {
   const [drivers, setDrivers] = useState([]);
   const [routes, setRoutes] = useState([]);
+  const [buses, setBuses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [selectedRouteId, setSelectedRouteId] = useState("all");
+  const [selectedBus, setSelectedBus] = useState("all");
+  const [selectedRoute, setSelectedRoute] = useState("all");
   const [selectedDriver, setSelectedDriver] = useState(null);
 
   /* ── add / edit modal state ── */
@@ -26,17 +28,35 @@ const DriverListingPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [driverData, routeData] = await Promise.all([
+      const [driverData, routeData, busData] = await Promise.all([
         getAllDrivers(),
         getAllTransportRoutes(),
+        getAllBuses(),
       ]);
       setDrivers(driverData || []);
       setRoutes(routeData || []);
+      setBuses(busData || []);
     } catch {
       message.error("Failed to load drivers");
     }
     setLoading(false);
   };
+
+/* ── small helper components ── */
+const DetailSection = ({ title, children }) => (
+  <div className="rounded-xl bg-surface-container-low p-4">
+    <h4 className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant/60 mb-3">{title}</h4>
+    <div className="space-y-2.5">{children}</div>
+  </div>
+);
+
+const DetailRow = ({ icon, label, value }) => (
+  <div className="flex items-center gap-3 text-sm">
+    <span className="material-symbols-outlined text-[18px] text-on-surface-variant/50">{icon}</span>
+    <span className="text-on-surface-variant w-24 shrink-0">{label}</span>
+    <span className="text-on-surface font-medium truncate">{value}</span>
+  </div>
+);
 
   useEffect(() => {
     fetchData();
@@ -51,17 +71,19 @@ const DriverListingPage = () => {
     return map;
   }, [routes]);
 
-  /* ── filter drivers ── */
   const filtered = useMemo(() => {
     let list = drivers;
-
-    if (selectedRouteId !== "all") {
+    if (selectedRoute !== "all") {
       list = list.filter((d) => {
-        const dRouteId = d.routeId || d.route?.id || d.route?._id || d.route;
-        return String(dRouteId) === String(selectedRouteId);
+        const dRoute = d.route?.id || d.route?._id || d.route;
+        return String(dRoute) === String(selectedRoute);
       });
     }
-
+    if (selectedBus !== "all") {
+      list = list.filter((d) => {
+        return d.bus && d.bus.number === selectedBus;
+      });
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -72,29 +94,27 @@ const DriverListingPage = () => {
           (d.licenseNo || "").toLowerCase().includes(q)
       );
     }
-
     return list;
-  }, [drivers, selectedRouteId, search]);
-
+  }, [drivers, selectedRoute, selectedBus, search]);
   /* ── stats per route ── */
   const routeDriverCounts = useMemo(() => {
     const counts = {};
     drivers.forEach((d) => {
-      const rId = d.routeId || d.route?.id || d.route?._id || d.route;
+      const rId = d.route?.id || d.route?._id || d.route;
       if (rId) counts[rId] = (counts[rId] || 0) + 1;
     });
     return counts;
   }, [drivers]);
 
   const getRouteName = (driver) => {
-    const rId = driver.routeId || driver.route?.id || driver.route?._id || driver.route;
+    const rId = driver.route?.id || driver.route?._id || driver.route;
     if (!rId) return "Unassigned";
     const r = routeMap[rId];
     return r ? r.routeName || `Route #${r.routeNo}` : "Unknown Route";
   };
 
   const getRouteNo = (driver) => {
-    const rId = driver.routeId || driver.route?.id || driver.route?._id || driver.route;
+    const rId = driver.route?.id || driver.route?._id || driver.route;
     const r = rId ? routeMap[rId] : null;
     return r?.routeNo || "—";
   };
@@ -114,10 +134,10 @@ const DriverListingPage = () => {
       phone: driver.phone || driver.mobile || "",
       email: driver.email || "",
       address: driver.address || "",
-      busNumber: driver.busNumber || driver.vehicleNo || "",
+      busId: driver.bus?.id || driver.busId || undefined,
       licenseNo: driver.licenseNo || "",
       bloodGroup: driver.bloodGroup || undefined,
-      routeId: driver.routeId || driver.route?.id || driver.route?._id || driver.route || undefined,
+      route: driver.route?.id || driver.route?._id || driver.route || undefined,
       status: driver.status || "ACTIVE",
     });
     setModalOpen(true);
@@ -127,11 +147,17 @@ const DriverListingPage = () => {
     try {
       const values = await form.validateFields();
       setSaving(true);
+      // Only send relevant fields
+      const payload = {
+        ...values,
+        busId: values.busId || null,
+        route: values.route || null,
+      };
       if (editingDriver) {
-        await updateDriver(editingDriver.id || editingDriver._id, values);
+        await updateDriver(editingDriver.id || editingDriver._id, payload);
         message.success("Driver updated");
       } else {
-        await createDriver(values);
+        await createDriver(payload);
         message.success("Driver added");
       }
       setModalOpen(false);
@@ -176,9 +202,9 @@ const DriverListingPage = () => {
 
           {/* All routes pill */}
           <button
-            onClick={() => setSelectedRouteId("all")}
+            onClick={() => setSelectedRoute("all")}
             className={`w-full text-left px-3 py-2.5 rounded-xl mb-1.5 text-sm transition-all flex items-center justify-between ${
-              selectedRouteId === "all"
+              selectedRoute === "all"
                 ? "bg-primary text-on-primary font-semibold shadow-sm"
                 : "text-on-surface-variant hover:bg-surface-container-high"
             }`}
@@ -188,7 +214,7 @@ const DriverListingPage = () => {
               All Routes
             </span>
             <span className={`text-xs px-2 py-0.5 rounded-full ${
-              selectedRouteId === "all" ? "bg-on-primary/20 text-on-primary" : "bg-surface-container-high text-on-surface-variant"
+              selectedRoute === "all" ? "bg-on-primary/20 text-on-primary" : "bg-surface-container-high text-on-surface-variant"
             }`}>
               {drivers.length}
             </span>
@@ -196,12 +222,12 @@ const DriverListingPage = () => {
 
           {routes.map((route) => {
             const rId = route.id || route._id;
-            const isActive = String(selectedRouteId) === String(rId);
+            const isActive = String(selectedRoute) === String(rId);
             const count = routeDriverCounts[rId] || 0;
             return (
               <button
                 key={rId}
-                onClick={() => setSelectedRouteId(rId)}
+                onClick={() => setSelectedRoute(rId)}
                 className={`w-full text-left px-3 py-2.5 rounded-xl mb-1.5 text-sm transition-all flex items-center justify-between ${
                   isActive
                     ? "bg-primary text-on-primary font-semibold shadow-sm"
@@ -237,11 +263,27 @@ const DriverListingPage = () => {
               Driver Directory
             </h2>
             <p className="text-xs text-on-surface-variant mt-0.5">
-              {selectedRouteId === "all"
-                ? "Showing all drivers"
-                : `Filtered — ${routeMap[selectedRouteId]?.routeName || "Route"}`}
-              {" "}· {filtered.length} result{filtered.length !== 1 ? "s" : ""}
-            </p>
+                {selectedRoute === "all"
+                    ? "All routes"
+                    : `Route: ${routeMap[selectedRoute]?.routeName || "Route"}`}
+              </p>
+              <Select
+                value={selectedBus}
+                onChange={setSelectedBus}
+                style={{ minWidth: 160 }}
+                size="small"
+                allowClear={false}
+                placeholder="Filter by Bus"
+                className="ml-2"
+              >
+                <Select.Option value="all">All Buses</Select.Option>
+                {buses.map((bus) => (
+                  <Select.Option key={bus.id} value={bus.number}>
+                    {bus.number} {bus.routeName ? `(${bus.routeName})` : ""}
+                  </Select.Option>
+                ))}
+              </Select>
+              <span className="text-xs text-on-surface-variant ml-2">{filtered.length} result{filtered.length !== 1 ? "s" : ""}</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -261,7 +303,7 @@ const DriverListingPage = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               allowClear
-              className="!w-72 rounded-xl"
+              className="w-72! rounded-xl"
             />
           </div>
         </div>
@@ -301,7 +343,7 @@ const DriverListingPage = () => {
                     </div>
                     <Tag
                       color={driver.status === "INACTIVE" ? "red" : "green"}
-                      className="!text-[10px] !px-2 !py-0 !rounded-full !m-0"
+                      className="text-[10px]! px-2! py-0! rounded-full! m-0!"
                     >
                       {driver.status || "ACTIVE"}
                     </Tag>
@@ -349,7 +391,7 @@ const DriverListingPage = () => {
                     </div>
                     <div>
                       <p className="text-on-surface-variant/60 uppercase tracking-wider text-[10px]">Vehicle</p>
-                      <p className="text-on-surface font-medium">{driver.busNumber || driver.vehicleNo || "—"}</p>
+                      <p className="text-on-surface font-medium">{driver.bus?.number || driver.vehicleNo || "—"}</p>
                     </div>
                     <div>
                       <p className="text-on-surface-variant/60 uppercase tracking-wider text-[10px]">License</p>
@@ -399,8 +441,19 @@ const DriverListingPage = () => {
             <Form.Item name="email" label="Email">
               <Input placeholder="driver@email.com" />
             </Form.Item>
-            <Form.Item name="busNumber" label="Vehicle / Bus No" rules={[{ required: true, message: "Vehicle number is required" }]}>
-              <Input placeholder="TN 01 AB 1234" />
+            <Form.Item name="busId" label="Assign Bus">
+              <Select
+                placeholder="Select bus"
+                allowClear
+                showSearch
+                optionFilterProp="children"
+              >
+                {buses.map((bus) => (
+                  <Select.Option key={bus.id} value={bus.id}>
+                    {bus.number} ({bus.plateNo})
+                  </Select.Option>
+                ))}
+              </Select>
             </Form.Item>
             <Form.Item name="licenseNo" label="License Number">
               <Input placeholder="DL-XXXXXXXXXX" />
@@ -408,7 +461,7 @@ const DriverListingPage = () => {
             <Form.Item name="bloodGroup" label="Blood Group">
               <Select placeholder="Select" allowClear options={["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map((g) => ({ label: g, value: g }))} />
             </Form.Item>
-            <Form.Item name="routeId" label="Assign Route">
+            <Form.Item name="route" label="Assign Route">
               <Select
                 placeholder="Select route"
                 allowClear
@@ -450,7 +503,7 @@ const DriverListingPage = () => {
                 <h3 className="text-lg font-bold text-on-surface">{selectedDriver.name || "Unnamed"}</h3>
                 <Tag
                   color={selectedDriver.status === "INACTIVE" ? "red" : "green"}
-                  className="!text-xs !mt-1"
+                  className="text-xs! mt-1!"
                 >
                   {selectedDriver.status || "ACTIVE"}
                 </Tag>
@@ -468,7 +521,7 @@ const DriverListingPage = () => {
               <DetailSection title="Route Assignment">
                 <DetailRow icon="route" label="Route" value={getRouteName(selectedDriver)} />
                 <DetailRow icon="tag" label="Route No" value={getRouteNo(selectedDriver)} />
-                <DetailRow icon="directions_bus" label="Vehicle" value={selectedDriver.busNumber || selectedDriver.vehicleNo || "—"} />
+                <DetailRow icon="directions_bus" label="Bus" value={selectedDriver.bus?.number || selectedDriver.busNumber || selectedDriver.vehicleNo || "—"} />
               </DetailSection>
 
               <DetailSection title="License & Documents">
@@ -490,21 +543,4 @@ const DriverListingPage = () => {
     </div>
   );
 };
-
-/* ── small helper components ── */
-const DetailSection = ({ title, children }) => (
-  <div className="rounded-xl bg-surface-container-low p-4">
-    <h4 className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant/60 mb-3">{title}</h4>
-    <div className="space-y-2.5">{children}</div>
-  </div>
-);
-
-const DetailRow = ({ icon, label, value }) => (
-  <div className="flex items-center gap-3 text-sm">
-    <span className="material-symbols-outlined text-[18px] text-on-surface-variant/50">{icon}</span>
-    <span className="text-on-surface-variant w-24 shrink-0">{label}</span>
-    <span className="text-on-surface font-medium truncate">{value}</span>
-  </div>
-);
-
 export default DriverListingPage;

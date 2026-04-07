@@ -24,20 +24,27 @@ const formatStandardLabel = (standard) => {
 };
 
 // ── component ─────────────────────────────────────────────────────────────
-const AssignTransportPage = () => {
+const AssignTransportPage = ({ initialStudentId, onMounted }) => {
   const [students, setStudents] = useState([]);
   const [pendingStudents, setPendingStudents] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [availableYears, setAvailableYears] = useState([]);
+
+  // filter state
+  const [filterStandard, setFilterStandard] = useState("");
+  const [filterSection, setFilterSection] = useState("");
 
   // form state
   const [studentId, setStudentId] = useState(null);
   const [academicYear, setAcademicYear] = useState("");
   const [routeId, setRouteId] = useState(null);
   const [stopId, setStopId] = useState(null);
+  // (removed duplicate busno declaration)
   const [isSplClass, setIsSplClass] = useState(false);
 
-  // derived state
+  const [busno, setBusno] = useState("");
+  // Buses for selected route
+  const [routeBuses, setRouteBuses] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [feePreview, setFeePreview] = useState(null);
@@ -51,9 +58,9 @@ const AssignTransportPage = () => {
 
   const { hasPermission } = usePermissionHelpers();
   const canAssign = hasPermission(PERMISSIONS.TRANSPORT_ASSIGN);
-
   // ── data ─────────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (onMounted) onMounted();
     const loadInitialData = async () => {
       try {
         const [years, routeData, admissionsResponse] = await Promise.all([
@@ -66,18 +73,26 @@ const AssignTransportPage = () => {
         setAvailableYears(normalizedYears);
         setAcademicYear((current) => current || normalizedYears[0] || "2026-2027");
         setRoutes(routeData || []);
-
+        
         const active = (admissionsResponse.data || []).filter(
           (student) => student.users?.isActive !== false && student.admission?.isApproved,
         );
         setStudents(active);
+
+        // Auto-select student if initialStudentId is provided
+        if (initialStudentId) {
+          // Wait slightly for routes to be set
+          setTimeout(() => {
+            onStudentChange(initialStudentId);
+          }, 100);
+        }
       } catch {
         message.error("Failed to load transport form data");
       }
     };
 
     loadInitialData();
-  }, []);
+  }, [initialStudentId]);
 
   useEffect(() => {
     if (!academicYear) return;
@@ -104,6 +119,7 @@ const AssignTransportPage = () => {
       setAcademicYear(assignment.academicYear || academicYear || availableYears[0] || "2026-2027");
       const route = routes.find((r) => r.id === assignment.routeId);
       setSelectedRoute(route || null);
+      setRouteBuses(route?.buses || []);
       const fee = await getTransportFee(id);
       setFeePreview(fee);
     } catch { /* no existing assignment */ }
@@ -115,15 +131,17 @@ const AssignTransportPage = () => {
     setFeePreview(null);
     const route = routes.find((r) => r.id === id);
     setSelectedRoute(route || null);
+    setRouteBuses(route?.buses || []);
   };
 
   const handleSubmit = async () => {
     if (!canAssign) { message.error("Not authorized to assign transport"); return; }
     if (!studentId) { message.error("Please select a student"); return; }
     if (!routeId) { message.error("Please select a route"); return; }
+    if (!busno) { message.error("Please enter bus number"); return; }
     setLoading(true);
     try {
-      const response = await assignStudentTransport({ studentId, academicYear, routeId, stopId, isSplClass });
+      const response = await assignStudentTransport({ studentId, academicYear, routeId, stopId, busno, isSplClass });
       message.success(response?.message || (currentAssignment ? "Assignment updated!" : "Transport assigned successfully!"));
       const fee = await getTransportFee(studentId);
       setFeePreview(fee);
@@ -159,14 +177,36 @@ const AssignTransportPage = () => {
     setStoppingSplClass(false);
   };
 
-  // student options for antd Select
-  const studentOptions = students.map((s) => {
+  // derive unique standard and section options from loaded students
+  const standardOptions = Array.from(
+    new Set(students.map((s) => s.standard).filter(Boolean))
+  ).sort();
+
+  const sectionOptions = Array.from(
+    new Set(
+      students
+        .filter((s) => !filterStandard || s.standard === filterStandard)
+        .map((s) => s.section)
+        .filter(Boolean)
+    )
+  ).sort();
+
+  // apply standard + section filters
+  const filteredStudents = students.filter((s) => {
+    if (filterStandard && s.standard !== filterStandard) return false;
+    if (filterSection && (s.section || "") !== filterSection) return false;
+    return true;
+  });
+
+  // student options for antd Select (uses filtered list)
+  const studentOptions = filteredStudents.map((s) => {
     const admNo = s.admission?.admissionNo || "-";
     const standardLabel = s.standardLabel || formatStandardLabel(s.standard);
+    const section = s.section ? ` [${s.section}]` : "";
     return {
       value: s.id,
-      label: `${s.name} — ${standardLabel} — ${admNo}`,
-      searchText: `${s.name} ${standardLabel} ${s.standard} ${admNo}`.toLowerCase(),
+      label: `${s.name}${section} — ${standardLabel} — ${admNo}`,
+      searchText: `${s.name} ${standardLabel} ${s.standard} ${s.section || ""} ${admNo}`.toLowerCase(),
     };
   });
 
@@ -191,16 +231,16 @@ const AssignTransportPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
 
         {/* ── LEFT: assignment form (7 cols) ── */}
-        <div className="lg:col-span-7 bg-white rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] overflow-hidden">
+        <div className="lg:col-span-7 bg-white rounded-2xl shadow-ambient overflow-hidden">
           {/* top accent stripe */}
           <div     style={{
   background: 'linear-gradient(to right, #00152a, #102a43)'
-}} className="h-1 w-full bg-gradient-to-r from-primary to-primary-container" />
+}} className="h-1 w-full bg-linear-to-r from-primary to-primary-container" />
 
           <div className="p-8 lg:p-10">
             {/* form header */}
             <div className="flex items-center gap-4 mb-8">
-              <div className="w-12 h-12 bg-primary-fixed rounded-full flex items-center justify-center text-primary flex-shrink-0">
+              <div className="w-12 h-12 bg-primary-fixed rounded-full flex items-center justify-center text-primary shrink-0">
                 <span
                   className="material-symbols-outlined"
                   style={{ fontVariationSettings: "'FILL' 1" }}
@@ -220,7 +260,7 @@ const AssignTransportPage = () => {
             {currentAssignment && (
               <div className="mb-6 flex items-start gap-3 bg-[#44ddc1]/10 border border-[#44ddc1]/30 rounded-xl px-4 py-3">
                 <span
-                  className="material-symbols-outlined text-[#44ddc1] flex-shrink-0"
+                  className="material-symbols-outlined text-[#44ddc1] shrink-0"
                   style={{ fontVariationSettings: "'FILL' 1" }}
                 >
                   info
@@ -235,12 +275,99 @@ const AssignTransportPage = () => {
             )}
 
             <div className="space-y-5">
+              {/* ── Filter row: Standard + Section + Academic Year ── */}
+              <div className="grid grid-cols-3 gap-3">
+                {/* Standard filter */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Standard</label>
+                  <div className="relative">
+                    <select
+                      value={filterStandard}
+                      onChange={(e) => { setFilterStandard(e.target.value); setFilterSection(""); setStudentId(null); }}
+                      className="w-full px-3 py-2.5 bg-surface-container-high border-none rounded-xl font-body text-on-surface appearance-none focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer text-sm"
+                    >
+                      <option value="">All Standards</option>
+                      {standardOptions.map((std) => (
+                        <option key={std} value={std}>
+                          {formatStandardLabel(std)}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-2 top-2.5 pointer-events-none text-on-surface-variant text-base">expand_more</span>
+                  </div>
+                </div>
+
+                {/* Section filter */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Section</label>
+                  <div className="relative">
+                    <select
+                      value={filterSection}
+                      onChange={(e) => { setFilterSection(e.target.value); setStudentId(null); }}
+                      className="w-full px-3 py-2.5 bg-surface-container-high border-none rounded-xl font-body text-on-surface appearance-none focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer text-sm"
+                    >
+                      <option value="">All Sections</option>
+                      {sectionOptions.map((sec) => (
+                        <option key={sec} value={sec}>{sec}</option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-2 top-2.5 pointer-events-none text-on-surface-variant text-base">expand_more</span>
+                  </div>
+                </div>
+
+                {/* Academic Year filter */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-on-surface-variant uppercase tracking-wider ml-1">Academic Year</label>
+                  <div className="relative">
+                    <select
+                      value={academicYear}
+                      onChange={(e) => setAcademicYear(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-surface-container-high border-none rounded-xl font-body text-on-surface appearance-none focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer text-sm"
+                    >
+                      {availableYears.map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                    <span className="material-symbols-outlined absolute right-2 top-2.5 pointer-events-none text-on-surface-variant text-base">expand_more</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Active filter chips */}
+              {(filterStandard || filterSection) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-on-surface-variant">Filtered:</span>
+                  {filterStandard && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full">
+                      {formatStandardLabel(filterStandard)}
+                      <button onClick={() => { setFilterStandard(""); setFilterSection(""); setStudentId(null); }} className="ml-0.5 hover:text-error transition-colors">
+                        <span className="material-symbols-outlined text-[12px]">close</span>
+                      </button>
+                    </span>
+                  )}
+                  {filterSection && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full">
+                      Section {filterSection}
+                      <button onClick={() => { setFilterSection(""); setStudentId(null); }} className="ml-0.5 hover:text-error transition-colors">
+                        <span className="material-symbols-outlined text-[12px]">close</span>
+                      </button>
+                    </span>
+                  )}
+                  <span className="text-xs text-on-surface-variant ml-1">{filteredStudents.length} student{filteredStudents.length !== 1 ? "s" : ""}</span>
+                </div>
+              )}
+
               {/* Student search */}
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-primary ml-1">Student</label>
+                <label className="text-sm font-semibold text-primary ml-1">
+                  Student
+                  <span className="ml-2 text-xs font-normal text-on-surface-variant">
+                    {filteredStudents.length} available
+                  </span>
+                </label>
                 <Select
                   showSearch
-                  placeholder="Search by name / standard / admission no..."
+                  placeholder="Search by name / section / admission no..."
                   className="w-full"
                   value={studentId}
                   onChange={onStudentChange}
@@ -253,20 +380,24 @@ const AssignTransportPage = () => {
                 />
               </div>
 
-              {/* Academic year + Route row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-primary ml-1">Academic Year</label>
-                  <Select
-                    value={academicYear || undefined}
-                    onChange={setAcademicYear}
-                    options={availableYears.map((year) => ({ label: year, value: year }))}
-                    placeholder="Select academic year"
-                    size="large"
-                    className="w-full"
-                  />
-                </div>
+              {/* Bus Number dropdown (populated by selected route) */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-primary ml-1">Bus Number</label>
+                <select
+                  value={busno}
+                  onChange={e => setBusno(e.target.value)}
+                  className="w-full px-4 py-3.5 bg-surface-container-high border-none rounded-xl font-body text-on-surface appearance-none focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer text-sm"
+                  disabled={!selectedRoute || !routeBuses.length}
+                >
+                  <option value="">{!selectedRoute ? "Select a route first" : routeBuses.length ? "Select Bus" : "No buses for this route"}</option>
+                  {routeBuses.map((bus) => (
+                    <option key={bus.id} value={bus.number}>{bus.number} (Capacity: {bus.capacity})</option>
+                  ))}
+                </select>
+              </div>
 
+              {/* Route row (academic year now in filter bar above) */}
+              <div className="grid grid-cols-1 gap-5">
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-primary ml-1">Route</label>
                   <div className="relative">
@@ -287,7 +418,6 @@ const AssignTransportPage = () => {
                 </div>
               </div>
 
-              {/* Stop selector (only when route selected) */}
               {selectedRoute?.stops?.length > 0 && (
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-primary ml-1">Stop <span className="text-on-surface-variant font-normal">(Optional)</span></label>
@@ -332,7 +462,7 @@ const AssignTransportPage = () => {
               {/* Special class toggle */}
               <div className="bg-surface-container-low p-5 rounded-xl flex items-center justify-between hover:bg-surface-container-high transition-colors">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-primary shadow-sm flex-shrink-0">
+                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-primary shadow-sm shrink-0">
                     <span className="material-symbols-outlined">event_repeat</span>
                   </div>
                   <div>
@@ -347,7 +477,7 @@ const AssignTransportPage = () => {
                     checked={isSplClass}
                     onChange={(e) => setIsSplClass(e.target.checked)}
                   />
-                  <div className="w-12 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+                  <div className="w-12 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:inset-s-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
                 </label>
               </div>
 
@@ -355,7 +485,7 @@ const AssignTransportPage = () => {
               {isSplClass && currentAssignment?.isSplClass && (
                 <div className="bg-surface-container-low p-5 rounded-xl space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center text-primary shadow-sm flex-shrink-0">
+                    <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center text-primary shadow-sm shrink-0">
                       <span className="material-symbols-outlined text-sm">calculate</span>
                     </div>
                     <div>
@@ -452,7 +582,7 @@ const AssignTransportPage = () => {
                     style={{
   background: 'linear-gradient(to right, #00152a, #102a43)'
 }}
-                className="w-full py-4 px-6 bg-gradient-to-br from-primary to-primary-container text-white font-headline font-bold text-lg rounded-xl shadow-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-60"
+                className="w-full py-4 px-6 bg-linear-to-br from-primary to-primary-container text-white font-headline font-bold text-lg rounded-xl shadow-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-60"
               >
                 {loading && <span className="material-symbols-outlined text-lg animate-spin">refresh</span>}
                 {currentAssignment ? "Update Assignment" : "Assign Transport"}
@@ -498,10 +628,10 @@ const AssignTransportPage = () => {
           </div>
 
           {/* AI insight chip */}
-          <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] border-l-4 border-[#44ddc1]">
+          <div className="bg-white p-6 rounded-2xl shadow-ambient border-l-4 border-[#44ddc1]">
             <div className="flex items-start gap-4">
               <span
-                className="material-symbols-outlined text-[#44ddc1] mt-0.5 flex-shrink-0"
+                className="material-symbols-outlined text-[#44ddc1] mt-0.5 shrink-0"
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
                 smart_toy
@@ -515,7 +645,7 @@ const AssignTransportPage = () => {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
+          <div className="bg-white p-6 rounded-2xl shadow-ambient">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-xs font-bold text-primary uppercase tracking-widest">Students Awaiting Mapping</h4>
               <span className="text-xs font-semibold text-on-surface-variant">{pendingStudents.length} pending</span>
@@ -527,7 +657,7 @@ const AssignTransportPage = () => {
                   onClick={() => onStudentChange(student.id)}
                   className="w-full text-left flex items-center gap-4 cursor-pointer hover:bg-surface rounded-xl px-3 py-2 transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center font-bold text-primary text-xs flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center font-bold text-primary text-xs shrink-0">
                     {student.name?.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -536,7 +666,7 @@ const AssignTransportPage = () => {
                       {student.standardLabel || formatStandardLabel(student.standard)} · {student.admissionNo || "No Admission No"}
                     </p>
                   </div>
-                  <span className="material-symbols-outlined text-[#44ddc1] flex-shrink-0">arrow_forward</span>
+                  <span className="material-symbols-outlined text-[#44ddc1] shrink-0">arrow_forward</span>
                 </button>
               ))}
               {pendingStudents.length === 0 && (
@@ -555,7 +685,7 @@ const AssignTransportPage = () => {
                   className="flex items-center gap-4 cursor-pointer hover:bg-white rounded-xl px-3 py-2 transition-colors"
                   onClick={() => onRouteChange(r.id)}
                 >
-                  <div className="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center font-bold text-primary text-xs flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center font-bold text-primary text-xs shrink-0">
                     {(r.routeNo || r.routeName || "").slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -564,7 +694,7 @@ const AssignTransportPage = () => {
                       {r.stops?.length || 0} stops · {fmt(r.baseFee)}
                     </p>
                   </div>
-                  <span className="material-symbols-outlined text-[#44ddc1] flex-shrink-0">
+                  <span className="material-symbols-outlined text-[#44ddc1] shrink-0">
                     {routeId === r.id ? "check_circle" : "chevron_right"}
                   </span>
                 </div>

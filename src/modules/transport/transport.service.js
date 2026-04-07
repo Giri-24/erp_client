@@ -206,6 +206,22 @@ export const getDailyTripSummary = async (date) => {
   } catch { return []; }
 };
 
+/** Get consolidated bus report (mileage + ignition + events) */
+export const getBusReport = async (plateNo, date) => {
+  try {
+    const res = await axios.get('/transport/bus-report', { params: { plateNo, date } });
+    return res.data;
+  } catch { return null; }
+};
+
+/** Get fuel logs with optional filters */
+export const getFuelLogs = async ({ plateNo, busId, driverId, from, to } = {}) => {
+  try {
+    const res = await axios.get('/transport/fuel-logs', { params: { plateNo, busId, driverId, from, to } });
+    return res.data;
+  } catch { return []; }
+};
+
 // ─── BUSES ────────────────────────────────
 
 export const getAllBuses = async () => {

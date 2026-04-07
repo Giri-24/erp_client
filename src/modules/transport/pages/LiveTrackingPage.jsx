@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { notification, Modal, Input, Form, message } from "antd";
+import { notification, Modal, Input, Form, message, Select } from "antd";
 import { getAPMTrackingData } from "../apm.service";
 import {
   pushOdometerSnapshots,
@@ -11,6 +11,7 @@ import {
   upsertVehicleDriver,
   removeVehicleDriver,
   pushTripEvents,
+  getAllDrivers,
 } from "../transport.service";
 import { getLiveDriverBusStatus } from "../transport.service";
 
@@ -71,6 +72,7 @@ const LiveTrackingPage = () => {
   const mapRef = useRef(null);
   const prevIgnitionRef = useRef({});  // { deviceId: boolean } — tracks previous ignition states
   const [driverBusStatus, setDriverBusStatus] = useState(null);
+  const [allDrivers, setAllDrivers] = useState([]); // all registered drivers from DB
 
   // ── Driver-Vehicle mapping (backend with localStorage fallback) ─────────
   const loadDriverMap = useCallback(async () => {
@@ -80,26 +82,31 @@ const LiveTrackingPage = () => {
 
   useEffect(() => { loadDriverMap(); }, [loadDriverMap]);
 
+  useEffect(() => {
+    getAllDrivers().then(setAllDrivers).catch(() => {});
+  }, []);
+
   const getDriver = useCallback((v) => driverMap[v.plateNo] || null, [driverMap]);
 
   const openAssignModal = (vehicle, e) => {
     if (e) e.stopPropagation();
     setAssignVehicle(vehicle);
     const existing = driverMap[vehicle.plateNo];
+    const matchedDriver = existing ? allDrivers.find(d => d.phone === existing.phone || d.name === existing.name) : null;
     assignForm.setFieldsValue({
-      driverName: existing?.name || "",
-      driverPhone: existing?.phone || "",
-      driverLicense: existing?.licenseNo || "",
+      driverId: matchedDriver?.id || undefined,
     });
     setAssignModalOpen(true);
   };
 
   const handleAssignDriver = async () => {
     const values = await assignForm.validateFields();
+    const driver = allDrivers.find(d => d.id === values.driverId);
+    if (!driver) return message.error("Please select a driver");
     const map = await upsertVehicleDriver(assignVehicle.plateNo, {
-      name: values.driverName,
-      phone: values.driverPhone || "",
-      licenseNo: values.driverLicense || "",
+      name: driver.name,
+      phone: driver.phone || "",
+      licenseNo: driver.licenseNo || "",
     });
     setDriverMap({ ...map });
     message.success(`Driver assigned to ${assignVehicle.plateNo}`);
@@ -296,10 +303,10 @@ const LiveTrackingPage = () => {
          assignedBus = vehicles.find(v => v.plateNo === plateNo);
       }
       
-      let distanceToBusMeters = d.distanceToBusMeters;
-      let isInsideBus = d.driverBusStatus === 'in-bus';
+      let distanceToBusMeters = null;
+      let busStatus = null; // null = no bus GPS available
       
-      // If we have actual APM GPS vehicle data, we override the backend's default Location table assumption
+      // Only compute bus proximity using actual APM GPS vehicle data
       if (assignedBus && assignedBus.latitude && assignedBus.longitude && d.latitude && d.longitude) {
          const R = 6371000;
          const dLat = (assignedBus.latitude - d.latitude) * Math.PI / 180;
@@ -308,13 +315,13 @@ const LiveTrackingPage = () => {
                    Math.cos(d.latitude * Math.PI / 180) * Math.cos(assignedBus.latitude * Math.PI / 180) *
                    Math.sin(dLon/2) * Math.sin(dLon/2);
          distanceToBusMeters = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-         isInsideBus = distanceToBusMeters <= 50; 
+         busStatus = distanceToBusMeters <= 50 ? 'in-bus' : 'outside'; 
       }
       
       return {
         ...d,
         distanceToBusMeters,
-        driverBusStatus: isInsideBus ? 'in-bus' : 'outside',
+        driverBusStatus: busStatus,
         assignedBus
       };
     });
@@ -800,17 +807,22 @@ const LiveTrackingPage = () => {
       >
         <Form form={assignForm} layout="vertical" className="mt-4">
           <Form.Item
-            name="driverName"
-            label="Driver Name"
-            rules={[{ required: true, message: "Driver name is required" }]}
+            name="driverId"
+            label="Select Driver"
+            rules={[{ required: true, message: "Please select a driver" }]}
           >
-            <Input placeholder="e.g. Rajesh Kumar" prefix={<span className="material-symbols-outlined text-sm text-gray-400">person</span>} />
-          </Form.Item>
-          <Form.Item name="driverPhone" label="Phone Number">
-            <Input placeholder="e.g. 9876543210" prefix={<span className="material-symbols-outlined text-sm text-gray-400">call</span>} />
-          </Form.Item>
-          <Form.Item name="driverLicense" label="License Number">
-            <Input placeholder="e.g. TN01 2023001234" prefix={<span className="material-symbols-outlined text-sm text-gray-400">badge</span>} />
+            <Select
+              showSearch
+              placeholder="Search by name or phone"
+              optionFilterProp="children"
+              filterOption={(input, option) => (option?.children ?? "").toLowerCase().includes(input.toLowerCase())}
+            >
+              {allDrivers.map((d) => (
+                <Select.Option key={d.id} value={d.id}>
+                  {d.name}{d.phone ? ` — ${d.phone}` : ""}
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
         </Form>
       </Modal>
