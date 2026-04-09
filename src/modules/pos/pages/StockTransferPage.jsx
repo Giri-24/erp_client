@@ -8,13 +8,13 @@ import { exportToCSV } from "../exportCsv";
 
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
-const StockTransferPage = () => {
+const StockTransferPage = ({ initialTab }) => {
   const [stores, setStores] = useState([]);
   const [items, setItems] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [stockOverview, setStockOverview] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("transfer"); // transfer | history | stock
+  const [tab, setTab] = useState(initialTab || "transfer"); // transfer | history | stock
 
   // Transfer form
   const [fromStoreId, setFromStoreId] = useState("");

@@ -200,6 +200,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
         identityMark1: editData.identification1,
         identityMark2: editData.identification2,
         previouslyStudied: editData.previousSchool,
+        previousBoard: editData.previousBoard || editData.board || editData.admission?.previousBoard || editData.admission?.board,
         section: editData.section || undefined,
         academicYear: editData.academicYear || undefined,
         vanNeeded: editData.transportMode === "Van" ? true : false,
@@ -299,6 +300,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
       identityMark1: "Mole on right cheek",
       identityMark2: "Scar on left hand",
       previouslyStudied: "Govt Hr Sec School",
+      previousBoard: Math.random() > 0.5 ? "TAMILNADU_BOARD" : "OTHER_BOARD",
       vanNeeded: Math.random() > 0.5,
 
       fatherName: randName(),
@@ -579,8 +581,14 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
             <Col span={12}><Form.Item name="identityMark1" label="Identity Mark 1" rules={[requiredRule]}><Input /></Form.Item></Col>
             <Col span={12}><Form.Item name="identityMark2" label="Identity Mark 2" rules={[requiredRule]}><Input /></Form.Item></Col>
             <Col span={12}><Form.Item name="previouslyStudied" label="Previously Studied" rules={[requiredRule]}><Input /></Form.Item></Col>
-           
-           
+            <Col span={12}>
+              <Form.Item name="previousBoard" label="Board Studied" rules={[requiredRule]}>
+                <Select placeholder="Select board">
+                  <Select.Option value="TAMILNADU_BOARD">Tamilnadu Board</Select.Option>
+                  <Select.Option value="OTHER_BOARD">Other Board</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
           </Row>
         </div>
       ),
@@ -1643,6 +1651,7 @@ const generatePDF = async () => {
                           identification1: values.identityMark1,
                           identification2: values.identityMark2,
                           previousSchool: values.previouslyStudied,
+                          previousBoard: values.previousBoard,
                           transportMode: values.vanNeeded ? "Van" : "Local",
                           section: values.section || undefined,
                           academicYear: values.academicYear || undefined,

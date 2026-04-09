@@ -13,6 +13,8 @@ const StaffAllowancePage = () => {
   const [allStaff, setAllStaff] = useState([]);
   const [summary, setSummary] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryQueried, setSummaryQueried] = useState(false);
   const [tab, setTab] = useState("give"); // give | records | summary
 
   // Give form
@@ -82,11 +84,26 @@ const StaffAllowancePage = () => {
   };
 
   const loadSummary = async () => {
-    if (!summaryStaffId) { message.error("Select a staff member"); return; }
+    if (!summaryStaffId) {
+      message.error("Select a staff member");
+      return;
+    }
+    setSummaryLoading(true);
+    setSummaryQueried(true);
     try {
       const data = await getTeacherFreeItemSummary(summaryStaffId, summaryYear);
-      setSummary(data || []);
-    } catch { message.error("Failed to load summary"); }
+      const items = (data?.items || []).map((item) => ({
+        ...item,
+        remaining: item.netHeld ?? 0,
+      }));
+      setSummary(items);
+      if (!items.length) {
+        message.info("No summary found for the selected staff and year.");
+      }
+    } catch (err) {
+      message.error(err?.response?.data?.message || "Failed to load summary");
+    }
+    setSummaryLoading(false);
   };
 
   const filteredRecords = freeItems.filter((fi) => {
@@ -103,6 +120,32 @@ const StaffAllowancePage = () => {
 
   const uniqueYears = [...new Set(freeItems.map((fi) => fi.academicYear).filter(Boolean))].sort().reverse();
 
+  const getAllStaffSummary = () => {
+    const summaryMap = {};
+    freeItems.forEach((fi) => {
+      const staffName = fi.staff?.name || fi.staffId || "Unknown";
+      const itemName = fi.item?.name || fi.itemId || "Unknown";
+      const year = fi.academicYear || "";
+      const key = `${fi.staffId || staffName}||${fi.itemId || itemName}||${year}`;
+      if (!summaryMap[key]) {
+        summaryMap[key] = {
+          staffName,
+          staffId: fi.staffId || "",
+          itemName,
+          freeLimit: fi.item?.freeLimit ?? "",
+          totalGiven: 0,
+          totalReturned: 0,
+          remaining: 0,
+          academicYear: year,
+        };
+      }
+      summaryMap[key].totalGiven += fi.quantity || 0;
+      summaryMap[key].totalReturned += fi.returnedQuantity || 0;
+      summaryMap[key].remaining = summaryMap[key].totalGiven - summaryMap[key].totalReturned;
+    });
+    return Object.values(summaryMap);
+  };
+
   const exportRecords = () => {
     exportToCSV(filteredRecords, [
       { key: (r) => r.staff?.name || r.staffId, label: "Staff" },
@@ -113,6 +156,43 @@ const StaffAllowancePage = () => {
       { key: "academicYear", label: "Year" },
       { key: (r) => new Date(r.createdAt).toLocaleDateString("en-IN"), label: "Date" },
     ], "staff_allowance_records");
+  };
+
+  const exportAllStaffSummary = () => {
+    const summaryRows = getAllStaffSummary();
+    if (summaryRows.length === 0) {
+      message.error("No staff summary data available to export.");
+      return;
+    }
+
+    exportToCSV(summaryRows, [
+      { key: "staffName", label: "Staff" },
+      { key: "staffId", label: "Staff ID" },
+      { key: "itemName", label: "Item" },
+      { key: "freeLimit", label: "Limit" },
+      { key: "totalGiven", label: "Given" },
+      { key: "totalReturned", label: "Returned" },
+      { key: "remaining", label: "Remaining" },
+      { key: "academicYear", label: "Year" },
+    ], "staff_allowance_summary_all");
+  };
+
+  const exportSummary = () => {
+    if (!summary || summary.length === 0) {
+      message.error("Load a staff summary before exporting.");
+      return;
+    }
+
+    const staffName = allStaff.find((s) => s.id === summaryStaffId)?.name || "Staff";
+    exportToCSV(summary, [
+      { key: () => staffName, label: "Staff" },
+      { key: (r) => r.item?.name || r.itemName || "", label: "Item" },
+      { key: "freeLimit", label: "Limit" },
+      { key: "totalGiven", label: "Given" },
+      { key: "totalReturned", label: "Returned" },
+      { key: "remaining", label: "Remaining" },
+      { key: () => summaryYear, label: "Year" },
+    ], `staff_allowance_summary_${summaryYear}`);
   };
 
   if (loading) {
@@ -315,11 +395,17 @@ const StaffAllowancePage = () => {
               <input value={summaryYear} onChange={(e) => setSummaryYear(e.target.value)}
                 className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1" />
             </div>
-            <button onClick={loadSummary} className="bg-primary text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-primary/90 transition-all">
-              <span className="material-symbols-outlined text-lg">search</span>Get Summary
+            <button onClick={loadSummary} disabled={summaryLoading} className="bg-primary text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50">
+              <span className="material-symbols-outlined text-lg">search</span>{summaryLoading ? "Searching..." : "Get Summary"}
+            </button>
+            <button onClick={exportSummary} disabled={summaryLoading || summary.length === 0} className="bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-surface-container-highest transition-all disabled:opacity-50">
+              <span className="material-symbols-outlined text-lg">download</span>Export Selected Staff
+            </button>
+            <button onClick={exportAllStaffSummary} disabled={summaryLoading || freeItems.length === 0} className="bg-surface-container-high text-on-surface-variant px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-surface-container-highest transition-all disabled:opacity-50">
+              <span className="material-symbols-outlined text-lg">download</span>Export All Staff Summary
             </button>
           </div>
-          {summary.length > 0 && (
+          {summary.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {summary.map((s, idx) => (
                 <div key={idx} className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
@@ -349,6 +435,12 @@ const StaffAllowancePage = () => {
                 </div>
               ))}
             </div>
+          ) : (
+            summaryQueried && (
+              <div className="rounded-2xl border border-outline-variant/50 bg-white p-8 text-center text-sm text-on-surface-variant">
+                No summary found for the selected staff and year.
+              </div>
+            )
           )}
         </div>
       )}

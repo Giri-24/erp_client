@@ -113,7 +113,7 @@ const POSDashboardPage = ({ onNavigate }) => {
           <h4 className="font-headline font-bold text-lg text-on-surface mt-3">New Purchase</h4>
           <p className="text-xs text-on-surface-variant mt-1">Record a stock purchase from supplier</p>
         </button>
-        <button onClick={() => onNavigate?.("pos-stock")} className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-all text-left group">
+        <button onClick={() => onNavigate?.({ key: "pos-transfers", payload: { initialTab: "stock" } })} className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-all text-left group">
           <span className="material-symbols-outlined text-3xl text-tertiary group-hover:scale-110 transition-transform">inventory_2</span>
           <h4 className="font-headline font-bold text-lg text-on-surface mt-3">Stock Overview</h4>
           <p className="text-xs text-on-surface-variant mt-1">View current stock across all stores</p>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Avatar, Dropdown, Modal } from "antd";
 import { useNavigate } from "react-router-dom";
 import {
@@ -66,6 +66,7 @@ import { hasPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions
 const Dashboard = () => {
   const navigate = useNavigate();
   const [selectedKey, setSelectedKey] = useState("dashboard");
+  const [navigationPayload, setNavigationPayload] = useState(null);
   const [editData, setEditData] = useState(null);
   const [feeStudentId, setFeeStudentId] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -130,6 +131,25 @@ const Dashboard = () => {
       },
     });
   };
+
+  const handleNavigate = (nav) => {
+    if (!nav) return;
+    if (typeof nav === "string") {
+      setSelectedKey(nav);
+      setNavigationPayload(null);
+      return;
+    }
+    if (nav.key) {
+      setSelectedKey(nav.key);
+      setNavigationPayload(nav.payload || null);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedKey !== "pos-items" && navigationPayload) {
+      setNavigationPayload(null);
+    }
+  }, [selectedKey, navigationPayload]);
 
   const onUserMenuClick = ({ key }) => {
     if (key === "profile") setSelectedKey("profile");
@@ -217,7 +237,7 @@ const Dashboard = () => {
       permission: canPOSDashboard || canPOSRead,
       children: [
         { key: "pos-dashboard", label: "Dashboard", icon: "space_dashboard", permission: canPOSDashboard || canPOSRead },
-        { key: "pos-items", label: "Items & Stores", icon: "inventory_2", permission: canPOSRead },
+        // { key: "pos-items", label: "Items & Stores", icon: "inventory_2", permission: canPOSRead },
         { key: "pos-sales", label: "Sales (POS)", icon: "point_of_sale", permission: canPOSSell },
         { key: "pos-purchases", label: "Purchases", icon: "add_shopping_cart", permission: canPOSPurchase },
         { key: "pos-transfers", label: "Stock & Transfer", icon: "swap_horiz", permission: canPOSManage },
@@ -292,11 +312,11 @@ case "fees-collect":
       case "hr-payroll":          return <PayrollPage />;
       case "hr-advance":          return <AdvanceRequestPage />;
       case "hr-salary-abstract":  return <SalaryAbstractPage />;
-      case "pos-dashboard":       return <POSDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
-      case "pos-items":           return <StoreItemsPage />;
+      case "pos-dashboard":       return <POSDashboardPage onNavigate={handleNavigate} />;
+      case "pos-items":           return <StoreItemsPage initialTab={navigationPayload?.initialTab} />;
       case "pos-sales":           return <SalesPage />;
-      case "pos-purchases":       return <PurchasesPage />;
-      case "pos-transfers":       return <StockTransferPage />;
+      case "pos-purchases":       return <PurchasesPage onNavigate={handleNavigate} />;
+      case "pos-transfers":       return <StockTransferPage initialTab={navigationPayload?.initialTab} />;
       case "pos-teacher-allowance": return <StaffAllowancePage />;
       case "pos-transactions":    return <IncomeExpensePage />;
       case "doc-requests":        return <DocRequestPage />;

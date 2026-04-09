@@ -8,17 +8,18 @@ import {
 } from "../pos.service";
 import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 import { exportToCSV } from "../exportCsv";
+import ItemsStoreView from "../components/ItemsStoreView";
 
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
-const PurchasesPage = () => {
+const PurchasesPage = ({ onNavigate }) => {
   const { hasPermission } = usePermissionHelpers();
   const [stores, setStores] = useState([]);
   const [items, setItems] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("new"); // new | history | suppliers
+  const [tab, setTab] = useState("items"); // new | items | stores | suppliers
 
   // New purchase form
   const [storeId, setStoreId] = useState("");
@@ -28,6 +29,10 @@ const PurchasesPage = () => {
   const [prRemarks, setPrRemarks] = useState("");
   const [prItems, setPrItems] = useState([]); // [{itemId, name, quantity, unitPrice}]
   const [searchItem, setSearchItem] = useState("");
+  const [searchStore, setSearchStore] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterFree, setFilterFree] = useState("");
+  const [priceRange, setPriceRange] = useState({ min: "", max: "" });
   const [submitting, setSubmitting] = useState(false);
 
   // Supplier modal
@@ -152,8 +157,19 @@ const PurchasesPage = () => {
   };
 
   const filteredItems = items.filter((i) => {
+    if (filterCategory && i.category !== filterCategory) return false;
+    if (filterFree === "yes" && !i.isFreeEligible) return false;
+    if (filterFree === "no" && i.isFreeEligible) return false;
+    if (priceRange.min !== "" && (i.sellingPrice || 0) < Number(priceRange.min)) return false;
+    if (priceRange.max !== "" && (i.sellingPrice || 0) > Number(priceRange.max)) return false;
     if (!searchItem) return true;
     return i.name.toLowerCase().includes(searchItem.toLowerCase()) || (i.sku || "").toLowerCase().includes(searchItem.toLowerCase());
+  });
+
+  const filteredStores = stores.filter((s) => {
+    if (!searchStore) return true;
+    const q = searchStore.toLowerCase();
+    return (s.name || "").toLowerCase().includes(q) || (s.description || "").toLowerCase().includes(q);
   });
 
   const filteredPurchases = purchases.filter((p) => {
@@ -202,6 +218,18 @@ const PurchasesPage = () => {
     ], "suppliers");
   };
 
+  const exportItems = () => {
+    exportToCSV(filteredItems, [
+      { key: "name", label: "Item Name" },
+      { key: "sku", label: "SKU" },
+      { key: (r) => (r.category || "").replace(/_/g, " "), label: "Category" },
+      { key: "sellingPrice", label: "Sell Price" },
+      { key: "costPrice", label: "Cost Price" },
+      { key: "reorderLevel", label: "Reorder Level" },
+      { key: (r) => r.isFreeEligible ? "Yes" : "No", label: "Free Eligible" },
+    ], "purchase_items");
+  };
+
   if (loading) {
     return (<div className="flex items-center justify-center py-20"><span className="material-symbols-outlined text-4xl text-primary animate-spin">refresh</span></div>);
   }
@@ -218,10 +246,11 @@ const PurchasesPage = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {[
           { key: "new", label: "New Purchase", icon: "add_shopping_cart" },
-          { key: "history", label: "Purchase History", icon: "history" },
+          { key: "items", label: "Items Catalog", icon: "inventory_2" },
+          { key: "stores", label: "Stores / Outlets", icon: "storefront" },
           { key: "suppliers", label: "Suppliers", icon: "local_shipping" },
         ].map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -231,96 +260,103 @@ const PurchasesPage = () => {
         ))}
       </div>
 
-      {/* ── NEW PURCHASE ── */}
-      {tab === "new" && canManage && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Items picker */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
-              <div className="flex gap-3 mb-4 flex-wrap">
-                <select value={storeId} onChange={(e) => { setStoreId(e.target.value); setPrItems([]); }}
-                  className="bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none appearance-none">
-                  {stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-                <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)}
-                  className="bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none appearance-none">
-                  <option value="">No Supplier</option>
-                  {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-                <div className="relative flex-1 min-w-[200px]">
-                  <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-lg">search</span>
-                  <input value={searchItem} onChange={(e) => setSearchItem(e.target.value)} placeholder="Search items..."
-                    className="w-full bg-surface-container-high rounded-xl py-2.5 pl-10 pr-4 text-sm border-none outline-none focus:ring-2 focus:ring-primary/30" />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[350px] overflow-y-auto pr-1">
-                {filteredItems.map((item) => (
-                  <button key={item.id} onClick={() => addPrItem(item)}
-                    className="p-2.5 rounded-xl bg-surface-container-low hover:bg-primary-container/30 border border-outline-variant/10 transition-all text-left">
-                    <p className="font-bold text-xs text-on-surface truncate">{item.name}</p>
-                    <p className="text-[10px] text-on-surface-variant">{fmt(item.costPrice)}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
+      {(tab === "new" || tab === "items" || tab === "stores") && canManage && (
+        <div className={`grid gap-5 ${tab === "new" ? "grid-cols-1 lg:grid-cols-3" : "grid-cols-1"}`}>
+          <div className={tab === "new" ? "lg:col-span-2" : ""}>
+            <ItemsStoreView
+              mode="purchase"
+              showTabRow={false}
+              tab={tab}
+              setTab={setTab}
+              items={items}
+              filteredItems={filteredItems}
+              stores={stores}
+              filteredStores={filteredStores}
+              search={tab === "stores" ? searchStore : searchItem}
+              onSearchChange={(value) => {
+                if (tab === "stores") setSearchStore(value);
+                else setSearchItem(value);
+              }}
+              searchStore={searchStore}
+              onSearchStoreChange={setSearchStore}
+              storeId={storeId}
+              selectedStoreId={storeId}
+              onSelectStore={setStoreId}
+              suppliers={suppliers}
+              supplierId={supplierId}
+              onSupplierChange={setSupplierId}
+              filterCategory={filterCategory}
+              onFilterCategoryChange={setFilterCategory}
+              filterFree={filterFree}
+              onFilterFreeChange={setFilterFree}
+              priceRange={priceRange}
+              onPriceRangeChange={setPriceRange}
+              onExportItems={exportItems}
+              onAddPurchaseItem={addPrItem}
+              canManage={canManage}
+            />
           </div>
 
-          {/* Cart */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
-              <h3 className="font-bold text-lg text-on-surface mb-3 flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">receipt</span>Purchase Items ({prItems.length})
-              </h3>
-              {prItems.length === 0 ? (
-                <p className="text-sm text-on-surface-variant text-center py-6">No items added</p>
-              ) : (
-                <div className="space-y-2 max-h-[250px] overflow-y-auto">
-                  {prItems.map((p) => (
-                    <div key={p.itemId} className="flex items-center gap-2 p-2 rounded-xl bg-surface-container-low">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-xs text-on-surface truncate">{p.name}</p>
+          {tab === "new" && (
+            <>
+            {/* Cart */}
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
+                <h3 className="font-bold text-lg text-on-surface mb-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">receipt</span>Purchase Items ({prItems.length})
+                </h3>
+                {prItems.length === 0 ? (
+                  <p className="text-sm text-on-surface-variant text-center py-6">No items added</p>
+                ) : (
+                  <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                    {prItems.map((p) => (
+                      <div key={p.itemId} className="flex items-center gap-2 p-2 rounded-xl bg-surface-container-low">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-xs text-on-surface truncate">{p.name}</p>
+                        </div>
+                        <input type="number" min={1} value={p.quantity} onChange={(e) => updatePrItem(p.itemId, "quantity", e.target.value)}
+                          className="w-14 text-center text-sm font-bold bg-surface-container-high rounded-lg py-1 outline-none" />
+                        <span className="text-[10px] text-on-surface-variant">×</span>
+                        <input type="number" min={0} value={p.unitPrice} onChange={(e) => updatePrItem(p.itemId, "unitPrice", e.target.value)}
+                          className="w-20 text-right text-sm bg-surface-container-high rounded-lg py-1 px-2 outline-none" />
+                        <button onClick={() => removePrItem(p.itemId)} className="text-error/50 hover:text-error transition-colors">
+                          <span className="material-symbols-outlined text-sm">close</span>
+                        </button>
                       </div>
-                      <input type="number" min={1} value={p.quantity} onChange={(e) => updatePrItem(p.itemId, "quantity", e.target.value)}
-                        className="w-14 text-center text-sm font-bold bg-surface-container-high rounded-lg py-1 outline-none" />
-                      <span className="text-[10px] text-on-surface-variant">×</span>
-                      <input type="number" min={0} value={p.unitPrice} onChange={(e) => updatePrItem(p.itemId, "unitPrice", e.target.value)}
-                        className="w-20 text-right text-sm bg-surface-container-high rounded-lg py-1 px-2 outline-none" />
-                      <button onClick={() => removePrItem(p.itemId)} className="text-error/50 hover:text-error transition-colors">
-                        <span className="material-symbols-outlined text-sm">close</span>
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+                <div className="border-t border-outline-variant/10 mt-4 pt-4 flex justify-between font-extrabold text-lg">
+                  <span>Total</span><span className="text-primary">{fmt(prTotal)}</span>
                 </div>
-              )}
-              <div className="border-t border-outline-variant/10 mt-4 pt-4 flex justify-between font-extrabold text-lg">
-                <span>Total</span><span className="text-primary">{fmt(prTotal)}</span>
               </div>
-            </div>
-            <div className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)] space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-on-surface-variant uppercase">Invoice No</label>
-                  <input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="Leave empty for auto-generated"
-                    className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1" />
+              <div className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)] space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-on-surface-variant uppercase">Invoice No</label>
+                    <input value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="Leave empty for auto-generated"
+                      className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-on-surface-variant uppercase">Invoice Date</label>
+                    <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)}
+                      className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1" />
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-on-surface-variant uppercase">Invoice Date</label>
-                  <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)}
+                  <label className="text-xs font-bold text-on-surface-variant uppercase">Remarks</label>
+                  <input value={prRemarks} onChange={(e) => setPrRemarks(e.target.value)}
                     className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1" />
                 </div>
+                <button onClick={handleSubmitPurchase} disabled={submitting || prItems.length === 0}
+                  className="w-full bg-primary text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 transition-all">
+                  <span className="material-symbols-outlined">save</span>
+                  {submitting ? "Saving..." : `Record Purchase — ${fmt(prTotal)}`}
+                </button>
               </div>
-              <div>
-                <label className="text-xs font-bold text-on-surface-variant uppercase">Remarks</label>
-                <input value={prRemarks} onChange={(e) => setPrRemarks(e.target.value)}
-                  className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1" />
-              </div>
-              <button onClick={handleSubmitPurchase} disabled={submitting || prItems.length === 0}
-                className="w-full bg-primary text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 transition-all">
-                <span className="material-symbols-outlined">save</span>
-                {submitting ? "Saving..." : `Record Purchase — ${fmt(prTotal)}`}
-              </button>
             </div>
-          </div>
+            </>
+          )}
         </div>
       )}
 

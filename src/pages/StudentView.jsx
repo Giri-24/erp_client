@@ -33,6 +33,15 @@ const initials = (name = "") => {
     : name.slice(0, 2).toUpperCase();
 };
 
+const normalizeTransportMode = (mode = "") => String(mode || "").trim().toUpperCase();
+
+const getTransportFilterValue = (mode = "") => {
+  const normalizedMode = normalizeTransportMode(mode);
+  if (!normalizedMode || ["LOCAL", "SELF", "WALKING"].includes(normalizedMode)) return "local";
+  if (normalizedMode.includes("VAN")) return "van";
+  return "van";
+};
+
 // ── component ─────────────────────────────────────────────────────────────
 const StudentView = ({ onCollectFee, onEdit }) => {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -44,6 +53,7 @@ const [fees, setFees] = useState([]);
   const [classFilter, setClassFilter] = useState("");
   const [sectionFilter, setSectionFilter] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
+  const [transportFilter, setTransportFilter] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
   const [fatherFilter, setFatherFilter] = useState("");
   const [siblingFilter, setSiblingFilter] = useState("");
@@ -100,6 +110,7 @@ const [fees, setFees] = useState([]);
       if (classFilter && (s.standard || s.admission?.standard) !== classFilter) return false;
       if (sectionFilter && (s.section || "") !== sectionFilter) return false;
       if (genderFilter && (s.gender || "").toLowerCase() !== genderFilter) return false;
+      if (transportFilter && getTransportFilterValue(s.transportMode) !== transportFilter) return false;
       if (areaFilter) {
         const areaStr = areaFilter.toLowerCase();
         const addr = s.address || {};
@@ -128,7 +139,7 @@ const [fees, setFees] = useState([]);
       }
       return true;
     });
-  }, [students, classFilter, sectionFilter, genderFilter, areaFilter, searchText]);
+  }, [students, classFilter, sectionFilter, genderFilter, transportFilter, areaFilter, fatherFilter, siblingFilter, searchText]);
 
   // ── summary stats ─────────────────────────────────────────────────────────
   const totalEnrollment = students.length;
@@ -185,7 +196,7 @@ const [fees, setFees] = useState([]);
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="font-headline font-extrabold text-4xl text-primary tracking-tight mb-2">
-            Student Registry
+            Student Management
           </h2>
           <p className="text-on-surface-variant max-w-md text-sm">
             Comprehensive database of enrolled students. Manage admissions, academic standing, and biographical records.
@@ -308,6 +319,20 @@ const [fees, setFees] = useState([]);
               <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">expand_more</span>
             </div>
 
+            {/* Transport select */}
+            <div className="relative">
+              <select
+                value={transportFilter}
+                onChange={(e) => { setTransportFilter(e.target.value); setPage(1); }}
+                className="bg-white border-none rounded-xl py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none shadow-sm cursor-pointer appearance-none min-w-[150px]"
+              >
+                <option value="">Transport</option>
+                <option value="van">Van Student</option>
+                <option value="local">Local Student</option>
+              </select>
+              <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">expand_more</span>
+            </div>
+
             {/* Area / Pin */}
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-3 text-on-surface-variant text-base">location_on</span>
@@ -347,9 +372,9 @@ const [fees, setFees] = useState([]);
             </div>
 
             {/* Clear */}
-            {(classFilter || sectionFilter || genderFilter || areaFilter || fatherFilter || siblingFilter || searchText) && (
+            {(classFilter || sectionFilter || genderFilter || transportFilter || areaFilter || fatherFilter || siblingFilter || searchText) && (
               <button
-                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setAreaFilter(""); setFatherFilter(""); setSiblingFilter(""); setSearchText(""); setPage(1); }}
+                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setTransportFilter(""); setAreaFilter(""); setFatherFilter(""); setSiblingFilter(""); setSearchText(""); setPage(1); }}
                 className="h-[46px] px-4 flex items-center gap-1 bg-surface-container-highest rounded-xl text-on-surface-variant hover:text-error hover:bg-error-container transition-all text-sm font-medium"
               >
                 <span className="material-symbols-outlined text-base">close</span>
