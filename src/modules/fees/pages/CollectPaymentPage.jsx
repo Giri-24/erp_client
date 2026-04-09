@@ -15,6 +15,7 @@ import {
   getSiblingFees,
 } from "../fees.service";
 import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
+import { getStudentFee } from "../fees.service";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => "₹" + Math.round(Number(v || 0)).toLocaleString("en-IN");
@@ -132,9 +133,9 @@ const buildReceiptFeeRows = (payment) => {
 const statusBadge = (status) => {
   const s = (status || "SUCCESS").toUpperCase();
   if (s === "REFUNDED")
-    return <span className="px-3 py-1 bg-error-container text-error rounded-full text-xs font-bold uppercase">Refunded</span>;
+    return <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-error-container text-error">Refunded</span>;
   if (s === "CANCELLED")
-    return <span className="px-3 py-1 bg-surface-container-high text-on-surface-variant rounded-full text-xs font-bold uppercase">Cancelled</span>;
+    return <span className="px-3 py-1 text-xs font-bold uppercase rounded-full bg-surface-container-high text-on-surface-variant">Cancelled</span>;
   return <span className="px-3 py-1 bg-[#44ddc1]/20 text-[#00201a] rounded-full text-xs font-bold uppercase">Success</span>;
 };
 
@@ -176,12 +177,16 @@ const CollectPaymentPage = ({ studentId }) => {
   const canCollectFee = hasPermission(PERMISSIONS.FEES_COLLECT);
 
   // ── data fetching ─────────────────────────────────────────────────────
+
+  // Use backend-provided academic years for dropdown
   const fetchAcademicYears = async () => {
     try {
       const years = await getAcademicYears();
       setAcademicYearOptions(years || []);
       if (years?.length > 0) setAcademicYear((prev) => prev || years[0]);
-    } catch { /* silent */ }
+    } catch {
+      setAcademicYearOptions([]);
+    }
   };
 
   const fetchReceiptNo = async () => {
@@ -287,12 +292,27 @@ const CollectPaymentPage = ({ studentId }) => {
   };
 
   // Search by admission number
-  const handleAdmissionNoSearch = () => {
+  const handleAdmissionNoSearch = async () => {
     if (!admissionNoSearch.trim()) return;
-    const fee = studentFees.find(
+    let fee = studentFees.find(
       (f) =>
         f.student?.admission?.admissionNo?.toLowerCase() === admissionNoSearch.trim().toLowerCase()
     );
+    if (!fee && academicYear) {
+      // Try fetching from backend if not found in loaded fees
+      try {
+        const fetched = await getStudentFee(admissionNoSearch.trim(), academicYear);
+        if (fetched && fetched.id) {
+          // Add to dropdown if not already present
+          setStudentFees((prev) => {
+            if (prev.some((f) => f.id === fetched.id)) return prev;
+            return [...prev, fetched];
+          });
+          onSelectFee(fetched.id);
+          return;
+        }
+      } catch {}
+    }
     if (fee) {
       onSelectFee(fee.id);
     } else {
@@ -596,9 +616,9 @@ const CollectPaymentPage = ({ studentId }) => {
         <nav className="flex items-center gap-1.5 text-xs text-on-surface-variant mb-2 font-medium">
           <span>Finance</span>
           <span className="material-symbols-outlined text-[10px]">chevron_right</span>
-          <span className="text-primary font-bold">Collect Fees</span>
+          <span className="font-bold text-primary">Collect Fees</span>
         </nav>
-        <h2 className="font-headline font-extrabold text-3xl text-primary tracking-tight">
+        <h2 className="text-3xl font-extrabold tracking-tight font-headline text-primary">
           Collect Student Fees
         </h2>
       </div>
@@ -607,20 +627,20 @@ const CollectPaymentPage = ({ studentId }) => {
       <div className="grid grid-cols-12 gap-5">
 
         {/* ── LEFT: form (8 cols) ── */}
-        <div className="col-span-12 lg:col-span-8 space-y-5">
+        <div className="col-span-12 space-y-5 lg:col-span-8">
 
           {/* Section 1: Select recipient */}
           <section className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.06)] relative overflow-hidden">
             {/* decorative corner */}
-            <div className="absolute top-0 right-0 w-28 h-28 bg-primary/5 rounded-bl-full -mr-8 -mt-8 pointer-events-none" />
+            <div className="absolute top-0 right-0 -mt-8 -mr-8 rounded-bl-full pointer-events-none w-28 h-28 bg-primary/5" />
 
             <div className="flex items-center gap-4 mb-7">
-              <div className="w-12 h-12 bg-secondary-container rounded-xl flex items-center justify-center text-primary flex-shrink-0">
+              <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 bg-secondary-container rounded-xl text-primary">
                 <span className="material-symbols-outlined"
                   style={{ fontVariationSettings: "'FILL' 1" }}>person_search</span>
               </div>
               <div>
-                <h3 className="font-headline font-bold text-lg text-primary">Select Recipient</h3>
+                <h3 className="text-lg font-bold font-headline text-primary">Select Recipient</h3>
                 <p className="text-sm text-on-surface-variant">Identify the student and academic session</p>
               </div>
             </div>
@@ -634,13 +654,13 @@ const CollectPaymentPage = ({ studentId }) => {
                   <select
                     value={academicYear}
                     onChange={(e) => setAcademicYear(e.target.value)}
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
+                    className="w-full px-4 py-3 text-sm font-medium transition-colors border-none outline-none appearance-none bg-surface-container-high rounded-xl focus:bg-surface-container-highest"
                   >
                     {academicYearOptions.map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
-                  <span className="material-symbols-outlined absolute right-3 top-3 text-on-surface-variant pointer-events-none text-base">expand_more</span>
+                  <span className="absolute text-base pointer-events-none material-symbols-outlined right-3 top-3 text-on-surface-variant">expand_more</span>
                 </div>
               </div>
 
@@ -655,14 +675,14 @@ const CollectPaymentPage = ({ studentId }) => {
                     onChange={(e) => setAdmissionNoSearch(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAdmissionNoSearch()}
                     placeholder="e.g. ADM-001"
-                    className="flex-1 bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                    className="flex-1 px-4 py-3 text-sm font-medium transition-colors border-none outline-none bg-surface-container-high rounded-xl focus:bg-surface-container-highest"
                   />
                   <button
                     type="button"
                     onClick={handleAdmissionNoSearch}
-                    className="px-3 rounded-xl bg-primary text-white flex items-center justify-center hover:opacity-90 transition-opacity"
+                    className="flex items-center justify-center px-3 text-white transition-opacity rounded-xl bg-primary hover:opacity-90"
                   >
-                    <span className="material-symbols-outlined text-sm">search</span>
+                    <span className="text-sm material-symbols-outlined">search</span>
                   </button>
                 </div>
               </div>
@@ -675,7 +695,7 @@ const CollectPaymentPage = ({ studentId }) => {
                   <select
                     value={selectedFee?.id || ""}
                     onChange={(e) => e.target.value && onSelectFee(e.target.value)}
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
+                    className="w-full px-4 py-3 text-sm font-medium transition-colors border-none outline-none appearance-none bg-surface-container-high rounded-xl focus:bg-surface-container-highest"
                   >
                     <option value="">Select student...</option>
                     {studentFees.map((f) => (
@@ -684,7 +704,7 @@ const CollectPaymentPage = ({ studentId }) => {
                       </option>
                     ))}
                   </select>
-                  <span className="material-symbols-outlined absolute right-3 top-3 text-primary/40 pointer-events-none text-base">expand_more</span>
+                  <span className="absolute text-base pointer-events-none material-symbols-outlined right-3 top-3 text-primary/40">expand_more</span>
                 </div>
               </div>
             </div>
@@ -693,22 +713,22 @@ const CollectPaymentPage = ({ studentId }) => {
           {/* Section 2: Payment transaction */}
           <section ref={paymentFormRef} className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
             <div className="flex items-center gap-4 mb-7">
-              <div className="w-12 h-12 bg-tertiary-fixed rounded-xl flex items-center justify-center text-tertiary flex-shrink-0">
+              <div className="flex items-center justify-center flex-shrink-0 w-12 h-12 bg-tertiary-fixed rounded-xl text-tertiary">
                 <span className="material-symbols-outlined"
                   style={{ fontVariationSettings: "'FILL' 1" }}>payments</span>
               </div>
               <div>
-                <h3 className="font-headline font-bold text-lg text-primary">Payment Transaction</h3>
+                <h3 className="text-lg font-bold font-headline text-primary">Payment Transaction</h3>
                 <p className="text-sm text-on-surface-variant">Enter receipt details and payment mode</p>
               </div>
             </div>
 
             {/* Term selection moved from Section 1 for better flow */}
             {selectedFee?.terms?.length > 0 && (
-              <div className="mb-8 p-6 bg-surface-container-low rounded-2xl border border-outline-variant/30">
+              <div className="p-6 mb-8 border bg-surface-container-low rounded-2xl border-outline-variant/30">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-primary">account_tree</span>
+                    <span className="text-sm material-symbols-outlined text-primary">account_tree</span>
                     <label className="text-[11px] font-extrabold text-primary uppercase tracking-widest">Term Distribution</label>
                   </div>
                   <Checkbox 
@@ -717,7 +737,7 @@ const CollectPaymentPage = ({ studentId }) => {
                       setSplitMode(e.target.checked);
                       if (e.target.checked) setTermNumber(null);
                     }}
-                    className="text-primary font-bold text-xs"
+                    className="text-xs font-bold text-primary"
                   >
                     Split Payment Across Terms
                   </Checkbox>
@@ -725,7 +745,7 @@ const CollectPaymentPage = ({ studentId }) => {
 
                 {!splitMode ? (
                   <>
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex flex-wrap gap-2">
                       {selectedFee.terms.map((t) => {
                         const paid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
                         const balance = Math.round(t.amount - paid);
@@ -793,7 +813,7 @@ const CollectPaymentPage = ({ studentId }) => {
                           >
                             <div className="flex flex-col items-start gap-0.5">
                               <span className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm">shopping_bag</span>
+                                <span className="text-sm material-symbols-outlined">shopping_bag</span>
                                 Other Fees
                               </span>
                               <span className={`text-[10px] opacity-70 ${payingNonTerm ? "text-white/80" : ""}`}>
@@ -856,7 +876,7 @@ const CollectPaymentPage = ({ studentId }) => {
 
                       const allSelected = payComponents.length === 0;
                       return (
-                        <div className="mt-3 p-4 bg-tertiary/5 rounded-xl border border-tertiary/10">
+                        <div className="p-4 mt-3 border bg-tertiary/5 rounded-xl border-tertiary/10">
                           <div className="flex items-center justify-between mb-3">
                             <span className="text-[10px] font-bold text-tertiary uppercase tracking-wider">
                               Non-Term Fees — Balance {fmt(nonTermBal)}
@@ -887,7 +907,7 @@ const CollectPaymentPage = ({ studentId }) => {
                                     key={c.key}
                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold bg-[#e8f5e9] text-[#2e7d32] border border-[#4caf50]/20 cursor-default"
                                   >
-                                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                                    <span className="text-sm material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                                     {c.label}
                                     <span className="text-[10px] text-[#2e7d32]/70">{fmt(c.val)} Paid</span>
                                   </div>
@@ -907,7 +927,7 @@ const CollectPaymentPage = ({ studentId }) => {
                                       : "bg-white text-on-surface-variant border-outline-variant/30 opacity-60"
                                   }`}
                                 >
-                                  <span className="material-symbols-outlined text-sm">{c.icon}</span>
+                                  <span className="text-sm material-symbols-outlined">{c.icon}</span>
                                   {c.label}
                                   <span className={`text-[10px] font-medium ${
                                     isActive ? "text-white/80" : allSelected ? "text-tertiary" : "text-on-surface-variant"
@@ -984,7 +1004,7 @@ const CollectPaymentPage = ({ studentId }) => {
 
                       const allSelected = payComponents.length === 0;
                       return (
-                        <div className="mt-3 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                        <div className="p-4 mt-3 border bg-primary/5 rounded-xl border-primary/10">
                           <div className="flex items-center justify-between mb-3">
                             <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
                               {selTerm.termName} — Balance {fmt(bal)}
@@ -1015,7 +1035,7 @@ const CollectPaymentPage = ({ studentId }) => {
                                     key={c.key}
                                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold bg-[#e8f5e9] text-[#2e7d32] border border-[#4caf50]/20 cursor-default"
                                   >
-                                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                                    <span className="text-sm material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                                     {c.label}
                                     <span className="text-[10px] text-[#2e7d32]/70">{fmt(c.val)} Paid</span>
                                   </div>
@@ -1039,7 +1059,7 @@ const CollectPaymentPage = ({ studentId }) => {
                                       : "bg-white text-on-surface-variant border-outline-variant/30 opacity-60"
                                   }`}
                                 >
-                                  <span className="material-symbols-outlined text-sm">{c.icon}</span>
+                                  <span className="text-sm material-symbols-outlined">{c.icon}</span>
                                   {c.label}
                                   <span className={`text-[10px] font-medium ${
                                     isActive ? "text-white/80" : allSelected && c.highlight ? "text-tertiary" : "text-on-surface-variant"
@@ -1074,11 +1094,11 @@ const CollectPaymentPage = ({ studentId }) => {
                           <table className="w-full text-xs">
                             <thead>
                               <tr className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-                                <th className="text-left py-2 px-3">Component</th>
+                                <th className="px-3 py-2 text-left">Component</th>
                                 {enrichedTerms.map((t) => (
-                                  <th key={t.termNumber} className="text-right py-2 px-3">{t.termName}</th>
+                                  <th key={t.termNumber} className="px-3 py-2 text-right">{t.termName}</th>
                                 ))}
-                                <th className="text-right py-2 px-3">Total</th>
+                                <th className="px-3 py-2 text-right">Total</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1093,21 +1113,21 @@ const CollectPaymentPage = ({ studentId }) => {
                                     {row.label}
                                   </td>
                                   {enrichedTerms.map((t) => (
-                                    <td key={t.termNumber} className="text-right py-2 px-3 font-medium text-on-surface-variant">
+                                    <td key={t.termNumber} className="px-3 py-2 font-medium text-right text-on-surface-variant">
                                       {fmt(t[row.field] || 0)}
                                     </td>
                                   ))}
-                                  <td className="text-right py-2 px-3 font-bold text-on-surface">{fmt(row.total)}</td>
+                                  <td className="px-3 py-2 font-bold text-right text-on-surface">{fmt(row.total)}</td>
                                 </tr>
                               ))}
                               <tr className="border-t border-outline-variant/30">
-                                <td className="py-2 px-3 font-extrabold text-primary">Total</td>
+                                <td className="px-3 py-2 font-extrabold text-primary">Total</td>
                                 {enrichedTerms.map((t) => (
-                                  <td key={t.termNumber} className="text-right py-2 px-3 font-extrabold text-primary">
+                                  <td key={t.termNumber} className="px-3 py-2 font-extrabold text-right text-primary">
                                     {fmt(t.amount)}
                                   </td>
                                 ))}
-                                <td className="text-right py-2 px-3 font-extrabold text-primary">
+                                <td className="px-3 py-2 font-extrabold text-right text-primary">
                                   {fmt(Number(selectedFee.tuitionFee || 0) + Number(selectedFee.transportFee || 0))}
                                 </td>
                               </tr>
@@ -1116,14 +1136,14 @@ const CollectPaymentPage = ({ studentId }) => {
                         </div>
                         {/* Non-term fees (Book, Hostel, Other, Custom — paid as lump sum) */}
                         {nonTermFees.length > 0 && (
-                          <div className="mt-3 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
+                          <div className="p-3 mt-3 border bg-surface-container-low rounded-xl border-outline-variant/30">
                             <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">
                               Non-Term Fees (paid separately)
                             </p>
                             <div className="flex flex-wrap gap-3">
                               {nonTermFees.map((nf, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5 px-3 py-2 bg-white rounded-lg border border-outline-variant/20 text-xs font-bold text-on-surface">
-                                  <span className="material-symbols-outlined text-sm text-on-surface-variant">{nf.icon}</span>
+                                  <span className="text-sm material-symbols-outlined text-on-surface-variant">{nf.icon}</span>
                                   {nf.label}: {fmt(nf.amount)}
                                 </div>
                               ))}
@@ -1135,7 +1155,7 @@ const CollectPaymentPage = ({ studentId }) => {
                     })()}
                   </>
                 ) : (
-                  <div className="bg-white rounded-xl border border-outline-variant/50 overflow-hidden shadow-sm">
+                  <div className="overflow-hidden bg-white border shadow-sm rounded-xl border-outline-variant/50">
                     <Table
                       dataSource={splitPayments.map((sp) => {
                         const enriched = computeTermComponents(selectedFee);
@@ -1146,7 +1166,7 @@ const CollectPaymentPage = ({ studentId }) => {
                         { 
                           title: "Term", 
                           dataIndex: "termName",
-                          render: (v) => <span className="font-bold text-primary text-xs">{v}</span>
+                          render: (v) => <span className="text-xs font-bold text-primary">{v}</span>
                         },
                         {
                           title: "Breakdown",
@@ -1155,7 +1175,7 @@ const CollectPaymentPage = ({ studentId }) => {
                             <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-on-surface-variant">
                               <span>Tuition: {fmt(t.tuitionAmount || 0)}</span>
                               {Number(t.transportAmount || 0) > 0 && (
-                                <span className="text-tertiary font-bold">Transport: {fmt(t.transportAmount)}</span>
+                                <span className="font-bold text-tertiary">Transport: {fmt(t.transportAmount)}</span>
                               )}
                               {Number(t.bookAmount || 0) > 0 && <span>Book: {fmt(t.bookAmount)}</span>}
                               {Number(t.otherAmount || 0) > 0 && <span>Other: {fmt(t.otherAmount)}</span>}
@@ -1194,7 +1214,7 @@ const CollectPaymentPage = ({ studentId }) => {
                       size="small"
                       className="split-payment-table"
                     />
-                    <div className="p-3 bg-surface-container-highest/30 flex justify-between items-center border-t border-outline-variant/50">
+                    <div className="flex items-center justify-between p-3 border-t bg-surface-container-highest/30 border-outline-variant/50">
                       <span className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">Distributed Total</span>
                       <p className="text-sm font-black text-primary">
                         {fmt(splitPayments.reduce((s, p) => s + Number(p.amount || 0), 0))}
@@ -1216,7 +1236,7 @@ const CollectPaymentPage = ({ studentId }) => {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
                       Amount to Collect (₹)
-                      {maxBal !== undefined && <span className="text-on-surface-variant font-medium ml-2">Max: {fmt(maxBal)}</span>}
+                      {maxBal !== undefined && <span className="ml-2 font-medium text-on-surface-variant">Max: {fmt(maxBal)}</span>}
                     </label>
                     <input
                       type="number"
@@ -1225,11 +1245,11 @@ const CollectPaymentPage = ({ studentId }) => {
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       placeholder="0.00"
-                      className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-xl font-headline font-bold text-primary focus:bg-surface-container-highest transition-colors outline-none"
+                      className="w-full px-4 py-3 text-xl font-bold transition-colors border-none outline-none bg-surface-container-high rounded-xl font-headline text-primary focus:bg-surface-container-highest"
                     />
                     {maxBal !== undefined && Number(amount) > maxBal && (
-                      <p className="text-xs text-error font-medium ml-1 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">warning</span>
+                      <p className="flex items-center gap-1 ml-1 text-xs font-medium text-error">
+                        <span className="text-xs material-symbols-outlined">warning</span>
                         Amount exceeds term balance ({fmt(maxBal)}). Transport & other fees are already included in the term amount.
                       </p>
                     )}
@@ -1254,7 +1274,7 @@ const CollectPaymentPage = ({ studentId }) => {
                           : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
                       }`}
                     >
-                      <span className="material-symbols-outlined text-sm">{m.icon}</span>
+                      <span className="text-sm material-symbols-outlined">{m.icon}</span>
                       {m.label}
                     </button>
                   ))}
@@ -1272,7 +1292,7 @@ const CollectPaymentPage = ({ studentId }) => {
                   value={receiptNo}
                   onChange={(e) => setReceiptNo(e.target.value)}
                   placeholder="REC-2024-001"
-                  className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                  className="w-full px-4 py-3 text-sm font-medium transition-colors border-none outline-none bg-surface-container-high rounded-xl focus:bg-surface-container-highest"
                 />
               </div>
 
@@ -1286,14 +1306,14 @@ const CollectPaymentPage = ({ studentId }) => {
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
                   placeholder="Add a note..."
-                  className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                  className="w-full px-4 py-3 text-sm font-medium transition-colors border-none outline-none bg-surface-container-high rounded-xl focus:bg-surface-container-highest"
                 />
               </div>
             </div>
 
             {/* Receipt components with amounts */}
             {selectedFee && getAvailableReceiptComponentOptions(selectedFee).length > 0 && (
-              <div className="mb-6 p-4 bg-surface rounded-xl">
+              <div className="p-4 mb-6 bg-surface rounded-xl">
                 <p className="text-[10px] text-on-surface-variant mb-3 flex items-center gap-1">
                   <span className="material-symbols-outlined text-[10px]">info</span>
                   These components are already included in the term amounts above. Checking/unchecking controls what appears on the printed receipt.
@@ -1319,7 +1339,7 @@ const CollectPaymentPage = ({ studentId }) => {
                         className="w-4 h-4 rounded border-outline accent-primary"
                       />
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium text-on-surface-variant group-hover:text-primary transition-colors">
+                        <span className="text-sm font-medium transition-colors text-on-surface-variant group-hover:text-primary">
                           Include {RECEIPT_COMPONENT_LABELS[key]}
                         </span>
                         <span className="text-[10px] text-on-surface-variant/70">
@@ -1346,7 +1366,7 @@ const CollectPaymentPage = ({ studentId }) => {
               className="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold text-lg shadow-[0_10px_20px_rgba(0,21,42,0.2)] hover:shadow-[0_15px_30px_rgba(0,21,42,0.3)] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
             >
               {loading ? (
-                <><span className="material-symbols-outlined text-base animate-spin">refresh</span>Processing...</>
+                <><span className="text-base material-symbols-outlined animate-spin">refresh</span>Processing...</>
               ) : (
                 <><span className="material-symbols-outlined">point_of_sale</span>Collect Payment</>
               )}
@@ -1357,9 +1377,9 @@ const CollectPaymentPage = ({ studentId }) => {
               <button
                 type="button"
                 onClick={openLinkModal}
-                className="w-full mt-3 py-3 rounded-xl border-2 border-outline-variant text-primary font-bold text-sm flex items-center justify-center gap-2 hover:bg-surface-container-low transition-colors"
+                className="flex items-center justify-center w-full gap-2 py-3 mt-3 text-sm font-bold transition-colors border-2 rounded-xl border-outline-variant text-primary hover:bg-surface-container-low"
               >
-                <span className="material-symbols-outlined text-sm">link</span>
+                <span className="text-sm material-symbols-outlined">link</span>
                 Send Payment Link (Digital)
               </button>
             )}
@@ -1367,14 +1387,14 @@ const CollectPaymentPage = ({ studentId }) => {
         </div>
 
         {/* ── RIGHT: summary + digital invoicing (4 cols) ── */}
-        <div className="col-span-12 lg:col-span-4 space-y-5">
+        <div className="col-span-12 space-y-5 lg:col-span-4">
 
           {/* Account summary card */}
-          <section className="bg-primary-container rounded-2xl p-7 text-white shadow-xl relative overflow-hidden">
+          <section className="relative overflow-hidden text-white shadow-xl bg-primary-container rounded-2xl p-7">
             <div className="absolute top-3 right-3 opacity-10">
               <span className="material-symbols-outlined text-8xl">account_balance_wallet</span>
             </div>
-            <h3 className="font-headline font-bold text-lg mb-5 flex items-center gap-2 text-on-primary-container">
+            <h3 className="flex items-center gap-2 mb-5 text-lg font-bold font-headline text-on-primary-container">
               <span className="material-symbols-outlined text-secondary-fixed-dim">bar_chart</span>
               Account Summary
             </h3>
@@ -1382,7 +1402,7 @@ const CollectPaymentPage = ({ studentId }) => {
             {selectedFee ? (
               <div className="space-y-3 text-white">
                 <div className="mb-4">
-                  <p className="text-lg font-headline font-extrabold text-white">{selectedFee.student?.name || "—"}</p>
+                  <p className="text-lg font-extrabold text-white font-headline">{selectedFee.student?.name || "—"}</p>
                   <p className="text-[11px] text-on-primary-container/70">
                     {selectedFee.student?.admission?.admissionNo && <span className="font-bold">{selectedFee.student.admission.admissionNo} · </span>}
                     {formatStandardLabel(selectedFee.student?.standard)}{selectedFee.student?.section ? ` - ${selectedFee.student.section}` : ""} · {selectedFee.academicYear || academicYear}
@@ -1395,14 +1415,14 @@ const CollectPaymentPage = ({ studentId }) => {
                   { label: "Amount Paid", val: selectedFee.totalPaid },
                 ].map(({ label, val, negative, divider }) => (
                   <React.Fragment key={label}>
-                    {divider && <div className="h-px bg-white/10 my-1" />}
-                    <div className="flex justify-between items-center text-on-primary-container/80">
+                    {divider && <div className="h-px my-1 bg-white/10" />}
+                    <div className="flex items-center justify-between text-on-primary-container/80">
                       <span className="text-sm text-white-dim">{label}</span>
                       <span className="font-bold text-white">{negative ? "− " : ""}{fmt(val)}</span>
                     </div>
                   </React.Fragment>
                 ))}
-                <div className="mt-6 bg-white/10 rounded-2xl p-5 backdrop-blur-md border border-white/10 text-center">
+                <div className="p-5 mt-6 text-center border bg-white/10 rounded-2xl backdrop-blur-md border-white/10">
                   <p className="text-[10px] uppercase tracking-widest text-secondary-fixed mb-1 font-bold">Pending Balance</p>
                   <p className={`text-4xl font-headline font-extrabold ${Number(selectedFee.pending || 0) > 0 ? "text-white" : "text-[#44ddc1]"}`}>
                     {fmt(selectedFee.pending)}
@@ -1410,8 +1430,8 @@ const CollectPaymentPage = ({ studentId }) => {
                 </div>
               </div>
             ) : (
-              <div className="text-on-primary-container/60 text-sm text-center py-8">
-                <span className="material-symbols-outlined text-3xl block mb-2 opacity-40">person_search</span>
+              <div className="py-8 text-sm text-center text-on-primary-container/60">
+                <span className="block mb-2 text-3xl material-symbols-outlined opacity-40">person_search</span>
                 Select a student to view their account summary
               </div>
             )}
@@ -1420,8 +1440,8 @@ const CollectPaymentPage = ({ studentId }) => {
           {/* Term-Wise Summary */}
           {selectedFee && selectedFee.terms?.length > 0 && (
             <section className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
-              <h3 className="font-headline font-bold text-primary mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
+              <h3 className="flex items-center gap-2 mb-4 font-bold font-headline text-primary">
+                <span className="text-base material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
                 Term-Wise Status
               </h3>
               <div className="space-y-3">
@@ -1487,7 +1507,7 @@ const CollectPaymentPage = ({ studentId }) => {
                     }`}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-bold text-tertiary flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">shopping_bag</span>Other Fees
+                          <span className="text-sm material-symbols-outlined">shopping_bag</span>Other Fees
                         </span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
                           nonTermBal <= 0 ? "bg-[#4caf50]/20 text-[#2e7d32]" : "bg-tertiary/10 text-tertiary"
@@ -1495,7 +1515,7 @@ const CollectPaymentPage = ({ studentId }) => {
                       </div>
                       <div className="flex justify-between text-[11px]">
                         <span className="text-on-surface-variant">Total: <span className="font-bold">{fmt(nonTermTotal)}</span></span>
-                        <span className="text-on-surface-variant">Bal: <span className={`font-bold ${nonTermBal > 0 ? "text-error" : "text-[#2e7d32]"}`}>{fmt(nonTermBal)}</span></span>
+                        <span className="text-on-surface-variant">Bal: <span className={`font-bold ${nonTermBal > 0 ? "text-error" : "text-green-700"}`}>{fmt(nonTermBal)}</span></span>
                       </div>
                     </div>
                   );
@@ -1507,22 +1527,22 @@ const CollectPaymentPage = ({ studentId }) => {
           {/* Sibling Fee Summary */}
           {selectedFee && (
             <section className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
-              <h3 className="font-headline font-bold text-primary mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
+              <h3 className="flex items-center gap-2 mb-4 font-bold font-headline text-primary">
+                <span className="text-base material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
                 Sibling Fees
               </h3>
               {!selectedFee.student?.siblingGroupId ? (
-                <p className="text-xs text-on-surface-variant text-center py-4">
-                  <span className="material-symbols-outlined text-2xl block mb-2 opacity-30">person</span>
+                <p className="py-4 text-xs text-center text-on-surface-variant">
+                  <span className="block mb-2 text-2xl material-symbols-outlined opacity-30">person</span>
                   No sibling group assigned for this student.
                 </p>
               ) : siblingData.length === 0 ? (
-                <p className="text-xs text-on-surface-variant text-center py-4">
-                  <span className="material-symbols-outlined text-2xl block mb-2 opacity-30">group_off</span>
+                <p className="py-4 text-xs text-center text-on-surface-variant">
+                  <span className="block mb-2 text-2xl material-symbols-outlined opacity-30">group_off</span>
                   No siblings found in this group.
                 </p>
               ) : (
-                <p className="text-xs text-on-surface-variant mb-4">
+                <p className="mb-4 text-xs text-on-surface-variant">
                   {siblingData.length} sibling{siblingData.length > 1 ? "s" : ""} found — parents can pay for siblings here.
                 </p>
               )}
@@ -1537,7 +1557,7 @@ const CollectPaymentPage = ({ studentId }) => {
                   const currentYearFee = sib.fees.find((f) => f.academicYear === academicYear);
                   const feeInStudentFees = currentYearFee ? studentFees.find((sf) => sf.id === currentYearFee.id) : null;
                   return (
-                    <div key={sib.id} className="p-4 bg-surface-container-low rounded-xl border border-outline-variant/20 hover:border-primary/20 transition-colors">
+                    <div key={sib.id} className="p-4 transition-colors border bg-surface-container-low rounded-xl border-outline-variant/20 hover:border-primary/20">
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <p className="text-sm font-bold text-primary">{sib.name}</p>
@@ -1583,7 +1603,7 @@ const CollectPaymentPage = ({ studentId }) => {
                               }}
                               className="px-3 py-1.5 rounded-lg bg-primary text-white text-[10px] font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
                             >
-                              <span className="material-symbols-outlined text-xs">payments</span>
+                              <span className="text-xs material-symbols-outlined">payments</span>
                               Pay
                             </button>
                           );
@@ -1618,7 +1638,7 @@ const CollectPaymentPage = ({ studentId }) => {
                   const familyPaid = siblingData.reduce((s, sib) => s + sib.fees.reduce((ss, f) => ss + Number(f.totalPaid || 0), 0), 0) + Number(selectedFee.totalPaid || 0);
                   const familyPending = siblingData.reduce((s, sib) => s + sib.fees.reduce((ss, f) => ss + Number(f.pending || 0), 0), 0) + Number(selectedFee.pending || 0);
                   return (
-                    <div className="mt-2 p-3 bg-primary/5 rounded-xl border border-primary/10">
+                    <div className="p-3 mt-2 border bg-primary/5 rounded-xl border-primary/10">
                       <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2">Family Total (All Siblings)</p>
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div>
@@ -1644,18 +1664,18 @@ const CollectPaymentPage = ({ studentId }) => {
 
           {/* Payment links / digital invoicing */}
           <section className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
-            <h3 className="font-headline font-bold text-primary mb-5 flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">send</span>
+            <h3 className="flex items-center gap-2 mb-5 font-bold font-headline text-primary">
+              <span className="text-base material-symbols-outlined">send</span>
               Digital Invoicing
             </h3>
             <div className="space-y-3">
               {paymentLinks.slice(0, 3).map((link, i) => (
-                <div key={link.id || i} className="flex items-center justify-between p-3 bg-surface rounded-xl hover:bg-surface-container transition-colors">
+                <div key={link.id || i} className="flex items-center justify-between p-3 transition-colors bg-surface rounded-xl hover:bg-surface-container">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                       link.channel === "WHATSAPP" ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"
                     }`}>
-                      <span className="material-symbols-outlined text-base">
+                      <span className="text-base material-symbols-outlined">
                         {link.channel === "WHATSAPP" ? "chat" : "mail"}
                       </span>
                     </div>
@@ -1680,14 +1700,14 @@ const CollectPaymentPage = ({ studentId }) => {
                 </div>
               ))}
               {paymentLinks.length === 0 && (
-                <p className="text-xs text-on-surface-variant text-center py-4">No payment links sent yet</p>
+                <p className="py-4 text-xs text-center text-on-surface-variant">No payment links sent yet</p>
               )}
             </div>
             <button
               onClick={() => message.info("Filter by status from the history table below")}
               className="w-full mt-5 py-2.5 text-sm font-bold text-primary border-2 border-primary-fixed rounded-xl hover:bg-primary-fixed transition-colors flex items-center justify-center gap-2"
             >
-              <span className="material-symbols-outlined text-sm">history</span>
+              <span className="text-sm material-symbols-outlined">history</span>
               View Log History
             </button>
           </section>
@@ -1699,7 +1719,7 @@ const CollectPaymentPage = ({ studentId }) => {
             <section className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="font-headline font-bold text-lg text-primary">Payment History</h3>
+                  <h3 className="text-lg font-bold font-headline text-primary">Payment History</h3>
                   <p className="text-sm text-on-surface-variant">
                     {selectedFee ? `Recent fee transactions for ${selectedFee.student?.name}` : "All transactions"}
                   </p>
@@ -1708,7 +1728,7 @@ const CollectPaymentPage = ({ studentId }) => {
                   <select
                     value={paymentStatusFilter}
                     onChange={(e) => setPaymentStatusFilter(e.target.value)}
-                    className="bg-surface-container-high border-none rounded-xl py-2 px-4 text-sm font-medium outline-none appearance-none"
+                    className="px-4 py-2 text-sm font-medium border-none outline-none appearance-none bg-surface-container-high rounded-xl"
                   >
                     <option value="ALL">All Status</option>
                     <option value="SUCCESS">Success</option>
@@ -1731,7 +1751,7 @@ const CollectPaymentPage = ({ studentId }) => {
                   </thead>
                   <tbody className="text-sm">
                     {filteredPayments.map((p, idx) => (
-                      <tr key={p.id || idx} className="border-b border-surface-container-low hover:bg-surface-bright transition-colors">
+                      <tr key={p.id || idx} className="transition-colors border-b border-surface-container-low hover:bg-surface-bright">
                         <td className="px-5 py-4 font-medium">
                           {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
                         </td>
@@ -1740,7 +1760,7 @@ const CollectPaymentPage = ({ studentId }) => {
                         <td className="px-5 py-4 text-right">
                           <div className="font-bold text-primary">{fmt(p.amount)}</div>
                           {p.paidComponents && Object.keys(p.paidComponents).length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1 justify-end">
+                            <div className="flex flex-wrap justify-end gap-1 mt-1">
                               {Object.entries(p.paidComponents).map(([k, v]) => (
                                 <span key={k} className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
                                   k === "transport" ? "bg-tertiary-fixed/20 text-tertiary" : "bg-surface-container-high text-on-surface-variant"
@@ -1753,7 +1773,7 @@ const CollectPaymentPage = ({ studentId }) => {
                         </td>
                         <td className="px-5 py-4">
                           <span className="flex items-center gap-2 text-on-surface-variant">
-                            <span className="material-symbols-outlined text-sm">{modeIcon(p.paymentMode)}</span>
+                            <span className="text-sm material-symbols-outlined">{modeIcon(p.paymentMode)}</span>
                             {p.paymentMode || "—"}
                           </span>
                         </td>
@@ -1763,25 +1783,25 @@ const CollectPaymentPage = ({ studentId }) => {
                             <button
                               onClick={() => handlePrintExistingPayment(p)}
                               title="Print Receipt"
-                              className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all"
+                              className="flex items-center justify-center w-8 h-8 transition-all rounded-full bg-surface-container-high text-primary hover:bg-primary hover:text-white"
                             >
-                              <span className="material-symbols-outlined text-sm">print</span>
+                              <span className="text-sm material-symbols-outlined">print</span>
                             </button>
                             {canCollectFee && p.status !== "CANCELLED" && p.status !== "REFUNDED" && (
                               <>
                                 <button
                                   onClick={() => openStatusModal("refund", p)}
                                   title="Refund"
-                                  className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all"
+                                  className="flex items-center justify-center w-8 h-8 transition-all rounded-full bg-surface-container-high text-primary hover:bg-primary hover:text-white"
                                 >
-                                  <span className="material-symbols-outlined text-sm">replay</span>
+                                  <span className="text-sm material-symbols-outlined">replay</span>
                                 </button>
                                 <button
                                   onClick={() => openStatusModal("cancel", p)}
                                   title="Cancel"
-                                  className="w-8 h-8 rounded-full bg-error-container flex items-center justify-center text-error hover:bg-error hover:text-white transition-all"
+                                  className="flex items-center justify-center w-8 h-8 transition-all rounded-full bg-error-container text-error hover:bg-error hover:text-white"
                                 >
-                                  <span className="material-symbols-outlined text-sm">close</span>
+                                  <span className="text-sm material-symbols-outlined">close</span>
                                 </button>
                               </>
                             )}
@@ -1791,8 +1811,8 @@ const CollectPaymentPage = ({ studentId }) => {
                     ))}
                     {filteredPayments.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-5 py-10 text-center text-on-surface-variant text-sm">
-                          <span className="material-symbols-outlined text-3xl block mb-2 opacity-30">receipt_long</span>
+                        <td colSpan={7} className="px-5 py-10 text-sm text-center text-on-surface-variant">
+                          <span className="block mb-2 text-3xl material-symbols-outlined opacity-30">receipt_long</span>
                           No payments found
                         </td>
                       </tr>
@@ -1812,11 +1832,11 @@ const CollectPaymentPage = ({ studentId }) => {
         onCancel={() => setPrintPayment(null)}
         width={700}
         footer={[
-          <button key="close" onClick={() => setPrintPayment(null)} className="px-6 py-2 rounded-xl border border-outline-variant font-bold text-sm mr-2 hover:bg-surface-container-low transition-colors">
+          <button key="close" onClick={() => setPrintPayment(null)} className="px-6 py-2 mr-2 text-sm font-bold transition-colors border rounded-xl border-outline-variant hover:bg-surface-container-low">
             Close
           </button>,
-          <button key="print" onClick={handlePrint} className="px-6 py-2 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <span className="material-symbols-outlined text-sm">print</span>Print Receipt
+          <button key="print" onClick={handlePrint} className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white transition-opacity rounded-xl bg-primary hover:opacity-90">
+            <span className="text-sm material-symbols-outlined">print</span>Print Receipt
           </button>,
         ]}
       >
@@ -1926,11 +1946,11 @@ const CollectPaymentPage = ({ studentId }) => {
         onCancel={() => { setLinkModal({ open: false, loading: false }); setLinkResult(null); }}
         footer={
           linkResult
-            ? [<button key="close" onClick={() => { setLinkModal({ open: false, loading: false }); setLinkResult(null); }} className="px-6 py-2 rounded-xl border border-outline-variant font-bold text-sm hover:bg-surface-container-low transition-colors">Close</button>]
+            ? [<button key="close" onClick={() => { setLinkModal({ open: false, loading: false }); setLinkResult(null); }} className="px-6 py-2 text-sm font-bold transition-colors border rounded-xl border-outline-variant hover:bg-surface-container-low">Close</button>]
             : [
-                <button key="cancel" onClick={() => setLinkModal({ open: false, loading: false })} className="px-6 py-2 rounded-xl border border-outline-variant font-bold text-sm mr-2 hover:bg-surface-container-low transition-colors">Cancel</button>,
-                <button key="send" disabled={linkModal.loading} onClick={handleSendLink} className="px-6 py-2 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50">
-                  <span className="material-symbols-outlined text-sm">send</span>
+                <button key="cancel" onClick={() => setLinkModal({ open: false, loading: false })} className="px-6 py-2 mr-2 text-sm font-bold transition-colors border rounded-xl border-outline-variant hover:bg-surface-container-low">Cancel</button>,
+                <button key="send" disabled={linkModal.loading} onClick={handleSendLink} className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white transition-opacity rounded-xl bg-primary hover:opacity-90 disabled:opacity-50">
+                  <span className="text-sm material-symbols-outlined">send</span>
                   {linkModal.loading ? "Sending..." : "Generate & Send Link"}
                 </button>,
               ]
@@ -1961,7 +1981,7 @@ const CollectPaymentPage = ({ studentId }) => {
                 </div>
               ))}
               {linkResult.phonePeUrl && (
-                <a href={linkResult.phonePeUrl} target="_blank" rel="noopener noreferrer" className="text-primary font-bold hover:underline block pt-2">
+                <a href={linkResult.phonePeUrl} target="_blank" rel="noopener noreferrer" className="block pt-2 font-bold text-primary hover:underline">
                   Open Payment Link →
                 </a>
               )}
@@ -1993,10 +2013,10 @@ const CollectPaymentPage = ({ studentId }) => {
         }`}
       >
         <div className="w-8 h-8 rounded-full bg-[#44ddc1] text-[#001813] flex items-center justify-center flex-shrink-0">
-          <span className="material-symbols-outlined text-sm font-bold">check</span>
+          <span className="text-sm font-bold material-symbols-outlined">check</span>
         </div>
         <div>
-          <p className="font-headline font-bold text-sm">Payment Recorded</p>
+          <p className="text-sm font-bold font-headline">Payment Recorded</p>
           <p className="text-xs opacity-80">Receipt #{receiptNo || "generated"}</p>
         </div>
       </div>

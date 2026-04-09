@@ -60,12 +60,13 @@ import IncomeExpensePage from "../modules/pos/pages/IncomeExpensePage";
 import DocRequestPage from "../modules/doc-request/pages/DocRequestPage";
 import HouseManagementPage from "../modules/house/pages/HouseManagementPage";
 import StaffDashboard from "./StaffDashboard";
+import MasterDashboardPage from "../modules/dashboard/pages/MasterDashboardPage";
 import { getAdminSettings } from "../modules/settings/settings.service";
 import { hasPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [selectedKey, setSelectedKey] = useState("dashboard");
+  const [selectedKey, setSelectedKey] = useState("master-dashboard");
   const [editData, setEditData] = useState(null);
   const [feeStudentId, setFeeStudentId] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -145,7 +146,8 @@ const Dashboard = () => {
   ];
 
   const sidebarLinks = [
-    { key: "dashboard", label: "Dashboard", icon: "dashboard", permission: true },
+    { key: "master-dashboard", label: "Master Dashboard", icon: "space_dashboard", permission: true },
+    { key: "dashboard", label: "Admission Dashboard", icon: "dashboard", permission: true },
     {
       key: "admission-group",
       label: "Admissions",
@@ -253,6 +255,7 @@ const Dashboard = () => {
 
   const renderContent = () => {
     switch (selectedKey) {
+      case "master-dashboard":    return <MasterDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
       case "dashboard":           return userRole === "STAFF" ? <StaffDashboard onNavigate={(key) => setSelectedKey(key)} /> : <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
       case "admission":           return <AdmissionPage editData={editData} clearEditData={() => setEditData(null)} />;
       case "admission-view":      return <AdmissionView onEdit={(record) => { setEditData(record); setSelectedKey("admission"); }} />;
@@ -280,6 +283,7 @@ case "fees-collect":
       case "transport-view":      return <TransportViewPage />;
       case "transport-live":      return <LiveTrackingPage />;
       case "transport-report":    return <BusReportPage />;
+      case "transport-bus-report": return <BusReportPage />;
       case "transport-drivers":   return <DriverListingPage />;
       case "transport-buses":     return <BussesPage />;
       case "staff-management":    return <StaffManagementPage />;
@@ -301,6 +305,7 @@ case "fees-collect":
       case "pos-transactions":    return <IncomeExpensePage />;
       case "doc-requests":        return <DocRequestPage />;
       case "house-management":    return <HouseManagementPage />;
+      case "house-championship":  return <HouseManagementPage />;
       default:                    return userRole === "STAFF" ? <StaffDashboard onNavigate={(key) => setSelectedKey(key)} /> : <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
     }
   };
@@ -325,10 +330,10 @@ case "fees-collect":
                 : "text-on-surface-variant dark:text-surface-container/70 hover:bg-surface-container-high dark:hover:bg-primary-container/50"
             }`}
           >
-            <span className="material-symbols-outlined text-xl">{link.icon}</span>
-            <span className="font-headline tracking-tight flex-1 text-left">{link.label}</span>
+            <span className="text-xl material-symbols-outlined">{link.icon}</span>
+            <span className="flex-1 tracking-tight text-left font-headline">{link.label}</span>
             <span
-              className="material-symbols-outlined text-base transition-transform duration-200"
+              className="text-base transition-transform duration-200 material-symbols-outlined"
               style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}
             >
               expand_more
@@ -356,9 +361,9 @@ case "fees-collect":
                     <span className={`material-symbols-outlined text-[16px] ${isActive ? "text-primary" : ""}`}>
                       {child.icon}
                     </span>
-                    <span className="font-headline tracking-tight">{child.label}</span>
+                    <span className="tracking-tight font-headline">{child.label}</span>
                     {isActive && (
-                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                     )}
                   </button>
                 );
@@ -381,16 +386,16 @@ case "fees-collect":
             : "text-on-surface-variant dark:text-surface-container/70 hover:bg-surface-container-high dark:hover:bg-primary-container/50 sm:mx-2"
         }`}
       >
-        <span className="material-symbols-outlined text-xl">{link.icon}</span>
-        <span className="font-headline tracking-tight">{link.label}</span>
+        <span className="text-xl material-symbols-outlined">{link.icon}</span>
+        <span className="tracking-tight font-headline">{link.label}</span>
       </button>
     );
   };
 
   return (
-    <div className="flex bg-surface min-h-screen">
+    <div className="flex min-h-screen bg-surface">
       {/* Sidebar */}
-      <aside className="h-screen w-64 fixed left-0 top-0 overflow-y-auto bg-surface-container-low dark:bg-primary flex flex-col py-6 z-50 border-r border-outline-variant/10">
+      <aside className="fixed top-0 left-0 z-50 flex flex-col w-64 h-screen py-6 overflow-y-auto border-r bg-surface-container-low dark:bg-primary border-outline-variant/10">
         <div className="px-6 mb-8">
           <h1 className="text-xl font-bold text-primary dark:text-surface font-headline">Academic Architect</h1>
           <p className="text-xs font-semibold tracking-tight text-on-surface-variant dark:text-surface-container/70">{userRole === "STAFF" ? "Staff Portal" : userRole === "STUDENT" ? "Student Portal" : "Admin Dashboard"}</p>
@@ -400,7 +405,7 @@ case "fees-collect":
           {sidebarLinks.map((link) => renderSidebarItem(link))}
         </nav>
 
-        <div className="mt-auto pt-4 border-t border-outline-variant/20 mx-4 space-y-1">
+        <div className="pt-4 mx-4 mt-auto space-y-1 border-t border-outline-variant/20">
           {canReadSettings && (
             <button
               onClick={() => setSelectedKey("admin-settings")}
@@ -410,29 +415,29 @@ case "fees-collect":
                   : "text-on-surface-variant dark:text-surface-container/70 hover:bg-surface-container-high"
               }`}
             >
-              <span className="material-symbols-outlined text-xl">settings</span>
-              <span className="font-headline tracking-tight">Settings</span>
+              <span className="text-xl material-symbols-outlined">settings</span>
+              <span className="tracking-tight font-headline">Settings</span>
             </button>
           )}
           <button
             onClick={onLogout}
-            className="w-full text-left text-on-surface-variant dark:text-surface-container/70 hover:bg-surface-container-high dark:hover:bg-primary-container/50 px-4 py-3 rounded-xl flex items-center gap-3 transition-all"
+            className="flex items-center w-full gap-3 px-4 py-3 text-left transition-all text-on-surface-variant dark:text-surface-container/70 hover:bg-surface-container-high dark:hover:bg-primary-container/50 rounded-xl"
           >
-            <span className="material-symbols-outlined text-xl">logout</span>
-            <span className="font-headline tracking-tight">Logout</span>
+            <span className="text-xl material-symbols-outlined">logout</span>
+            <span className="tracking-tight font-headline">Logout</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 ml-64 flex flex-col min-h-screen">
+      <div className="flex flex-col flex-1 min-h-screen ml-64">
         {/* Header */}
-        <header className="fixed top-0 right-0 left-64 h-16 z-40 bg-white/80 dark:bg-primary/80 backdrop-blur-md shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex items-center justify-between px-8">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="relative w-full max-w-md focus-within:ring-2 focus-within:ring-primary rounded-full transition-all">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+        <header className="fixed top-0 right-0 z-40 flex items-center justify-between h-16 px-8 left-64 bg-white/80 dark:bg-primary/80 backdrop-blur-md shadow-ambient">
+          <div className="flex items-center flex-1 gap-4">
+            <div className="relative w-full max-w-md transition-all rounded-full focus-within:ring-2 focus-within:ring-primary">
+              <span className="absolute text-lg -translate-y-1/2 material-symbols-outlined left-3 top-1/2 text-on-surface-variant">search</span>
               <input
-                className="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-0 placeholder:text-on-surface-variant/60"
+                className="w-full py-2 pl-10 pr-4 text-sm border-none rounded-full bg-surface-container-low focus:ring-0 placeholder:text-on-surface-variant/60"
                 placeholder="Search applicants, ID, or status..."
                 type="text"
               />
@@ -441,32 +446,32 @@ case "fees-collect":
 
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <button className="hover:bg-surface-container-low dark:hover:bg-primary-container rounded-full p-2 transition-colors relative">
+              <button className="relative p-2 transition-colors rounded-full hover:bg-surface-container-low dark:hover:bg-primary-container">
                 <span className="material-symbols-outlined text-primary dark:text-surface">notifications</span>
-                <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+                <span className="absolute w-2 h-2 rounded-full top-2 right-2 bg-error"></span>
               </button>
-              <button className="hover:bg-surface-container-low dark:hover:bg-primary-container rounded-full p-2 transition-colors">
+              <button className="p-2 transition-colors rounded-full hover:bg-surface-container-low dark:hover:bg-primary-container">
                 <span className="material-symbols-outlined text-primary dark:text-surface">help_outline</span>
               </button>
             </div>
-            <div className="h-8 w-[1px] bg-outline-variant/30"></div>
+            <div className="w-px h-8 bg-outline-variant/30"></div>
             <Dropdown menu={{ items: userMenu, onClick: onUserMenuClick }} trigger={["click"]}>
               <div className="flex items-center gap-3 cursor-pointer">
-                <div className="text-right hidden xl:block">
+                <div className="hidden text-right xl:block">
                   <p className="text-xs font-bold text-primary">{displayName}</p>
                   <p className="text-[10px] text-on-surface-variant">{userRole}</p>
                 </div>
                 <Avatar
                   src={logo}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-primary-fixed shadow-sm"
+                  className="object-cover w-10 h-10 border-2 rounded-full shadow-sm border-primary-fixed"
                 />
               </div>
             </Dropdown>
           </div>
         </header>
 
-        <main className="mt-16 p-8 flex-1">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 p-8 mt-16">
+          <div className="mx-auto max-w-7xl">
             {renderContent()}
           </div>
         </main>

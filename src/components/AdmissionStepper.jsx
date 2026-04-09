@@ -91,13 +91,13 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
           <div className="flex items-center gap-3">
             <span>You have a saved draft!</span>
             <button
-              className="px-3 py-1 bg-primary text-white text-xs rounded-lg hover:bg-primary-container transition-all"
+              className="px-3 py-1 text-xs text-white transition-all rounded-lg bg-primary hover:bg-primary-container"
               onClick={handleRestoreDraft}
             >
               Restore
             </button>
             <button
-              className="text-error text-xs hover:underline"
+              className="text-xs text-error hover:underline"
               onClick={handleClearDraft}
             >
               Discard
@@ -452,9 +452,9 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
         <div className="space-y-6">
           <div className="mb-4">
             <h3 className="text-xl font-bold text-primary">Student Profile</h3>
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Enter the student's basic identification and demographic details.</p>
-            <div className="mt-4 pt-4 ">
-              <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Admission Details</h4>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Enter the student's basic identification and demographic details.</p>
+            <div className="pt-4 mt-4 ">
+              <h4 className="mb-3 text-sm font-bold tracking-wider uppercase text-secondary">Admission Details</h4>
               <Row gutter={[16, 16]}>
                 <Col span={12}>
                   <Form.Item name="admissionNo" label="Admission No">
@@ -594,12 +594,12 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Provide information about parents, siblings, and contact preferences.</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Provide information about parents, siblings, and contact preferences.</p>
           </div>
           <Row gutter={16}>
             {/* LEFT — FATHER */}
             <Col span={12}>
-              <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Father Particulars</h4>
+              <h4 className="mb-3 text-sm font-bold tracking-wider uppercase text-secondary">Father Particulars</h4>
               <Form.Item name="fatherName" label="Father Name">
                 <Input />
               </Form.Item>
@@ -619,7 +619,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
 
             {/* RIGHT — MOTHER */}
             <Col span={12}>
-              <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Mother Particulars</h4>
+              <h4 className="mb-3 text-sm font-bold tracking-wider uppercase text-secondary">Mother Particulars</h4>
               <Form.Item name="motherName" label="Mother Name">
                 <Input />
               </Form.Item>
@@ -639,8 +639,8 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
           </Row>
 
 
-          <div className="mt-8 pt-4 border-t border-outline-variant">
-            <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Siblings & Preferences</h4>
+          <div className="pt-4 mt-8 border-t border-outline-variant">
+            <h4 className="mb-3 text-sm font-bold tracking-wider uppercase text-secondary">Siblings & Preferences</h4>
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item name="familyIncome" label="Family Income">
@@ -704,7 +704,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Enter the current contact information for correspondence and transport.</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Enter the current contact information for correspondence and transport.</p>
           </div>
           <Row gutter={16}>
             <Col span={12}>
@@ -755,7 +755,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Details of qualifying examinations and subject-wise performance.</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Details of qualifying examinations and subject-wise performance.</p>
           </div>
           <>
             {/* ── Qualifying Exam header ── */}
@@ -942,7 +942,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Upload mandatory certificates and student profile photo.</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Upload mandatory certificates and student profile photo.</p>
           </div>
           <>
             {/* ✅ PROFILE PHOTO */}
@@ -1086,7 +1086,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Verify all information before submission.</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Verify all information before submission.</p>
           </div>
           <Card>
             <Descriptions bordered column={2}>
@@ -1116,12 +1116,12 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
                         isPdf ? (
                           <div className="flex flex-col gap-2">
                             <iframe src={url} width="100%" height="200px" title="Birth Certificate" className="border rounded" />
-                            <a href={url} target="_blank" rel="noreferrer" className="text-secondary text-xs hover:underline flex items-center gap-1">
-                              <span className="material-symbols-outlined text-sm">open_in_new</span> Open Full PDF
+                            <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-secondary hover:underline">
+                              <span className="text-sm material-symbols-outlined">open_in_new</span> Open Full PDF
                             </a>
                           </div>
                         ) : (
-                          <img src={url} alt="birth certificate" width={100} className="rounded shadow-sm border" />
+                          <img src={url} alt="birth certificate" width={100} className="border rounded shadow-sm" />
                         )
                       ) : "No Birth Certificate"}
                     </Descriptions.Item>
@@ -1138,12 +1138,12 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
                         isPdf ? (
                           <div className="flex flex-col gap-2">
                             <iframe src={url} width="100%" height="200px" title="Community Certificate" className="border rounded" />
-                            <a href={url} target="_blank" rel="noreferrer" className="text-secondary text-xs hover:underline flex items-center gap-1">
-                              <span className="material-symbols-outlined text-sm">open_in_new</span> Open Full PDF
+                            <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-secondary hover:underline">
+                              <span className="text-sm material-symbols-outlined">open_in_new</span> Open Full PDF
                             </a>
                           </div>
                         ) : (
-                          <img src={url} alt="community certificate" width={100} className="rounded shadow-sm border" />
+                          <img src={url} alt="community certificate" width={100} className="border rounded shadow-sm" />
                         )
                       ) : "No Community Certificate"}
                     </Descriptions.Item>
@@ -1160,12 +1160,12 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
                         isPdf ? (
                           <div className="flex flex-col gap-2">
                             <iframe src={url} width="100%" height="200px" title="Aadhar" className="border rounded" />
-                            <a href={url} target="_blank" rel="noreferrer" className="text-secondary text-xs hover:underline flex items-center gap-1">
-                              <span className="material-symbols-outlined text-sm">open_in_new</span> Open Full PDF
+                            <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-secondary hover:underline">
+                              <span className="text-sm material-symbols-outlined">open_in_new</span> Open Full PDF
                             </a>
                           </div>
                         ) : (
-                          <img src={url} alt="aadhar" width={100} className="rounded shadow-sm border" />
+                          <img src={url} alt="aadhar" width={100} className="border rounded shadow-sm" />
                         )
                       ) : "No Aadhar"}
                     </Descriptions.Item>
@@ -1469,24 +1469,24 @@ const generatePDF = async () => {
 };
 
   return (
-    <div className="min-h-screen bg-surface p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen p-8 bg-surface">
+      <div className="mx-auto space-y-8 max-w-7xl">
         
         {/* Header Section */}
-        <div className="flex justify-between items-end px-4">
+        <div className="flex items-end justify-between px-4">
           <div>
-            <h2 className="font-headline text-3xl font-extrabold text-primary">Admission Desk</h2>
-            <p className="text-on-surface-variant font-medium mt-1">Manage new student enrollments and academic records.</p>
+            <h2 className="text-3xl font-extrabold font-headline text-primary">Admission Desk</h2>
+            <p className="mt-1 font-medium text-on-surface-variant">Manage new student enrollments and academic records.</p>
           </div>
-          <div className="hidden lg:flex items-center gap-3 bg-surface-container-low px-4 py-2 rounded-full border border-outline-variant/20">
+          <div className="items-center hidden gap-3 px-4 py-2 border rounded-full lg:flex bg-surface-container-low border-outline-variant/20">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-            <span className="text-xs font-bold text-primary uppercase tracking-tighter">Academic Session 2026-27</span>
+            <span className="text-xs font-bold tracking-tighter uppercase text-primary">Academic Session 2026-27</span>
           </div>
         </div>
 
 
         {/* Custom Stepper Designer UI */}
-        <div className="grid grid-cols-7 gap-x-1 gap-y-4 mb-10 mt-6 px-4">
+        <div className="grid grid-cols-7 px-4 mt-6 mb-10 gap-x-1 gap-y-4">
           {steps.map((step, index) => {
             const isActive = index === current;
             const isCompleted = index < current;
@@ -1494,7 +1494,7 @@ const generatePDF = async () => {
             return (
               <div
                 key={index}
-                className="flex flex-col items-center gap-2 group cursor-pointer"
+                className="flex flex-col items-center gap-2 cursor-pointer group"
                 onClick={() => setCurrent(index)}
               >
                 <div
@@ -1521,17 +1521,17 @@ const generatePDF = async () => {
 
 
         {/* Main Form Card */}
-        <div className="bg-surface-container-lowest rounded-xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] overflow-hidden">
-          <div className="p-8 border-b border-surface-container-low flex justify-between items-center">
+        <div className="overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient">
+          <div className="flex items-center justify-between p-8 border-b border-surface-container-low">
             <div>
-              <h3 className="font-headline text-2xl font-extrabold text-primary">{steps[current].title} Details</h3>
-              <p className="text-on-surface-variant text-sm mt-1">Step {current + 1} of {steps.length}: Please provide the following information.</p>
+              <h3 className="text-2xl font-extrabold font-headline text-primary">{steps[current].title} Details</h3>
+              <p className="mt-1 text-sm text-on-surface-variant">Step {current + 1} of {steps.length}: Please provide the following information.</p>
             </div>
             <button
               className="px-5 py-2.5 bg-surface-container-high hover:bg-surface-container-highest text-primary font-bold text-sm rounded-xl transition-all flex items-center gap-2 active:scale-95"
               onClick={fillRandomData}
             >
-              <span className="material-symbols-outlined text-lg">auto_fix_high</span>
+              <span className="text-lg material-symbols-outlined">auto_fix_high</span>
               Fill Random Indian Data
             </button>
           </div>
@@ -1542,15 +1542,15 @@ const generatePDF = async () => {
             onValuesChange={(_, all) => setFormData(all)}
             className="p-8"
           >
-            <div className="min-h-[400px]">
+            <div className="min-h-100">
               {steps[current].content}
             </div>
           </Form>
 
           {/* Footer Actions */}
-          <div className="px-8 py-6 bg-surface-container-low flex justify-between items-center">
+          <div className="flex items-center justify-between px-8 py-6 bg-surface-container-low">
             <button
-              className="px-6 py-3 text-primary font-bold text-sm hover:underline flex items-center gap-2 transition-all active:scale-95"
+              className="flex items-center gap-2 px-6 py-3 text-sm font-bold transition-all text-primary hover:underline active:scale-95"
               onClick={() => {
                 form.resetFields();
                 setFormData({});
@@ -1559,22 +1559,22 @@ const generatePDF = async () => {
                 if (clearEditData) clearEditData();
               }}
             >
-              <span className="material-symbols-outlined text-lg">close</span>
+              <span className="text-lg material-symbols-outlined">close</span>
               Discard Application
             </button>
             <div className="flex gap-4">
               {current > 0 && (
                 <button
-                  className="px-8 py-3 bg-white border border-outline-variant text-primary font-bold text-sm rounded-xl hover:bg-surface-container-lowest shadow-sm transition-all active:scale-95 flex items-center gap-2"
+                  className="flex items-center gap-2 px-8 py-3 text-sm font-bold transition-all bg-white border shadow-sm border-outline-variant text-primary rounded-xl hover:bg-surface-container-lowest active:scale-95"
                   onClick={prev}
                 >
-                  <span className="material-symbols-outlined text-lg rotate-180">arrow_forward</span>
+                  <span className="text-lg rotate-180 material-symbols-outlined">arrow_forward</span>
                   Prev
                 </button>
               )}
 
               <button
-                className="px-8 py-3 bg-white border border-outline-variant text-primary font-bold text-sm rounded-xl hover:bg-surface-container-lowest shadow-sm transition-all active:scale-95"
+                className="px-8 py-3 text-sm font-bold transition-all bg-white border shadow-sm border-outline-variant text-primary rounded-xl hover:bg-surface-container-lowest active:scale-95"
                 onClick={handleSaveDraft}
               >
                 Save as Draft
@@ -1585,23 +1585,23 @@ const generatePDF = async () => {
                   style={{
                     background: 'linear-gradient(to right, #00152a, #102a43)'
                   }}
-                  className="px-10 py-3 bg-gradient-to-r from-primary to-primary-container text-white font-bold text-sm rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 active:scale-95"
+                  className="px-10 py-3 bg-linear-to-r from-primary to-primary-container text-white font-bold text-sm rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 active:scale-95"
                   onClick={next}
                 >
                   Next Stage
-                  <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                  <span className="text-lg material-symbols-outlined">arrow_forward</span>
                 </button>
               ) : (
                 <div className="flex gap-4">
                   <button
-                    className="px-8 py-3 bg-white border border-outline-variant text-primary font-bold text-sm rounded-xl hover:bg-surface-container-lowest shadow-sm transition-all active:scale-95 flex items-center gap-2"
+                    className="flex items-center gap-2 px-8 py-3 text-sm font-bold transition-all bg-white border shadow-sm border-outline-variant text-primary rounded-xl hover:bg-surface-container-lowest active:scale-95"
                     onClick={generatePDF}
                   >
-                    <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
+                    <span className="text-lg material-symbols-outlined">picture_as_pdf</span>
                     PDF
                   </button>
                   <button
-                    className="px-10 py-3 bg-gradient-to-r from-primary to-primary-container text-white font-bold text-sm rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 active:scale-95"
+                    className="px-10 py-3 bg-linear-to-r from-primary to-primary-container text-white font-bold text-sm rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 active:scale-95"
                     onClick={async () => {
 
                       try {
@@ -1793,7 +1793,7 @@ const generatePDF = async () => {
                     }}
                   >
                     {editData ? "Update Application" : "Submit Enrollment"}
-                    <span className="material-symbols-outlined text-lg">check_circle</span>
+                    <span className="text-lg material-symbols-outlined">check_circle</span>
                   </button>
                 </div>
               )}
@@ -1803,10 +1803,10 @@ const generatePDF = async () => {
 
         {/* AI Insight Chip */}
         <div className="flex justify-center pb-8">
-          <div className="inline-flex items-center gap-3 bg-surface-container-lowest px-6 py-3 rounded-full shadow-ambient border border-outline-variant/10">
-            <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse transition-all"></span>
+          <div className="inline-flex items-center gap-3 px-6 py-3 border rounded-full bg-surface-container-lowest shadow-ambient border-outline-variant/10">
+            <span className="w-2 h-2 transition-all rounded-full bg-tertiary animate-pulse"></span>
             <p className="text-xs font-medium text-on-surface-variant">
-              <span className="font-extrabold text-primary uppercase tracking-tighter">Admission Insight:</span> Aadhar validation is recommended before finalizing academic records.
+              <span className="font-extrabold tracking-tighter uppercase text-primary">Admission Insight:</span> Aadhar validation is recommended before finalizing academic records.
             </p>
           </div>
         </div>

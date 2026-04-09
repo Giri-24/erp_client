@@ -18,7 +18,7 @@ const formatMilestoneTitle = (milestone) => {
   return milestone.label || `${milestone.threshold}% milestone`;
 };
 
-const DashboardSummary = ({ onNavigate }) => {
+const DashboardSummary = ({ onNavigate, hideBulkUpload = false, hideReviewApps = false }) => {
   const [summary, setSummary] = useState(null);
   const [pendingApplicants, setPendingApplicants] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -334,20 +334,24 @@ const DashboardSummary = ({ onNavigate }) => {
 
         {/* Quick Actions Grid */}
         <div className="grid grid-cols-2 gap-4">
-          <button 
-            onClick={() => onNavigate("bulk-upload")}
-            className="bg-white hover:bg-primary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
-          >
-            <span className="p-4 bg-primary-fixed group-hover:bg-white rounded-full text-primary transition-colors material-symbols-outlined">mail</span>
-            <span className="font-bold text-sm font-headline">Bulk Upload</span>
-          </button>
-          <button 
-            onClick={() => onNavigate("approval")}
-            className="bg-white hover:bg-tertiary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
-          >
-            <span className="p-4 bg-tertiary-fixed group-hover:bg-white rounded-full text-on-tertiary-fixed-variant transition-colors material-symbols-outlined">edit_calendar</span>
-            <span className="font-bold text-sm font-headline">Review Apps</span>
-          </button>
+          {!hideBulkUpload && (
+            <button 
+              onClick={() => onNavigate("bulk-upload")}
+              className="bg-white hover:bg-primary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
+            >
+              <span className="p-4 bg-primary-fixed group-hover:bg-white rounded-full text-primary transition-colors material-symbols-outlined">mail</span>
+              <span className="font-bold text-sm font-headline">Bulk Upload</span>
+            </button>
+          )}
+          {!hideReviewApps && (
+            <button 
+              onClick={() => onNavigate("approval")}
+              className="bg-white hover:bg-tertiary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
+            >
+              <span className="p-4 bg-tertiary-fixed group-hover:bg-white rounded-full text-on-tertiary-fixed-variant transition-colors material-symbols-outlined">edit_calendar</span>
+              <span className="font-bold text-sm font-headline">Review Apps</span>
+            </button>
+          )}
           <button 
             onClick={onExportCsv}
             className="bg-white hover:bg-secondary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"

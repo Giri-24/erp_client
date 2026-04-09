@@ -259,17 +259,17 @@ const BusReportPage = () => {
     <div className="flex gap-5 h-[calc(100vh-8rem)]">
 
       {/* ────────────────── LEFT: Bus list ────────────────── */}
-      <aside className="w-[300px] shrink-0 bg-surface-container-low rounded-2xl flex flex-col overflow-hidden shadow-sm">
+      <aside className="flex flex-col overflow-hidden shadow-sm w-75 shrink-0 bg-surface-container-low rounded-2xl">
         {/* Header */}
-        <div className="p-4 border-b border-outline-variant/20 bg-white shrink-0">
-          <h3 className="text-base font-headline font-extrabold text-primary flex items-center gap-2">
-            <span className="material-symbols-outlined text-lg">analytics</span>
+        <div className="p-4 bg-white border-b border-outline-variant/20 shrink-0">
+          <h3 className="flex items-center gap-2 text-base font-extrabold font-headline text-primary">
+            <span className="text-lg material-symbols-outlined">analytics</span>
             Bus Report
           </h3>
           <p className="text-[10px] text-on-surface-variant mt-0.5">Select a bus to view report</p>
 
           {/* Search */}
-          <div className="mt-3 relative">
+          <div className="relative mt-3">
             <span className="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-base">search</span>
             <input
               type="text"
@@ -281,7 +281,7 @@ const BusReportPage = () => {
           </div>
 
           {/* Stats pills */}
-          <div className="mt-3 flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2 mt-3">
             {[
               { label: `All ${stats.total}`, color: "text-primary", bg: "bg-primary/10" },
               { label: `${stats.running} Running`, color: "text-green-700", bg: "bg-green-100" },
@@ -306,11 +306,11 @@ const BusReportPage = () => {
                 onClick={() => setSelectedPlate(isSel ? null : v.plateNo)}
                 className={`p-3 rounded-xl flex items-center gap-3 cursor-pointer transition-all ${isSel ? "bg-primary-container ring-2 ring-primary/30" : "bg-white hover:bg-primary-container/20"}`}
               >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: `${cfg.color}20` }}>
+                <div className="flex items-center justify-center w-10 h-10 rounded-full shrink-0" style={{ background: `${cfg.color}20` }}>
                   <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 20 }}>directions_bus</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h5 className="text-sm font-bold text-primary truncate">{v.plateNo || "Unknown"}</h5>
+                  <h5 className="text-sm font-bold truncate text-primary">{v.plateNo || "Unknown"}</h5>
                   {driver && <p className="text-[10px] text-blue-600 font-semibold truncate">{driver.name}</p>}
                   <p className="text-[10px] text-on-surface-variant truncate">
                     {v.speed} km/h {mileage ? `• ${mileage.dailyKm} km today` : ""}
@@ -327,7 +327,7 @@ const BusReportPage = () => {
       </aside>
 
       {/* ────────────────── CENTER: Map + Report ────────────────── */}
-      <div className="flex-1 flex flex-col gap-4 min-h-0 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 min-h-0 gap-4">
 
         {/* Date selector bar */}
         <div className="flex items-center gap-3 shrink-0">
@@ -345,14 +345,14 @@ const BusReportPage = () => {
             value={reportDate}
             max={today()}
             onChange={(e) => setReportDate(e.target.value)}
-            className="px-3 py-2 rounded-xl text-xs bg-surface-container-high border-none outline-none focus:ring-2 focus:ring-primary/20"
+            className="px-3 py-2 text-xs border-none outline-none rounded-xl bg-surface-container-high focus:ring-2 focus:ring-primary/20"
           />
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={() => setShowMap(!showMap)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-all"
             >
-              <span className="material-symbols-outlined text-sm">{showMap ? "map" : "map"}</span>
+              <span className="text-sm material-symbols-outlined">{showMap ? "map" : "map"}</span>
               {showMap ? "Hide Map" : "Show Map"}
             </button>
             <button
@@ -368,7 +368,7 @@ const BusReportPage = () => {
 
         {/* Map section (collapsible) */}
         {showMap && (
-          <section className="relative rounded-2xl overflow-hidden shadow-md h-[300px] shrink-0 bg-surface-container-low">
+          <section className="relative overflow-hidden shadow-md rounded-2xl h-75 shrink-0 bg-surface-container-low">
             <MapContainer center={mapCenter} zoom={selectedVehicle ? 16 : 13} style={{ height: "100%", width: "100%" }} zoomControl={false}>
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -381,10 +381,10 @@ const BusReportPage = () => {
                 <Marker key={v.deviceId} position={[v.latitude, v.longitude]} icon={makeBusIcon(v.vehicleStatusString)}
                   eventHandlers={{ click: () => setSelectedPlate(v.plateNo) }}>
                   <Popup>
-                    <div className="text-sm min-w-[160px]">
+                    <div className="text-sm min-w-40">
                       <p className="font-bold">{v.plateNo}</p>
                       <p className="text-xs">{v.vehicleStatusString} • {v.speed} km/h</p>
-                      {v.ignitionStatus && <p className="text-xs text-green-600 font-bold">Ignition ON</p>}
+                      {v.ignitionStatus && <p className="text-xs font-bold text-green-600">Ignition ON</p>}
                     </div>
                   </Popup>
                 </Marker>
@@ -395,7 +395,7 @@ const BusReportPage = () => {
                 <>
                   <Marker position={[selectedDriverLive.latitude, selectedDriverLive.longitude]} icon={driverIcon}>
                     <Popup>
-                      <div className="text-sm min-w-[140px]">
+                      <div className="text-sm min-w-35">
                         <p className="font-bold text-blue-700">{selectedDriverLive.driver?.name || "Driver"}</p>
                         <p className={`text-xs font-bold ${selectedDriverLive.driverBusStatus === "in-bus" ? "text-green-600" : "text-amber-600"}`}>
                           {selectedDriverLive.driverBusStatus === "in-bus" ? "Inside Bus" : "Outside Bus"}
@@ -456,13 +456,13 @@ const BusReportPage = () => {
                   html: `<div style="width:36px;height:36px;border-radius:50%;background:#00152a;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,21,42,0.4);border:3px solid white;"><span class="material-symbols-outlined" style="color:#44ddc1;font-size:18px;">school</span></div>`,
                 })}
               >
-                <Popup><p className="font-bold text-sm">School Campus</p></Popup>
+                <Popup><p className="text-sm font-bold">School Campus</p></Popup>
               </Marker>
             </MapContainer>
 
             {/* Driver status overlay on map */}
             {selectedDriverLive && (
-              <div className="absolute top-3 left-3 z-[500] p-3 rounded-xl shadow-lg border border-white/40" style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)" }}>
+              <div className="absolute p-3 border shadow-lg top-3 left-3 z-500 rounded-xl border-white/40" style={{ background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)" }}>
                 <div className="flex items-center gap-2">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${selectedDriverLive.driverBusStatus === "in-bus" ? "bg-green-100" : selectedDriverLive.driverBusStatus === "outside" ? "bg-amber-100" : "bg-gray-100"}`}>
                     <span className={`material-symbols-outlined text-sm ${selectedDriverLive.driverBusStatus === "in-bus" ? "text-green-700" : selectedDriverLive.driverBusStatus === "outside" ? "text-amber-700" : "text-gray-500"}`}>person_pin</span>
@@ -480,24 +480,24 @@ const BusReportPage = () => {
         )}
 
         {/* ──────── Report Content ──────── */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {!selectedPlate ? (
             /* ── No bus selected: show fleet summary ── */
             <div className="space-y-4">
-              <h3 className="text-base font-headline font-bold text-primary flex items-center gap-2">
-                <span className="material-symbols-outlined text-lg">summarize</span>
+              <h3 className="flex items-center gap-2 text-base font-bold font-headline text-primary">
+                <span className="text-lg material-symbols-outlined">summarize</span>
                 Fleet Summary — {reportDate === today() ? "Today" : reportDate === yesterday() ? "Yesterday" : reportDate}
               </h3>
 
               {/* Trip summary cards */}
               {tripSummary.length === 0 ? (
-                <div className="bg-surface-container-low rounded-xl p-8 text-center">
-                  <span className="material-symbols-outlined text-4xl opacity-30 block mb-2">event_busy</span>
+                <div className="p-8 text-center bg-surface-container-low rounded-xl">
+                  <span className="block mb-2 text-4xl material-symbols-outlined opacity-30">event_busy</span>
                   <p className="text-sm text-on-surface-variant">No trip events recorded for this date</p>
-                  <p className="text-xs text-on-surface-variant/60 mt-1">Ignition events will appear here once buses start reporting</p>
+                  <p className="mt-1 text-xs text-on-surface-variant/60">Ignition events will appear here once buses start reporting</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
                   {tripSummary.map((t) => {
                     const liveV = vehicles.find((v) => v.plateNo === t.plateNo);
                     const cfg = liveV ? getStatusCfg(liveV.vehicleStatusString) : getStatusCfg("InActive");
@@ -505,44 +505,44 @@ const BusReportPage = () => {
                       <div
                         key={t.plateNo}
                         onClick={() => setSelectedPlate(t.plateNo)}
-                        className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer border-l-4 group"
+                        className="p-4 transition-all bg-white border-l-4 shadow-sm cursor-pointer rounded-xl hover:shadow-md group"
                         style={{ borderColor: cfg.color }}
                       >
-                        <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-start justify-between mb-2">
                           <div>
                             <h4 className="text-sm font-bold text-primary">{t.plateNo}</h4>
                             {t.driverName && <p className="text-[10px] text-blue-600 font-semibold">{t.driverName}</p>}
                           </div>
-                          <span className="material-symbols-outlined text-lg" style={{ color: cfg.color }}>{cfg.icon}</span>
+                          <span className="text-lg material-symbols-outlined" style={{ color: cfg.color }}>{cfg.icon}</span>
                         </div>
                         <div className="space-y-1.5 text-xs text-on-surface-variant">
                           <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-sm text-green-600">key</span>
+                            <span className="text-sm text-green-600 material-symbols-outlined">key</span>
                             <span>{t.ignitionOnCount} start{t.ignitionOnCount !== 1 ? "s" : ""}</span>
                             <span className="mx-1">•</span>
                             <span>{t.ignitionOffCount} stop{t.ignitionOffCount !== 1 ? "s" : ""}</span>
                           </div>
                           {t.totalRunningMinutes > 0 && (
                             <div className="flex items-center gap-2">
-                              <span className="material-symbols-outlined text-sm text-blue-600">schedule</span>
+                              <span className="text-sm text-blue-600 material-symbols-outlined">schedule</span>
                               <span>{Math.floor(t.totalRunningMinutes / 60)}h {t.totalRunningMinutes % 60}m running</span>
                             </div>
                           )}
                           {t.distanceKm != null && (
                             <div className="flex items-center gap-2">
-                              <span className="material-symbols-outlined text-sm text-purple-600">route</span>
+                              <span className="text-sm text-purple-600 material-symbols-outlined">route</span>
                               <span>{t.distanceKm} km</span>
                             </div>
                           )}
                           {t.firstStartTime && (
                             <div className="flex items-center gap-2">
-                              <span className="material-symbols-outlined text-sm text-gray-500">play_arrow</span>
+                              <span className="text-sm text-gray-500 material-symbols-outlined">play_arrow</span>
                               <span>First start: {fmtTime(t.firstStartTime)}</span>
                             </div>
                           )}
                           {t.lastStopTime && (
                             <div className="flex items-center gap-2">
-                              <span className="material-symbols-outlined text-sm text-gray-500">stop</span>
+                              <span className="text-sm text-gray-500 material-symbols-outlined">stop</span>
                               <span>Last stop: {fmtTime(t.lastStopTime)}</span>
                             </div>
                           )}
@@ -554,11 +554,11 @@ const BusReportPage = () => {
               )}
 
               {/* All buses live status */}
-              <h3 className="text-base font-headline font-bold text-primary flex items-center gap-2 mt-6">
-                <span className="material-symbols-outlined text-lg">directions_bus</span>
+              <h3 className="flex items-center gap-2 mt-6 text-base font-bold font-headline text-primary">
+                <span className="text-lg material-symbols-outlined">directions_bus</span>
                 All Buses — Live
               </h3>
-              <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-3 gap-3 xl:grid-cols-4">
                 {vehicles.map((v) => {
                   const cfg = getStatusCfg(v.vehicleStatusString);
                   const driver = driverMap[v.plateNo];
@@ -567,7 +567,7 @@ const BusReportPage = () => {
                     <div
                       key={v.deviceId}
                       onClick={() => setSelectedPlate(v.plateNo)}
-                      className="bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition-all cursor-pointer border-l-4 group"
+                      className="p-3 transition-all bg-white border-l-4 shadow-sm cursor-pointer rounded-xl hover:shadow-md group"
                       style={{ borderColor: cfg.color }}
                     >
                       <div className="flex justify-between items-start mb-1.5">
@@ -577,7 +577,7 @@ const BusReportPage = () => {
                       {driver && <p className="text-[10px] text-blue-600 font-semibold truncate mb-1">{driver.name}</p>}
                       <div className="text-[10px] text-on-surface-variant space-y-0.5">
                         <p>{v.speed} km/h {v.ignitionStatus ? "• IGN ON" : ""}</p>
-                        {mileage && <p className="text-blue-700 font-bold">{mileage.dailyKm} km today</p>}
+                        {mileage && <p className="font-bold text-blue-700">{mileage.dailyKm} km today</p>}
                       </div>
                     </div>
                   );
@@ -589,11 +589,11 @@ const BusReportPage = () => {
             <div className="space-y-4">
               {/* Header */}
               <div className="flex items-center gap-3">
-                <button onClick={() => setSelectedPlate(null)} className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center hover:bg-surface-container-highest transition-colors">
-                  <span className="material-symbols-outlined text-base">arrow_back</span>
+                <button onClick={() => setSelectedPlate(null)} className="flex items-center justify-center w-8 h-8 transition-colors rounded-full bg-surface-container-high hover:bg-surface-container-highest">
+                  <span className="text-base material-symbols-outlined">arrow_back</span>
                 </button>
                 <div>
-                  <h3 className="text-lg font-headline font-extrabold text-primary">{selectedPlate}</h3>
+                  <h3 className="text-lg font-extrabold font-headline text-primary">{selectedPlate}</h3>
                   <p className="text-[10px] text-on-surface-variant">
                     Report for {reportDate === today() ? "Today" : reportDate === yesterday() ? "Yesterday" : reportDate}
                   </p>
@@ -606,17 +606,17 @@ const BusReportPage = () => {
 
               {/* Live status cards */}
               {selectedVehicle && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   {/* Speed */}
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
+                  <div className="p-4 bg-white shadow-sm rounded-xl">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="material-symbols-outlined text-sm text-green-600">speed</span>
+                      <span className="text-sm text-green-600 material-symbols-outlined">speed</span>
                       <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Speed</span>
                     </div>
-                    <p className="text-xl font-headline font-extrabold text-primary">{selectedVehicle.speed} <span className="text-xs font-normal">km/h</span></p>
+                    <p className="text-xl font-extrabold font-headline text-primary">{selectedVehicle.speed} <span className="text-xs font-normal">km/h</span></p>
                   </div>
                   {/* Ignition */}
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
+                  <div className="p-4 bg-white shadow-sm rounded-xl">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`material-symbols-outlined text-sm ${selectedVehicle.ignitionStatus ? "text-green-600" : "text-red-500"}`}>key</span>
                       <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Ignition</span>
@@ -626,27 +626,27 @@ const BusReportPage = () => {
                     </p>
                   </div>
                   {/* Odometer */}
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
+                  <div className="p-4 bg-white shadow-sm rounded-xl">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="material-symbols-outlined text-sm text-blue-600">straighten</span>
+                      <span className="text-sm text-blue-600 material-symbols-outlined">straighten</span>
                       <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Odometer</span>
                     </div>
-                    <p className="text-xl font-headline font-extrabold text-primary">{selectedVehicle.odometer?.toFixed(1)} <span className="text-xs font-normal">km</span></p>
+                    <p className="text-xl font-extrabold font-headline text-primary">{selectedVehicle.odometer?.toFixed(1)} <span className="text-xs font-normal">km</span></p>
                   </div>
                   {/* Battery */}
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
+                  <div className="p-4 bg-white shadow-sm rounded-xl">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="material-symbols-outlined text-sm text-amber-600">battery_charging_full</span>
+                      <span className="text-sm material-symbols-outlined text-amber-600">battery_charging_full</span>
                       <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Power</span>
                     </div>
-                    <p className="text-xl font-headline font-extrabold text-primary">{selectedVehicle.mainPowerStatus} <span className="text-xs font-normal">V</span></p>
+                    <p className="text-xl font-extrabold font-headline text-primary">{selectedVehicle.mainPowerStatus} <span className="text-xs font-normal">V</span></p>
                   </div>
                 </div>
               )}
 
               {/* Driver card */}
               {selectedDriver && (
-                <div className="bg-white rounded-xl p-4 shadow-sm">
+                <div className="p-4 bg-white shadow-sm rounded-xl">
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 relative ${selectedDriverLive?.driverBusStatus === "in-bus" ? "bg-green-100" : selectedDriverLive?.driverBusStatus === "outside" ? "bg-amber-100" : "bg-gray-100"}`}>
                       <span className={`material-symbols-outlined ${selectedDriverLive?.driverBusStatus === "in-bus" ? "text-green-700" : selectedDriverLive?.driverBusStatus === "outside" ? "text-amber-700" : "text-gray-500"}`}>person</span>
@@ -686,21 +686,21 @@ const BusReportPage = () => {
 
               {/* Report: Mileage + Ignition Summary */}
               {reportLoading ? (
-                <div className="bg-surface-container-low rounded-xl p-8 text-center">
-                  <span className="material-symbols-outlined text-2xl animate-spin text-primary block mb-2">progress_activity</span>
+                <div className="p-8 text-center bg-surface-container-low rounded-xl">
+                  <span className="block mb-2 text-2xl material-symbols-outlined animate-spin text-primary">progress_activity</span>
                   <p className="text-sm text-on-surface-variant">Loading report...</p>
                 </div>
               ) : report ? (
                 <>
                   {/* Summary cards */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     {/* Daily Mileage */}
-                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                    <div className="p-4 border border-blue-100 bg-blue-50 rounded-xl">
                       <div className="flex items-center gap-2 mb-1.5">
-                        <span className="material-symbols-outlined text-sm text-blue-600">route</span>
+                        <span className="text-sm text-blue-600 material-symbols-outlined">route</span>
                         <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600">Mileage</span>
                       </div>
-                      <p className="text-2xl font-headline font-extrabold text-blue-800">
+                      <p className="text-2xl font-extrabold text-blue-800 font-headline">
                         {report.mileage?.dailyKm ?? "—"} <span className="text-xs font-normal">km</span>
                       </p>
                       {report.mileage && (
@@ -710,36 +710,36 @@ const BusReportPage = () => {
                       )}
                     </div>
                     {/* Ignition starts */}
-                    <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                    <div className="p-4 border border-green-100 bg-green-50 rounded-xl">
                       <div className="flex items-center gap-2 mb-1.5">
-                        <span className="material-symbols-outlined text-sm text-green-600">key</span>
+                        <span className="text-sm text-green-600 material-symbols-outlined">key</span>
                         <span className="text-[10px] font-bold uppercase tracking-widest text-green-600">Starts</span>
                       </div>
-                      <p className="text-2xl font-headline font-extrabold text-green-800">{report.ignitionSummary?.onCount ?? 0}</p>
+                      <p className="text-2xl font-extrabold text-green-800 font-headline">{report.ignitionSummary?.onCount ?? 0}</p>
                       {report.ignitionSummary?.firstStart && (
                         <p className="text-[10px] text-green-600 mt-1">First: {fmtTime(report.ignitionSummary.firstStart)}</p>
                       )}
                     </div>
                     {/* Running time */}
-                    <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+                    <div className="p-4 border border-purple-100 bg-purple-50 rounded-xl">
                       <div className="flex items-center gap-2 mb-1.5">
-                        <span className="material-symbols-outlined text-sm text-purple-600">timer</span>
+                        <span className="text-sm text-purple-600 material-symbols-outlined">timer</span>
                         <span className="text-[10px] font-bold uppercase tracking-widest text-purple-600">Running</span>
                       </div>
                       {(() => {
                         const mins = report.ignitionSummary?.totalRunningMinutes ?? 0;
                         const h = Math.floor(mins / 60);
                         const m = mins % 60;
-                        return <p className="text-2xl font-headline font-extrabold text-purple-800">{h}h {m}m</p>;
+                        return <p className="text-2xl font-extrabold text-purple-800 font-headline">{h}h {m}m</p>;
                       })()}
                       {report.ignitionSummary?.lastStop && (
                         <p className="text-[10px] text-purple-600 mt-1">Last stop: {fmtTime(report.ignitionSummary.lastStop)}</p>
                       )}
                     </div>
                     {/* Bus info */}
-                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <div className="p-4 border border-gray-200 bg-gray-50 rounded-xl">
                       <div className="flex items-center gap-2 mb-1.5">
-                        <span className="material-symbols-outlined text-sm text-gray-600">info</span>
+                        <span className="text-sm text-gray-600 material-symbols-outlined">info</span>
                         <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">Info</span>
                       </div>
                       <p className="text-sm font-bold text-gray-800">{report.bus?.number || selectedPlate}</p>
@@ -749,29 +749,29 @@ const BusReportPage = () => {
                   </div>
 
                   {/* Trip Events Timeline */}
-                  <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="overflow-hidden bg-white shadow-sm rounded-xl">
                     <div className="p-4 border-b border-outline-variant/10">
-                      <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-                        <span className="material-symbols-outlined text-base">timeline</span>
+                      <h4 className="flex items-center gap-2 text-sm font-bold text-primary">
+                        <span className="text-base material-symbols-outlined">timeline</span>
                         Ignition Events Timeline
                         <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-label">{report.tripEvents?.length || 0} events</span>
                       </h4>
                     </div>
                     {(!report.tripEvents || report.tripEvents.length === 0) ? (
-                      <div className="p-8 text-center text-on-surface-variant text-sm">
-                        <span className="material-symbols-outlined text-3xl opacity-30 block mb-2">event_busy</span>
+                      <div className="p-8 text-sm text-center text-on-surface-variant">
+                        <span className="block mb-2 text-3xl material-symbols-outlined opacity-30">event_busy</span>
                         No ignition events recorded
                       </div>
                     ) : (
-                      <div className="max-h-[300px] overflow-y-auto">
+                      <div className="overflow-y-auto max-h-75">
                         <table className="w-full text-xs">
-                          <thead className="bg-surface-container-low sticky top-0">
+                          <thead className="sticky top-0 bg-surface-container-low">
                             <tr>
-                              <th className="text-left p-3 font-bold text-on-surface-variant">Time</th>
-                              <th className="text-left p-3 font-bold text-on-surface-variant">Event</th>
-                              <th className="text-left p-3 font-bold text-on-surface-variant">Speed</th>
-                              <th className="text-left p-3 font-bold text-on-surface-variant">Odometer</th>
-                              <th className="text-left p-3 font-bold text-on-surface-variant">Location</th>
+                              <th className="p-3 font-bold text-left text-on-surface-variant">Time</th>
+                              <th className="p-3 font-bold text-left text-on-surface-variant">Event</th>
+                              <th className="p-3 font-bold text-left text-on-surface-variant">Speed</th>
+                              <th className="p-3 font-bold text-left text-on-surface-variant">Odometer</th>
+                              <th className="p-3 font-bold text-left text-on-surface-variant">Location</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -800,36 +800,36 @@ const BusReportPage = () => {
                   </div>
                 </>
               ) : (
-                <div className="bg-surface-container-low rounded-xl p-8 text-center">
-                  <span className="material-symbols-outlined text-4xl opacity-30 block mb-2">description</span>
+                <div className="p-8 text-center bg-surface-container-low rounded-xl">
+                  <span className="block mb-2 text-4xl material-symbols-outlined opacity-30">description</span>
                   <p className="text-sm text-on-surface-variant">No report data for this bus on the selected date</p>
                 </div>
               )}
 
               {/* Fuel Log Section — always shown when a bus is selected */}
               {selectedPlate && (
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="overflow-hidden bg-white shadow-sm rounded-xl">
                   <div className="p-4 border-b border-outline-variant/10">
-                    <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-                      <span className="material-symbols-outlined text-base">local_gas_station</span>
+                    <h4 className="flex items-center gap-2 text-sm font-bold text-primary">
+                      <span className="text-base material-symbols-outlined">local_gas_station</span>
                       Fuel Log
                       <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-label">{fuelLogs.length} entries</span>
                     </h4>
                   </div>
                   {fuelLogs.length === 0 ? (
-                    <div className="p-8 text-center text-on-surface-variant text-sm">
-                      <span className="material-symbols-outlined text-3xl opacity-30 block mb-2">local_gas_station</span>
+                    <div className="p-8 text-sm text-center text-on-surface-variant">
+                      <span className="block mb-2 text-3xl material-symbols-outlined opacity-30">local_gas_station</span>
                       No fuel entries for this date
                       <p className="text-[10px] mt-1 text-on-surface-variant/60">Drivers can log fuel fill-ups from their mobile app</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-outline-variant/10">
                       {fuelLogs.map((log) => (
-                        <div key={log.id} className="p-4 hover:bg-primary-container/10 transition-colors">
+                        <div key={log.id} className="p-4 transition-colors hover:bg-primary-container/10">
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-lg text-orange-600">local_gas_station</span>
+                              <div className="flex items-center justify-center w-10 h-10 bg-orange-100 rounded-full shrink-0">
+                                <span className="text-lg text-orange-600 material-symbols-outlined">local_gas_station</span>
                               </div>
                               <div>
                                 <div className="flex items-center gap-2 mb-0.5">
@@ -843,7 +843,7 @@ const BusReportPage = () => {
                                 </div>
                                 {log.imageUrl && (
                                   <a href={`${import.meta.env.VITE_API_URL || ''}${log.imageUrl}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 text-[10px] text-blue-600 hover:underline">
-                                    <span className="material-symbols-outlined text-xs">photo_camera</span>
+                                    <span className="text-xs material-symbols-outlined">photo_camera</span>
                                     View receipt photo
                                   </a>
                                 )}
@@ -870,40 +870,40 @@ const BusReportPage = () => {
 
               {/* Driver Location History */}
               {report?.driverLocationHistory?.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="overflow-hidden bg-white shadow-sm rounded-xl">
                   <div className="p-4 border-b border-outline-variant/10">
-                    <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-                      <span className="material-symbols-outlined text-base">person_pin_circle</span>
+                    <h4 className="flex items-center gap-2 text-sm font-bold text-primary">
+                      <span className="text-base material-symbols-outlined">person_pin_circle</span>
                       Driver Location History
                       <span className="text-[10px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-label">{report.driverLocationHistory.length} points</span>
                     </h4>
                   </div>
                   <div className="p-4 space-y-3">
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                      <div className="p-3 border border-green-100 rounded-lg bg-green-50">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-green-600 mb-1">First Seen</p>
                         <p className="text-sm font-bold text-green-800">{fmtTime(report.driverLocationHistory[0].createdAt)}</p>
                         <p className="text-[10px] text-green-600">{report.driverLocationHistory[0].latitude.toFixed(4)}, {report.driverLocationHistory[0].longitude.toFixed(4)}</p>
                       </div>
-                      <div className="bg-red-50 rounded-lg p-3 border border-red-100">
+                      <div className="p-3 border border-red-100 rounded-lg bg-red-50">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-red-600 mb-1">Last Seen</p>
                         <p className="text-sm font-bold text-red-800">{fmtTime(report.driverLocationHistory[report.driverLocationHistory.length - 1].createdAt)}</p>
                         <p className="text-[10px] text-red-600">{report.driverLocationHistory[report.driverLocationHistory.length - 1].latitude.toFixed(4)}, {report.driverLocationHistory[report.driverLocationHistory.length - 1].longitude.toFixed(4)}</p>
                       </div>
-                      <div className="bg-violet-50 rounded-lg p-3 border border-violet-100">
+                      <div className="p-3 border rounded-lg bg-violet-50 border-violet-100">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600 mb-1">Total Points</p>
                         <p className="text-sm font-bold text-violet-800">{report.driverLocationHistory.length}</p>
                         <p className="text-[10px] text-violet-600">GPS pings recorded</p>
                       </div>
                     </div>
-                    <div className="max-h-[200px] overflow-y-auto">
+                    <div className="overflow-y-auto max-h-50">
                       <table className="w-full text-xs">
-                        <thead className="bg-surface-container-low sticky top-0">
+                        <thead className="sticky top-0 bg-surface-container-low">
                           <tr>
-                            <th className="text-left p-2 font-bold text-on-surface-variant">#</th>
-                            <th className="text-left p-2 font-bold text-on-surface-variant">Time</th>
-                            <th className="text-left p-2 font-bold text-on-surface-variant">Latitude</th>
-                            <th className="text-left p-2 font-bold text-on-surface-variant">Longitude</th>
+                            <th className="p-2 font-bold text-left text-on-surface-variant">#</th>
+                            <th className="p-2 font-bold text-left text-on-surface-variant">Time</th>
+                            <th className="p-2 font-bold text-left text-on-surface-variant">Latitude</th>
+                            <th className="p-2 font-bold text-left text-on-surface-variant">Longitude</th>
                           </tr>
                         </thead>
                         <tbody>

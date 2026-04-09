@@ -441,7 +441,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
           min={0}
           value={fees[field]}
           onChange={(e) => setFees((prev) => ({ ...prev, [field]: Number(e.target.value) || 0 }))}
-          className="w-full bg-surface-container-high border-none rounded-xl py-3 pl-8 pr-4 text-on-surface focus:bg-surface-container-highest focus:ring-2 focus:ring-primary/30 transition-all font-bold outline-none"
+          className="w-full py-3 pl-8 pr-4 font-bold transition-all border-none outline-none bg-surface-container-high rounded-xl text-on-surface focus:bg-surface-container-highest focus:ring-2 focus:ring-primary/30"
         />
       </div>
     </div>
@@ -454,10 +454,10 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
     const savings = valState.type === "PERCENTAGE" ? (grossFee * (val / 100)) : val;
     
     return (
-      <div className="flex flex-col gap-2 group p-4 bg-surface-container-low/50 rounded-xl border border-outline-variant/10">
+      <div className="flex flex-col gap-2 p-4 border group bg-surface-container-low/50 rounded-xl border-outline-variant/10">
         <div className="flex items-center justify-between">
           <div>
-            <div className="font-bold text-sm text-on-surface flex items-center gap-2">
+            <div className="flex items-center gap-2 text-sm font-bold text-on-surface">
               {label}
               {eligible && (
                 <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
@@ -476,7 +476,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
           />
         </div>
         {isChecked && eligible && (
-          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-outline-variant/10 animate-fadeIn">
+          <div className="flex items-center gap-2 pt-3 mt-3 border-t border-outline-variant/10 animate-fadeIn">
             <select
               value={valState.type}
               onChange={(e) => setDiscountValues(prev => ({ ...prev, [field]: { ...prev[field], type: e.target.value } }))}
@@ -508,16 +508,16 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
   return (
     <div className="space-y-8">
       {/* Page header */}
-      <div className="flex justify-between items-start">
+      <div className="flex items-start justify-between">
         <div>
           <nav className="flex items-center gap-1.5 text-on-surface-variant text-xs mb-2 font-medium">
-            <span className="hover:text-primary cursor-pointer transition-colors">Finance</span>
+            <span className="transition-colors cursor-pointer hover:text-primary">Finance</span>
             <span className="material-symbols-outlined text-[10px]">chevron_right</span>
-            <span className="hover:text-primary cursor-pointer transition-colors">Fees</span>
+            <span className="transition-colors cursor-pointer hover:text-primary">Fees</span>
             <span className="material-symbols-outlined text-[10px]">chevron_right</span>
-            <span className="text-primary font-bold">Assign &amp; Collect</span>
+            <span className="font-bold text-primary">Assign &amp; Collect</span>
           </nav>
-          <h2 className="font-headline text-3xl font-extrabold text-primary tracking-tight">
+          <h2 className="text-3xl font-extrabold tracking-tight font-headline text-primary">
             Assign &amp; Collect Fees
           </h2>
         </div>
@@ -525,7 +525,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
           onClick={() => { setBulkModal(true); setBulkYear(selectedYear || academicYears[0] || ""); }}
           className="bg-secondary text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:scale-[1.02] transition-all shadow"
         >
-          <span className="material-symbols-outlined text-base">groups</span>
+          <span className="text-base material-symbols-outlined">groups</span>
           Bulk Assign Class
         </button>
       </div>
@@ -536,24 +536,24 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
         onCancel={() => setBulkModal(false)}
         onOk={handleBulkAssign} okText="Assign to All" confirmLoading={bulkLoading}
       >
-        <div className="space-y-4 py-2">
+        <div className="py-2 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-on-surface-variant mb-1">Standard</label>
+            <label className="block mb-1 text-xs font-bold text-on-surface-variant">Standard</label>
             <select value={bulkStandard} onChange={(e) => setBulkStandard(e.target.value)}
-              className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none">
+              className="w-full px-4 py-3 border-none outline-none bg-surface-container-high rounded-xl">
               <option value="">Select...</option>
               {STANDARDS_LIST.map((s) => <option key={s} value={s}>{s.replace("STD_", "Std ")}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-on-surface-variant mb-1">Section (optional)</label>
+            <label className="block mb-1 text-xs font-bold text-on-surface-variant">Section (optional)</label>
             <input value={bulkSection} onChange={(e) => setBulkSection(e.target.value)}
-              placeholder="A, B, C..." className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none" />
+              placeholder="A, B, C..." className="w-full px-4 py-3 border-none outline-none bg-surface-container-high rounded-xl" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-on-surface-variant mb-1">Academic Year</label>
+            <label className="block mb-1 text-xs font-bold text-on-surface-variant">Academic Year</label>
             <select value={bulkYear} onChange={(e) => setBulkYear(e.target.value)}
-              className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none">
+              className="w-full px-4 py-3 border-none outline-none bg-surface-container-high rounded-xl">
               <option value="">Select...</option>
               {academicYears.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
@@ -565,17 +565,17 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
       </Modal>
 
       {/* Main 3-col grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ── left: form (spans 2 cols) ── */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="space-y-5 lg:col-span-2">
 
           {/* Student + Year selection */}
           <div className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.04)] relative overflow-hidden">
             {/* decorative icon */}
-            <span className="material-symbols-outlined absolute top-6 right-6 text-8xl text-primary/5 pointer-events-none select-none">
+            <span className="absolute pointer-events-none select-none material-symbols-outlined top-6 right-6 text-8xl text-primary/5">
               school
             </span>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
+            <div className="relative z-10 grid grid-cols-2 gap-4 md:grid-cols-4">
               {/* Academic Year */}
               <div className="space-y-2">
                 <label className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
@@ -585,14 +585,14 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                   <select
                     value={selectedYear}
                     onChange={(e) => onYearChange(e.target.value)}
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest appearance-none transition-all outline-none"
+                    className="w-full px-4 py-3 text-sm font-medium transition-all border-none outline-none appearance-none bg-surface-container-high rounded-xl focus:bg-surface-container-highest"
                   >
                     <option value="">Select year...</option>
                     {academicYears.map((y) => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
-                  <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">
+                  <span className="absolute text-base pointer-events-none material-symbols-outlined right-3 top-3 text-on-surface-variant">
                     expand_more
                   </span>
                 </div>
@@ -606,12 +606,12 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                   <select
                     value={filterStandard}
                     onChange={(e) => { setFilterStandard(e.target.value); setFilterSection(""); setSelectedStudent(null); setExistingFee(null); setExistingPayments([]); }}
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest appearance-none transition-all outline-none"
+                    className="w-full px-4 py-3 text-sm font-medium transition-all border-none outline-none appearance-none bg-surface-container-high rounded-xl focus:bg-surface-container-highest"
                   >
                     <option value="">All Standards</option>
                     {STANDARDS_LIST.map((s) => <option key={s} value={s}>{s.replace("STD_", "Std ")}</option>)}
                   </select>
-                  <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">
+                  <span className="absolute text-base pointer-events-none material-symbols-outlined right-3 top-3 text-on-surface-variant">
                     expand_more
                   </span>
                 </div>
@@ -625,12 +625,12 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                   <select
                     value={filterSection}
                     onChange={(e) => { setFilterSection(e.target.value); setSelectedStudent(null); setExistingFee(null); setExistingPayments([]); }}
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest appearance-none transition-all outline-none"
+                    className="w-full px-4 py-3 text-sm font-medium transition-all border-none outline-none appearance-none bg-surface-container-high rounded-xl focus:bg-surface-container-highest"
                   >
                     <option value="">All Sections</option>
                     {availableSections.map((sec) => <option key={sec} value={sec}>{sec}</option>)}
                   </select>
-                  <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">
+                  <span className="absolute text-base pointer-events-none material-symbols-outlined right-3 top-3 text-on-surface-variant">
                     expand_more
                   </span>
                 </div>
@@ -638,13 +638,13 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
               {/* Student */}
               <div className="space-y-2">
                 <label className="block text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
-                  Student {filteredStudents.length > 0 && <span className="text-on-surface-variant font-medium">({filteredStudents.length})</span>}
+                  Student {filteredStudents.length > 0 && <span className="font-medium text-on-surface-variant">({filteredStudents.length})</span>}
                 </label>
                 <div className="relative">
                   <select
                     value={selectedStudent?.id || ""}
                     onChange={(e) => e.target.value && onStudentChange(e.target.value)}
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest appearance-none transition-all outline-none"
+                    className="w-full px-4 py-3 text-sm font-medium transition-all border-none outline-none appearance-none bg-surface-container-high rounded-xl focus:bg-surface-container-highest"
                   >
                     <option value="">Select student...</option>
                     {filteredStudents.map((s) => (
@@ -653,7 +653,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                       </option>
                     ))}
                   </select>
-                  <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">
+                  <span className="absolute text-base pointer-events-none material-symbols-outlined right-3 top-3 text-on-surface-variant">
                     expand_more
                   </span>
                 </div>
@@ -663,7 +663,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
             {/* Structure loaded banner */}
             {structurePreview && (
               <div className="mt-4 flex items-center gap-2 text-xs text-on-surface-variant bg-surface-container-low rounded-xl px-4 py-2.5">
-                <span className="material-symbols-outlined text-base text-primary">
+                <span className="text-base material-symbols-outlined text-primary">
                   auto_awesome
                 </span>
                 Fee structure auto-loaded for&nbsp;
@@ -686,11 +686,11 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
             /* ── Existing Fee: Read-Only View + Collect Payment ── */
             <>
               <div className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
-                <h4 className="font-headline font-bold text-xl text-primary flex items-center gap-2 mb-5">
+                <h4 className="flex items-center gap-2 mb-5 text-xl font-bold font-headline text-primary">
                   <span className="material-symbols-outlined text-secondary">receipt_long</span>
                   Assigned Fee (View Only)
                 </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
                   {[
                     ["Tuition Fee", existingFee.tuitionFee],
                     ["Transport Fee", existingFee.transportFee],
@@ -698,7 +698,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                     ["Hostel Fee", existingFee.hostelFee],
                     ["Other Fee", existingFee.otherFee],
                   ].map(([label, val]) => (
-                    <div key={label} className="bg-surface-container-low rounded-xl p-3">
+                    <div key={label} className="p-3 bg-surface-container-low rounded-xl">
                       <div className="text-[10px] font-bold text-on-surface-variant uppercase">{label}</div>
                       <div className="text-lg font-bold text-on-surface">{fmt(val)}</div>
                     </div>
@@ -708,14 +708,14 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                   <div className="mt-3 space-y-1">
                     <div className="text-[10px] font-bold text-on-surface-variant uppercase">Custom Items</div>
                     {existingFee.customItems.map((ci, i) => (
-                      <div key={i} className="flex justify-between text-sm px-2">
+                      <div key={i} className="flex justify-between px-2 text-sm">
                         <span>{ci.name}</span><span className="font-bold">{fmt(ci.amount)}</span>
                       </div>
                     ))}
                   </div>
                 )}
-                <div className="mt-4 pt-4 border-t border-outline-variant/20 grid grid-cols-3 gap-4">
-                  <div className="bg-primary-container/30 rounded-xl p-3 text-center">
+                <div className="grid grid-cols-3 gap-4 pt-4 mt-4 border-t border-outline-variant/20">
+                  <div className="p-3 text-center bg-primary-container/30 rounded-xl">
                     <div className="text-[10px] font-bold uppercase">Total</div>
                     <div className="text-xl font-black text-primary">{fmt(existingFee.totalFee)}</div>
                   </div>
@@ -723,19 +723,19 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                     <div className="text-[10px] font-bold uppercase">Discount</div>
                     <div className="text-xl font-black text-[#001813]">{fmt(existingFee.discount)}</div>
                   </div>
-                  <div className="bg-secondary-container/30 rounded-xl p-3 text-center">
+                  <div className="p-3 text-center bg-secondary-container/30 rounded-xl">
                     <div className="text-[10px] font-bold uppercase">Net Fee</div>
                     <div className="text-xl font-black text-secondary">{fmt(existingFee.netFee)}</div>
                   </div>
                 </div>
                 {/* Term-wise status */}
                 {(existingFee.terms || []).length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-outline-variant/20">
+                  <div className="pt-4 mt-4 border-t border-outline-variant/20">
                     <div className="text-[10px] font-bold text-on-surface-variant uppercase mb-2">Term Breakdown</div>
                     <div className="space-y-2">
                       {existingFee.terms.map((t) => (
                         <div key={t.id} className="flex justify-between items-center bg-surface-container-low rounded-xl px-4 py-2.5">
-                          <span className="font-bold text-sm">{t.termName}</span>
+                          <span className="text-sm font-bold">{t.termName}</span>
                           <span className="text-sm">{fmt(t.amount)}</span>
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                             t.status === "PAID" ? "bg-[#44ddc1]/20 text-[#001813]" :
@@ -751,7 +751,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
 
               {/* Inline Collect Payment */}
               <div className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
-                <h4 className="font-headline font-bold text-xl text-primary flex items-center gap-2 mb-5">
+                <h4 className="flex items-center gap-2 mb-5 text-xl font-bold font-headline text-primary">
                   <span className="material-symbols-outlined text-secondary">payments</span>
                   Collect Payment
                 </h4>
@@ -771,20 +771,20 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                       <div>
                         <label className="block text-[10px] font-bold uppercase mb-1">Amount</label>
                         <div className="relative">
-                          <span className="absolute left-3 top-3 text-on-surface-variant font-bold text-sm">₹</span>
+                          <span className="absolute text-sm font-bold left-3 top-3 text-on-surface-variant">₹</span>
                           <input type="number" min={0} value={payAmount}
                             onChange={(e) => setPayAmount(e.target.value)}
-                            className="w-full bg-surface-container-high border-none rounded-xl py-3 pl-7 pr-4 outline-none font-bold" />
+                            className="w-full py-3 pr-4 font-bold border-none outline-none bg-surface-container-high rounded-xl pl-7" />
                         </div>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold uppercase mb-1">Mode</label>
                         <select value={payMode} onChange={(e) => setPayMode(e.target.value)}
-                          className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none">
+                          className="w-full px-4 py-3 border-none outline-none bg-surface-container-high rounded-xl">
                           <option value="CASH">Cash</option>
                           <option value="UPI">UPI</option>
                           <option value="GPAY">GPay</option>
@@ -796,7 +796,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                         <div>
                           <label className="block text-[10px] font-bold uppercase mb-1">Term</label>
                           <select value={payTerm || ""} onChange={(e) => setPayTerm(e.target.value ? Number(e.target.value) : null)}
-                            className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none">
+                            className="w-full px-4 py-3 border-none outline-none bg-surface-container-high rounded-xl">
                             <option value="">Select term</option>
                             {existingFee.terms.filter((t) => t.status !== "PAID").map((t) => (
                               <option key={t.termNumber} value={t.termNumber}>{t.termName}</option>
@@ -807,15 +807,15 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                       <div>
                         <label className="block text-[10px] font-bold uppercase mb-1">Remarks</label>
                         <input value={payRemarks} onChange={(e) => setPayRemarks(e.target.value)}
-                          placeholder="Optional" className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none text-sm" />
+                          placeholder="Optional" className="w-full px-4 py-3 text-sm border-none outline-none bg-surface-container-high rounded-xl" />
                       </div>
                     </div>
                     <button onClick={handleInlinePayment} disabled={payLoading || !canCollectFee}
                       className="bg-primary text-white px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 hover:scale-[1.02] transition-all disabled:opacity-50">
                       {payLoading ? (
-                        <><span className="material-symbols-outlined animate-spin text-base">refresh</span> Processing...</>
+                        <><span className="text-base material-symbols-outlined animate-spin">refresh</span> Processing...</>
                       ) : (
-                        <><span className="material-symbols-outlined text-base">check_circle</span> Collect Payment</>
+                        <><span className="text-base material-symbols-outlined">check_circle</span> Collect Payment</>
                       )}
                     </button>
                   </div>
@@ -823,16 +823,16 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
 
                 {/* Payment history */}
                 {existingPayments.length > 0 && (
-                  <div className="mt-5 pt-5 border-t border-outline-variant/20">
+                  <div className="pt-5 mt-5 border-t border-outline-variant/20">
                     <div className="text-[10px] font-bold text-on-surface-variant uppercase mb-2">Payment History</div>
                     <div className="space-y-2">
                       {existingPayments.map((p) => (
                         <div key={p.id} className="flex justify-between items-center bg-surface-container-low rounded-xl px-4 py-2.5">
                           <div>
-                            <span className="font-bold text-sm">{fmt(p.amount)}</span>
-                            <span className="text-xs text-on-surface-variant ml-2">{p.paymentMode}</span>
-                            {p.receiptNo && <span className="text-xs text-on-surface-variant ml-2">#{p.receiptNo}</span>}
-                            {p.termNumber && <span className="text-xs text-on-surface-variant ml-2">Term {p.termNumber}</span>}
+                            <span className="text-sm font-bold">{fmt(p.amount)}</span>
+                            <span className="ml-2 text-xs text-on-surface-variant">{p.paymentMode}</span>
+                            {p.receiptNo && <span className="ml-2 text-xs text-on-surface-variant">#{p.receiptNo}</span>}
+                            {p.termNumber && <span className="ml-2 text-xs text-on-surface-variant">Term {p.termNumber}</span>}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
@@ -843,9 +843,9 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                             {p.status === "SUCCESS" && canCollectFee && (
                               <>
                                 <button onClick={() => setCancelModal({ open: true, payment: p, action: "cancel", reason: "", refundAmount: 0 })}
-                                  className="text-xs text-on-surface-variant hover:text-error transition-colors font-bold">Cancel</button>
+                                  className="text-xs font-bold transition-colors text-on-surface-variant hover:text-error">Cancel</button>
                                 <button onClick={() => setCancelModal({ open: true, payment: p, action: "refund", reason: "", refundAmount: p.amount })}
-                                  className="text-xs text-on-surface-variant hover:text-error transition-colors font-bold">Refund</button>
+                                  className="text-xs font-bold transition-colors text-on-surface-variant hover:text-error">Refund</button>
                               </>
                             )}
                           </div>
@@ -865,9 +865,9 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                 okText={cancelModal.action === "cancel" ? "Cancel Receipt" : "Process Refund"}
                 okButtonProps={{ danger: true }}
               >
-                <div className="space-y-3 py-2">
+                <div className="py-2 space-y-3">
                   {cancelModal.payment && (
-                    <div className="bg-surface-container-low rounded-xl px-4 py-3">
+                    <div className="px-4 py-3 bg-surface-container-low rounded-xl">
                       <div className="text-sm font-bold">Amount: {fmt(cancelModal.payment.amount)}</div>
                       <div className="text-xs text-on-surface-variant">
                         Receipt: {cancelModal.payment.receiptNo || "—"} | Mode: {cancelModal.payment.paymentMode}
@@ -876,19 +876,19 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                   )}
                   {cancelModal.action === "refund" && (
                     <div>
-                      <label className="block text-xs font-bold mb-1">Refund Amount</label>
+                      <label className="block mb-1 text-xs font-bold">Refund Amount</label>
                       <input type="number" min={0} max={cancelModal.payment?.amount}
                         value={cancelModal.refundAmount}
                         onChange={(e) => setCancelModal((p) => ({ ...p, refundAmount: Number(e.target.value) }))}
-                        className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none font-bold" />
+                        className="w-full px-4 py-3 font-bold border-none outline-none bg-surface-container-high rounded-xl" />
                     </div>
                   )}
                   <div>
-                    <label className="block text-xs font-bold mb-1">Reason</label>
+                    <label className="block mb-1 text-xs font-bold">Reason</label>
                     <input value={cancelModal.reason}
                       onChange={(e) => setCancelModal((p) => ({ ...p, reason: e.target.value }))}
                       placeholder={cancelModal.action === "cancel" ? "Reason for cancellation (e.g. human error)" : "Reason for refund"}
-                      className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none text-sm" />
+                      className="w-full px-4 py-3 text-sm border-none outline-none bg-surface-container-high rounded-xl" />
                   </div>
                 </div>
               </Modal>
@@ -898,17 +898,17 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
           <>
           {/* Fee breakdown */}
           <div className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
-            <div className="flex justify-between items-center mb-6">
-              <h4 className="font-headline font-bold text-xl text-primary flex items-center gap-2">
+            <div className="flex items-center justify-between mb-6">
+              <h4 className="flex items-center gap-2 text-xl font-bold font-headline text-primary">
                 <span className="material-symbols-outlined text-secondary">analytics</span>
                 Fee Breakdown
               </h4>
               <button
                 type="button"
                 onClick={() => setCustomItems([...customItems, { name: "", amount: 0 }])}
-                className="text-sm font-bold text-on-surface-variant flex items-center gap-1 hover:text-primary transition-colors"
+                className="flex items-center gap-1 text-sm font-bold transition-colors text-on-surface-variant hover:text-primary"
               >
-                <span className="material-symbols-outlined text-lg">add</span>
+                <span className="text-lg material-symbols-outlined">add</span>
                 Add Custom Fee
               </button>
             </div>
@@ -925,8 +925,8 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
 
             {/* Custom items */}
             {customItems.length > 0 && (
-              <div className="mt-5 space-y-3 pt-5 border-t border-outline-variant/20">
-                <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+              <div className="pt-5 mt-5 space-y-3 border-t border-outline-variant/20">
+                <p className="text-xs font-bold tracking-widest uppercase text-on-surface-variant">
                   Custom Fee Items
                 </p>
                 {customItems.map((ci, idx) => (
@@ -940,7 +940,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                         next[idx] = { ...next[idx], name: e.target.value };
                         setCustomItems(next);
                       }}
-                      className="flex-1 bg-surface-container-high border-none rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/30 outline-none font-body text-sm"
+                      className="flex-1 px-4 py-3 text-sm border-none outline-none bg-surface-container-high rounded-xl text-on-surface focus:ring-2 focus:ring-primary/30 font-body"
                     />
                     <div className="relative w-40">
                       <span className="absolute left-3 top-3.5 text-on-surface-variant font-bold text-sm">₹</span>
@@ -954,15 +954,15 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                           next[idx] = { ...next[idx], amount: Number(e.target.value) || 0 };
                           setCustomItems(next);
                         }}
-                        className="w-full bg-surface-container-high border-none rounded-xl py-3 pl-7 pr-4 text-on-surface focus:ring-2 focus:ring-primary/30 outline-none font-bold"
+                        className="w-full py-3 pr-4 font-bold border-none outline-none bg-surface-container-high rounded-xl pl-7 text-on-surface focus:ring-2 focus:ring-primary/30"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => setCustomItems(customItems.filter((_, i) => i !== idx))}
-                      className="w-10 h-10 mt-1 flex items-center justify-center rounded-xl hover:bg-error-container text-error transition-colors"
+                      className="flex items-center justify-center w-10 h-10 mt-1 transition-colors rounded-xl hover:bg-error-container text-error"
                     >
-                      <span className="material-symbols-outlined text-base">delete</span>
+                      <span className="text-base material-symbols-outlined">delete</span>
                     </button>
                   </div>
                 ))}
@@ -978,7 +978,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
           <div className="space-y-5">
             {/* Discount card */}
             <div className="bg-surface-container rounded-2xl p-7">
-              <h4 className="font-headline font-bold text-lg text-primary mb-5">
+              <h4 className="mb-5 text-lg font-bold font-headline text-primary">
                 Discounts Eligibility
               </h4>
               <div className="space-y-5">
@@ -1009,7 +1009,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
               </div>
 
               {/* Manual discount section */}
-              <div className="mt-6 pt-6 border-t border-outline-variant/20 space-y-4">
+              <div className="pt-6 mt-6 space-y-4 border-t border-outline-variant/20">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
                     Quick Flat Discount (₹)
@@ -1052,7 +1052,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                           next[realIdx] = { ...next[realIdx], type: e.target.value };
                           setManualDiscounts(next);
                         }}
-                        className="flex-1 bg-surface-container-high border-none rounded-lg py-2 px-3 text-xs outline-none font-bold"
+                        className="flex-1 px-3 py-2 text-xs font-bold border-none rounded-lg outline-none bg-surface-container-high"
                       >
                         <option value="">Select Type</option>
                         <option value="FLAT">Flat (₹)</option>
@@ -1072,15 +1072,15 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                             next[realIdx] = { ...next[realIdx], value: e.target.value };
                             setManualDiscounts(next);
                           }}
-                          className="w-full bg-surface-container-high border-none rounded-lg py-2 pl-6 pr-2 text-sm font-bold outline-none"
+                          className="w-full py-2 pl-6 pr-2 text-sm font-bold border-none rounded-lg outline-none bg-surface-container-high"
                         />
                       </div>
                       <button
                         type="button"
                         onClick={() => setManualDiscounts(manualDiscounts.filter((item) => item !== d))}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-error-container text-error transition-colors"
+                        className="flex items-center justify-center w-8 h-8 transition-colors rounded-lg hover:bg-error-container text-error"
                       >
-                        <span className="material-symbols-outlined text-sm">close</span>
+                        <span className="text-sm material-symbols-outlined">close</span>
                       </button>
                     </div>
                   ))}
@@ -1095,13 +1095,13 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
               </div>
 
               {/* Payable Preview inside Discount Card */}
-              <div className="mt-8 pt-6 border-t-2 border-primary/10">
-                <div className="flex justify-between items-end">
+              <div className="pt-6 mt-8 border-t-2 border-primary/10">
+                <div className="flex items-end justify-between">
                   <div>
                     <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-1">
                       Estimated Net Pay
                     </p>
-                    <p className="text-2xl font-headline font-black text-primary">{fmt(netFee)}</p>
+                    <p className="text-2xl font-black font-headline text-primary">{fmt(netFee)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-bold text-[#001813] bg-[#44ddc1]/20 px-2 py-0.5 rounded-full inline-block">
@@ -1114,8 +1114,8 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
 
             {/* Sibling insight chip */}
             {discountEligibility?.siblingDiscount?.eligible && (
-              <div className="bg-white px-4 py-3 rounded-2xl shadow-sm flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#44ddc1]/25 flex items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-3 px-4 py-3 bg-white shadow-sm rounded-2xl">
+                <div className="w-8 h-8 rounded-full bg-[#44ddc1]/25 flex items-center justify-center shrink-0">
                   <span className="material-symbols-outlined text-sm text-[#001813]">tips_and_updates</span>
                 </div>
                 <p className="text-xs font-medium text-on-surface-variant">
@@ -1125,9 +1125,9 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
             )}
 
             {/* Summary / CTA card */}
-            <div className="bg-primary-container rounded-2xl p-7 relative overflow-hidden">
-              <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/5 rounded-full blur-2xl pointer-events-none" />
-              <h4 className="font-headline font-bold text-lg text-on-primary-container mb-5">
+            <div className="relative overflow-hidden bg-primary-container rounded-2xl p-7">
+              <div className="absolute w-40 h-40 rounded-full pointer-events-none -right-8 -bottom-8 bg-white/5 blur-2xl" />
+              <h4 className="mb-5 text-lg font-bold font-headline text-on-primary-container">
                 Total Assignment Value
               </h4>
               <div className="space-y-2.5 mb-6">
@@ -1141,8 +1141,8 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                     <span>− {fmt(totalDiscount)}</span>
                   </div>
                 )}
-                <div className="h-px bg-white/10 my-1" />
-                <div className="flex justify-between text-2xl font-headline font-black text-white">
+                <div className="h-px my-1 bg-white/10" />
+                <div className="flex justify-between text-2xl font-black text-white font-headline">
                   <span>Net Total</span>
                   <span>{fmt(netFee)}</span>
                 </div>
@@ -1154,16 +1154,16 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                 style={{
                   background: "linear-gradient(to right, #00152a, #102a43)",
                 }}
-                className="w-full bg-gradient-to-br from-primary to-primary-container text-white py-4 px-6 rounded-xl font-headline font-extrabold tracking-tight text-base shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-linear-to-br from-primary to-primary-container text-white py-4 px-6 rounded-xl font-headline font-extrabold tracking-tight text-base shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
-                    <span className="material-symbols-outlined text-base animate-spin">refresh</span>
+                    <span className="text-base material-symbols-outlined animate-spin">refresh</span>
                     Assigning...
                   </>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined text-base">assignment_turned_in</span>
+                    <span className="text-base material-symbols-outlined">assignment_turned_in</span>
                     Assign Fee
                   </>
                 )}
@@ -1174,10 +1174,10 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
       </div>
 
       <div className="mt-6">
-        <h4 className="font-headline font-bold text-2xl text-primary mb-5">
+        <h4 className="mb-5 text-2xl font-bold font-headline text-primary">
           Recent Fee Assignments
         </h4>
-        <div className="bg-surface-container-low rounded-2xl overflow-hidden shadow-sm">
+        <div className="overflow-hidden shadow-sm bg-surface-container-low rounded-2xl">
           {/* header */}
           <div className="grid grid-cols-5 px-7 py-3.5 bg-surface-container-high">
             {["Student", "Standard", "Academic Year", "Net Fee", "Status"].map((h) => (
@@ -1188,8 +1188,8 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
           </div>
 
           {recentAssignments.length === 0 ? (
-            <div className="px-7 py-10 text-center text-on-surface-variant text-sm">
-              <span className="material-symbols-outlined text-3xl block mb-2 opacity-30">receipt_long</span>
+            <div className="py-10 text-sm text-center px-7 text-on-surface-variant">
+              <span className="block mb-2 text-3xl material-symbols-outlined opacity-30">receipt_long</span>
               No recent assignments found
             </div>
           ) : (
@@ -1205,10 +1205,10 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                 >
                   {/* Student name */}
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold text-sm flex-shrink-0">
+                    <div className="flex items-center justify-center text-sm font-bold rounded-full shrink-0 w-9 h-9 bg-primary-container text-on-primary-container">
                       {(fee.student?.name || "?")[0].toUpperCase()}
                     </div>
-                    <span className="font-bold text-primary text-sm truncate">
+                    <span className="text-sm font-bold truncate text-primary">
                       {fee.student?.name || "—"}
                     </span>
                   </div>

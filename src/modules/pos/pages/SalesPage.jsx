@@ -142,9 +142,9 @@ const SalesPage = () => {
       setDiscount(0);
       setRemarks("");
       loadData();
-    } catch (err) { 
+    } catch (err) {
       const msg = err?.response?.data?.message;
-      message.error(Array.isArray(msg) ? msg.join(', ') : msg || "Failed to create sale"); 
+      message.error(Array.isArray(msg) ? msg.join(', ') : msg || "Failed to create sale");
     }
     setSubmitting(false);
   };
@@ -388,37 +388,37 @@ const SalesPage = () => {
               <span className="material-symbols-outlined text-lg">download</span>Export CSV
             </button>
           </div>
-        <div className="bg-white rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.04)] overflow-hidden">
-          <div className="grid grid-cols-7 px-6 py-3 bg-surface-container-high">
-            {["Invoice #", "Date", "Customer", "Items", "Total", "Payment", ""].map((h) => (
-              <span key={h} className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">{h}</span>
-            ))}
-          </div>
-          {filteredSales.length === 0 ? (
-            <div className="px-6 py-10 text-center text-on-surface-variant text-sm">
-              <span className="material-symbols-outlined text-3xl block mb-2 opacity-30">receipt_long</span>No sales found
-            </div>
-          ) : (
-            <div className="divide-y divide-outline-variant/10">
-              {filteredSales.map((sale, idx) => (
-                <div key={sale.id} className={`grid grid-cols-7 px-6 py-4 items-center ${idx % 2 === 0 ? "bg-white" : "bg-surface-container-low/30"}`}>
-                  <span className="font-mono text-sm font-bold text-on-surface">{sale.invoiceNo || "—"}</span>
-                  <span className="text-sm text-on-surface-variant">{new Date(sale.createdAt).toLocaleDateString("en-IN")}</span>
-                  <div>
-                    <p className="text-sm font-bold text-on-surface">{sale.customerName || "Walk-in"}</p>
-                    <p className="text-[10px] text-on-surface-variant">{(sale.customerType || "").replace(/_/g, " ")}</p>
-                  </div>
-                  <span className="text-sm text-on-surface-variant">{sale.items?.length || 0} items</span>
-                  <span className="font-bold text-sm text-primary">{fmt(sale.totalAmount)}</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold w-fit ${sale.paymentMode === "CASH" ? "bg-[#44ddc1]/20 text-[#001813]" : sale.paymentMode === "UPI" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}>
-                    {sale.paymentMode}
-                  </span>
-                  <button onClick={() => setSelectedSale(sale)} className="text-primary text-xs font-bold hover:underline">View</button>
-                </div>
+          <div className="bg-white rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.04)] overflow-hidden">
+            <div className="grid grid-cols-7 px-6 py-3 bg-surface-container-high">
+              {["Invoice #", "Date", "Customer", "Items", "Total", "Payment", ""].map((h) => (
+                <span key={h} className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">{h}</span>
               ))}
             </div>
-          )}
-        </div>
+            {filteredSales.length === 0 ? (
+              <div className="px-6 py-10 text-center text-on-surface-variant text-sm">
+                <span className="material-symbols-outlined text-3xl block mb-2 opacity-30">receipt_long</span>No sales found
+              </div>
+            ) : (
+              <div className="divide-y divide-outline-variant/10">
+                {filteredSales.map((sale, idx) => (
+                  <div key={sale.id} className={`grid grid-cols-7 px-6 py-4 items-center ${idx % 2 === 0 ? "bg-white" : "bg-surface-container-low/30"}`}>
+                    <span className="font-mono text-sm font-bold text-on-surface">{sale.invoiceNo || "—"}</span>
+                    <span className="text-sm text-on-surface-variant">{new Date(sale.createdAt).toLocaleDateString("en-IN")}</span>
+                    <div>
+                      <p className="text-sm font-bold text-on-surface">{sale.customerName || "Walk-in"}</p>
+                      <p className="text-[10px] text-on-surface-variant">{(sale.customerType || "").replace(/_/g, " ")}</p>
+                    </div>
+                    <span className="text-sm text-on-surface-variant">{sale.items?.length || 0} items</span>
+                    <span className="font-bold text-sm text-primary">{fmt(sale.totalAmount)}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-bold w-fit ${sale.paymentMode === "CASH" ? "bg-[#44ddc1]/20 text-[#001813]" : sale.paymentMode === "UPI" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"}`}>
+                      {sale.paymentMode}
+                    </span>
+                    <button onClick={() => setSelectedSale(sale)} className="text-primary text-xs font-bold hover:underline">View</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
