@@ -270,6 +270,12 @@ const AllBusReportsPage = () => {
       render: (val) => (val ? `${fmt(val)} km` : '-'),
     },
     {
+        title: 'Image',
+        dataIndex: 'imageUrl',
+        key: 'imageUrl',
+        width: 90,
+    },
+    {
       title: 'Export',
       key: 'actions',
       fixed: 'right',
@@ -352,23 +358,7 @@ const AllBusReportsPage = () => {
       dataIndex: 'imageUrl',
       key: 'imageUrl',
       width: 90,
-      render: (val) =>
-        val ? (
-          <Image
-            src={val.startsWith('http') ? val : `${SERVER_BASE}${val}`}
-            alt="Receipt"
-            width={40}
-            height={40}
-            style={{ objectFit: 'cover', borderRadius: 6, cursor: 'pointer' }}
-            preview={{
-              mask: <EyeOutlined style={{ fontSize: 14 }} />,
-              src: val.startsWith('http') ? val : `${SERVER_BASE}${val}`,
-            }}
-            fallback="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZjVmNWY1Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjYmZiZmJmIiBmb250LXNpemU9IjEwIj5OL0E8L3RleHQ+PC9zdmc+"
-          />
-        ) : (
-          <span style={{ color: '#bfbfbf', fontSize: 12 }}>—</span>
-        ),
+   
     },
   ];
 

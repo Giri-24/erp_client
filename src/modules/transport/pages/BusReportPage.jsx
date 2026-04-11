@@ -108,6 +108,11 @@ const toDateInput = (d) => {
 };
 const today = () => toDateInput(new Date());
 const yesterday = () => { const d = new Date(); d.setDate(d.getDate() - 1); return toDateInput(d); };
+const getIsoDate = (dt) => {
+  if (!dt) return null;
+  try { return new Date(dt).toISOString().slice(0, 10); }
+  catch { return null; }
+};
 
 const MapRecenter = ({ center, zoom }) => {
   const map = useMap();
@@ -234,13 +239,18 @@ const BusReportPage = () => {
       .then(setReport)
       .catch(() => setReport(null))
       .finally(() => setReportLoading(false));
-    // Fetch fuel logs for selected bus
-    const startOfDay = reportDate + "T00:00:00.000Z";
-    const endOfDay = reportDate + "T23:59:59.999Z";
-    getFuelLogs({ plateNo: selectedPlate, from: startOfDay, to: endOfDay })
+    // Fetch recent fuel logs for the selected bus and filter them client-side.
+    getFuelLogs({ plateNo: selectedPlate })
       .then((d) => setFuelLogs(Array.isArray(d) ? d : []))
       .catch(() => setFuelLogs([]));
   }, [selectedPlate, reportDate]);
+
+  const selectedDateFuelLogs = useMemo(
+    () => fuelLogs.filter((log) => getIsoDate(log.timestamp) === reportDate),
+    [fuelLogs, reportDate],
+  );
+  const displayedFuelLogs = selectedDateFuelLogs.length > 0 ? selectedDateFuelLogs : fuelLogs;
+  const fallbackFuelDate = displayedFuelLogs[0] ? getIsoDate(displayedFuelLogs[0].timestamp) : null;
 
   /* ── enriched driver tracking ── */
   const enrichedDrivers = useMemo(() => {
@@ -867,18 +877,24 @@ const BusReportPage = () => {
                     <h4 className="text-sm font-bold text-primary flex items-center gap-2">
                       <span className="material-symbols-outlined text-base">local_gas_station</span>
                       Fuel Log
-                      <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-label">{fuelLogs.length} entries</span>
+                      <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-label">{displayedFuelLogs.length} entries</span>
                     </h4>
                   </div>
-                  {fuelLogs.length === 0 ? (
+                  {displayedFuelLogs.length === 0 ? (
                     <div className="p-8 text-center text-on-surface-variant text-sm">
                       <span className="material-symbols-outlined text-3xl opacity-30 block mb-2">local_gas_station</span>
-                      No fuel entries for this date
+                      No fuel entries found for this bus
                       <p className="text-[10px] mt-1 text-on-surface-variant/60">Drivers can log fuel fill-ups from their mobile app</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-outline-variant/10">
-                      {fuelLogs.map((log) => (
+                    <div>
+                      {selectedDateFuelLogs.length === 0 && fallbackFuelDate && (
+                        <div className="px-4 py-3 text-[11px] font-medium bg-amber-50 text-amber-700 border-b border-amber-100">
+                          No fuel entries on {reportDate}. Showing latest available entries from {fallbackFuelDate}.
+                        </div>
+                      )}
+                      <div className="divide-y divide-outline-variant/10">
+                        {displayedFuelLogs.map((log) => (
                         <div key={log.id} className="p-4 hover:bg-primary-container/10 transition-colors">
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
@@ -927,7 +943,8 @@ const BusReportPage = () => {
                             </div>
                           </div>
                         </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
