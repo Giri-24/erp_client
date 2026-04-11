@@ -28,13 +28,11 @@ import {
 import {
   getLeaveTypes,
   getLeaveApplications,
-  getMyLeaves,
   applyLeave,
   approveLeave,
   rejectLeave,
   cancelLeave,
   getAllLeaveBalances,
-  getLeaveBalance,
 } from "../hr.service";
 import { getAllStaff } from "../../staff/staff.service";
 import dayjs from "dayjs";
@@ -51,7 +49,7 @@ const LEAVE_STATUS_COLORS = {
   cancelled: "default",
 };
 
-const LeaveManagementPage = () => {
+const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [applications, setApplications] = useState([]);
   const [myLeaves, setMyLeaves] = useState([]);
@@ -62,13 +60,14 @@ const LeaveManagementPage = () => {
   const [applyModal, setApplyModal] = useState(false);
   const [detailModal, setDetailModal] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
-  const [activeTab, setActiveTab] = useState("all");
   const [filterMonth, setFilterMonth] = useState(dayjs());
   const [form] = Form.useForm();
 
   const canManageLeave = hasPermission(PERMISSIONS.HR_LEAVE_MANAGE);
   const canApproveLeave = hasPermission(PERMISSIONS.HR_LEAVE_APPROVE);
   const currentUser = getCurrentUser();
+  const isSelfOnly = selfOnlyProp || (!canManageLeave && !canApproveLeave && !hasPermission(PERMISSIONS.HR_DASHBOARD));
+  const [activeTab, setActiveTab] = useState(isSelfOnly ? "my-leaves" : "all");
 
   const defaultLeaveTypes = [
     { id: "CL", name: "Casual Leave", code: "CL", maxPerYear: 12, carryForward: false },
@@ -102,8 +101,10 @@ const LeaveManagementPage = () => {
   const fetchMyLeaves = async () => {
     setLoading(true);
     try {
-      const data = await getMyLeaves({ year: filterMonth.format("YYYY") });
-      setMyLeaves(data);
+      const staffId = String(currentUser?.staffId);
+      const data = await getLeaveApplications({ staffId, year: filterMonth.format("YYYY") });
+      const list = Array.isArray(data) ? data : data?.data || [];
+      setMyLeaves(staffId ? list.filter(l => l.staffId === staffId) : list);
     } catch {
       setMyLeaves([]);
     }
@@ -120,10 +121,10 @@ const LeaveManagementPage = () => {
   };
 
   const fetchMyBalance = async () => {
-    if (!currentUser?.staffId) return;
+    if (!currentUser?.id) return;
     try {
-      const data = await getLeaveBalance(currentUser.staffId, { year: filterMonth.format("YYYY") });
-      setMyBalance(data);
+      const data = await getAllLeaveBalances({ staffId: currentUser.staffId, year: filterMonth.format("YYYY") });
+      setMyBalance(Array.isArray(data) ? data : data?.data || []);
     } catch {
       setMyBalance([]);
     }
@@ -138,11 +139,11 @@ const LeaveManagementPage = () => {
 
   useEffect(() => {
     fetchLeaveTypes();
-    fetchStaff();
+    if (!isSelfOnly) fetchStaff();
   }, []);
 
   useEffect(() => {
-    if (activeTab === "all" || activeTab === "approvals") {
+    if (!isSelfOnly && (activeTab === "all" || activeTab === "approvals")) {
       fetchApplications();
       fetchBalances();
     } else {
@@ -154,6 +155,11 @@ const LeaveManagementPage = () => {
   const handleApply = async () => {
     try {
       const values = await form.validateFields();
+      const staffId = values.staffId || currentUser?.staffId;
+      if (!staffId) {
+        message.error("Staff ID not found. Please logout and login again.");
+        return;
+      }
       const [fromDate, toDate] = values.dateRange;
       const diffDays = toDate.diff(fromDate, "day") + 1;
       await applyLeave({
@@ -163,7 +169,7 @@ const LeaveManagementPage = () => {
         days: values.halfDay ? diffDays * 0.5 : diffDays,
         halfDay: values.halfDay || false,
         reason: values.reason,
-        staffId: values.staffId || currentUser?.staffId,
+        staffId,
       });
       message.success("Leave applied successfully");
       setApplyModal(false);
@@ -177,7 +183,7 @@ const LeaveManagementPage = () => {
 
   const handleApprove = async (id) => {
     try {
-      await approveLeave(id, { approvedBy: currentUser?.id });
+      await approveLeave(id, { approvedBy: currentUser?.staffId });
       message.success("Leave approved");
       fetchApplications();
     } catch (err) {
@@ -187,7 +193,7 @@ const LeaveManagementPage = () => {
 
   const handleReject = async (id, reason) => {
     try {
-      await rejectLeave(id, { rejectedBy: currentUser?.id, reason });
+      await rejectLeave(id, { rejectedBy: currentUser?.staffId, reason });
       message.success("Leave rejected");
       fetchApplications();
     } catch (err) {
@@ -283,10 +289,10 @@ const LeaveManagementPage = () => {
             <span style={{ color: "#00152a", fontWeight: 700 }}>Leave Management</span>
           </div>
           <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 28, fontWeight: 800, color: "#00152a", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
-            Leave Management
+            {isSelfOnly ? "My Leaves" : "Leave Management"}
           </h2>
           <p style={{ color: "#43474d", fontSize: 13, margin: 0, fontFamily: "'Public Sans', sans-serif" }}>
-            CL, SL, EL, Maternity/Paternity — apply, approve, and track leave balances.
+            {isSelfOnly ? "Apply for leave, track your leave balance and application status." : "CL, SL, EL, Maternity/Paternity — apply, approve, and track leave balances."}
           </p>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setApplyModal(true); }}>
@@ -313,10 +319,10 @@ const LeaveManagementPage = () => {
       )}
 
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
-        { key: "all", label: "All Applications" },
-        { key: "approvals", label: canApproveLeave ? "Pending Approvals" : "Pending" },
+        ...(!isSelfOnly ? [{ key: "all", label: "All Applications" }] : []),
+        ...(!isSelfOnly ? [{ key: "approvals", label: canApproveLeave ? "Pending Approvals" : "Pending" }] : []),
         { key: "my-leaves", label: "My Leaves" },
-        { key: "balances", label: "Leave Balances" },
+        ...(!isSelfOnly ? [{ key: "balances", label: "Leave Balances" }] : []),
       ]} />
 
       <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
@@ -354,7 +360,7 @@ const LeaveManagementPage = () => {
       {/* Apply Leave Modal */}
       <Modal title="Apply Leave" open={applyModal} onCancel={() => setApplyModal(false)} onOk={handleApply} width={520}>
         <Form form={form} layout="vertical">
-          {canManageLeave && (
+          {canManageLeave && !isSelfOnly && (
             <Form.Item name="staffId" label="Staff Member">
               <Select placeholder="Select staff (leave empty for self)" allowClear showSearch optionFilterProp="children">
                 {staff.map((s) => (

@@ -27,6 +27,7 @@ import {
 } from "@ant-design/icons";
 import {
   getAttendance,
+  getAttendanceByStaff,
   bulkMarkAttendance,
   updateAttendance,
   getAttendanceSummary,
@@ -34,7 +35,7 @@ import {
 } from "../hr.service";
 import { getAllStaff } from "../../staff/staff.service";
 import dayjs from "dayjs";
-import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { hasPermission, PERMISSIONS, getCurrentUser } from "../../../utils/permissions";
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -49,7 +50,7 @@ const STATUS_COLORS = {
   week_off: "default",
 };
 
-const AttendancePage = () => {
+const AttendancePage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [attendance, setAttendance] = useState([]);
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -64,6 +65,8 @@ const AttendancePage = () => {
   const [editingRecord, setEditingRecord] = useState(null);
   const [form] = Form.useForm();
   const canManageAttendance = hasPermission(PERMISSIONS.HR_ATTENDANCE_MANAGE);
+  const currentUser = getCurrentUser();
+  const isSelfOnly = selfOnlyProp || (!canManageAttendance && !hasPermission(PERMISSIONS.HR_DASHBOARD));
 
   const fetchStaff = async () => {
     try {
@@ -77,7 +80,18 @@ const AttendancePage = () => {
   const fetchAttendance = async () => {
     setLoading(true);
     try {
-      setAttendance(data);
+      let data;
+      if (isSelfOnly && currentUser?.staffId) {
+        const res = await getAttendanceByStaff(currentUser.staffId, {
+          date: selectedDate.format("YYYY-MM-DD"),
+        });
+        data = res?.records || res || [];
+      } else {
+        data = await getAttendance({
+          date: selectedDate.format("YYYY-MM-DD"),
+        });
+      }
+      setAttendance(Array.isArray(data) ? data : data?.records || data?.data || []);
     } catch {
       setAttendance([]);
     }
@@ -98,17 +112,18 @@ const AttendancePage = () => {
   const fetchMonthlyReport = async () => {
     setLoading(true);
     try {
-      const data = await getMonthlyAttendanceReport({
-        month: selectedMonth.format("YYYY-MM"),
-      });
-      setMonthlyReport(data);
+      const params = { month: selectedMonth.format("YYYY-MM") };
+      if (isSelfOnly && currentUser?.staffId) params.staffId = currentUser.staffId;
+      const data = await getMonthlyAttendanceReport(params);
+      const list = Array.isArray(data) ? data : data?.data || [];
+      setMonthlyReport(isSelfOnly && currentUser?.staffId ? list.filter(r => r.staffId === currentUser.staffId) : list);
     } catch {
       setMonthlyReport([]);
     }
-  };
+    }
 
   useEffect(() => {
-    fetchStaff();
+    if (!isSelfOnly) fetchStaff();
   }, []);
 
   useEffect(() => {
@@ -267,10 +282,10 @@ const AttendancePage = () => {
             <span style={{ color: "#00152a", fontWeight: 700 }}>Attendance</span>
           </div>
           <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 28, fontWeight: 800, color: "#00152a", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
-            Attendance Management
+            {isSelfOnly ? "My Attendance" : "Attendance Management"}
           </h2>
           <p style={{ color: "#43474d", fontSize: 13, margin: 0, fontFamily: "'Public Sans', sans-serif" }}>
-            Track daily attendance, biometric punch logs, and monthly reports.
+            {isSelfOnly ? "View your daily attendance and monthly report." : "Track daily attendance, biometric punch logs, and monthly reports."}
           </p>
         </div>
       </div>
@@ -436,6 +451,5 @@ const AttendancePage = () => {
       </Modal>
     </div>
   );
-};
-
+}
 export default AttendancePage;

@@ -8,7 +8,7 @@ import {
   disburseAdvance,
 } from "../hr.service";
 import { getAllStaff } from "../../staff/staff.service";
-import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { hasPermission, PERMISSIONS, getCurrentUser } from "../../../utils/permissions";
 
 const fmt = (v) => "₹" + Math.round(Number(v || 0)).toLocaleString("en-IN");
 
@@ -51,9 +51,11 @@ const AdvanceRequestPage = () => {
   const [formMonthlyDeduction, setFormMonthlyDeduction] = useState("");
 
   const userEmail = JSON.parse(localStorage.getItem("user") || "{}").email || "";
+  const currentUser = getCurrentUser();
 
   const canManage = hasPermission(PERMISSIONS.HR_PAYROLL_MANAGE);
   const canApprove = hasPermission(PERMISSIONS.HR_PAYROLL_APPROVE);
+  const isSelfOnly = !canManage && !canApprove;
 
   useEffect(() => {
     loadData();
@@ -62,8 +64,14 @@ const AdvanceRequestPage = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [advData, staffData] = await Promise.all([getAdvanceRequests({}), getAllStaff()]);
-      setAdvances(advData || []);
+      const [advData, staffData] = await Promise.all([
+        getAdvanceRequests(isSelfOnly && currentUser?.staffId ? { staffId: currentUser.staffId } : {}),
+        isSelfOnly ? Promise.resolve([]) : getAllStaff(),
+      ]);
+      const allAdvances = advData || [];
+      setAdvances(isSelfOnly && currentUser?.staffId
+        ? allAdvances.filter ? allAdvances.filter(a => a.staffId === currentUser.staffId) : allAdvances
+        : allAdvances);
       setStaffList((staffData || []).filter((s) => s.isActive));
     } catch {
       message.error("Failed to load data");
@@ -73,10 +81,11 @@ const AdvanceRequestPage = () => {
   };
 
   const handleCreate = async () => {
-    if (!formStaffId || !formAmount) return message.warning("Staff and amount are required");
+    const staffId = isSelfOnly ? currentUser?.staffId : formStaffId;
+    if (!staffId || !formAmount) return message.warning("Staff and amount are required");
     try {
       await createAdvanceRequest({
-        staffId: formStaffId,
+        staffId,
         type: formType,
         amount: Number(formAmount),
         reason: formReason || undefined,
@@ -145,13 +154,13 @@ const AdvanceRequestPage = () => {
             <span className="text-primary font-bold">Advance / Loan</span>
           </nav>
           <h2 className="font-headline text-3xl font-extrabold text-primary tracking-tight">
-            Advance & Loan Requests
+            {isSelfOnly ? "My Advance / Loan Requests" : "Advance & Loan Requests"}
           </h2>
           <p className="text-on-surface-variant text-sm mt-1">
-            Ticket-based advance request workflow — request, approve, disburse, auto-deduct from payroll.
+            {isSelfOnly ? "Request salary advance or loan — track your application status." : "Ticket-based advance request workflow \u2014 request, approve, disburse, auto-deduct from payroll."}
           </p>
         </div>
-        {canManage && (
+        {(canManage || isSelfOnly) && (
           <button
             onClick={() => setShowForm(!showForm)}
             className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition-opacity"
@@ -186,6 +195,7 @@ const AdvanceRequestPage = () => {
         <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
           <h3 className="text-sm font-bold text-primary">Create Advance Request</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {!isSelfOnly && (
             <div>
               <label className="block text-[10px] font-bold uppercase mb-1 text-on-surface-variant">Staff</label>
               <select value={formStaffId} onChange={(e) => setFormStaffId(e.target.value)}
@@ -194,6 +204,7 @@ const AdvanceRequestPage = () => {
                 {staffList.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.employeeId})</option>)}
               </select>
             </div>
+            )}
             <div>
               <label className="block text-[10px] font-bold uppercase mb-1 text-on-surface-variant">Type</label>
               <select value={formType} onChange={(e) => setFormType(e.target.value)}

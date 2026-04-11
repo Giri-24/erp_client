@@ -387,29 +387,65 @@ const CollectPaymentPage = ({ studentId }) => {
           receiptComponents,
         };
       } else {
-        // Build paidComponents from chip selection
+        // Build paidComponents from chip selection — use actual payment amount, not full fee value
         let paidComps;
+        const actualAmount = Math.round(Number(amount));
         if (payComponents.length > 0 && termNumber) {
           const enriched = computeTermComponents(selectedFee);
           const selTerm = enriched.find((t) => t.termNumber === termNumber);
           if (selTerm) {
             const keyMap = { tuition: "tuitionAmount", transport: "transportAmount", book: "bookAmount", hostel: "hostelAmount", other: "otherAmount" };
+            const selectedVals = payComponents.map((k) => ({ key: k, val: Math.round(selTerm[keyMap[k]] || 0) }));
+            const totalSelected = selectedVals.reduce((s, it) => s + it.val, 0);
             paidComps = {};
-            payComponents.forEach((k) => { paidComps[k] = Math.round(selTerm[keyMap[k]] || 0); });
+            if (selectedVals.length === 1) {
+              paidComps[selectedVals[0].key] = actualAmount;
+            } else if (totalSelected > 0) {
+              let rem = actualAmount;
+              selectedVals.forEach((it, i) => {
+                if (i === selectedVals.length - 1) { paidComps[it.key] = rem; }
+                else { const share = Math.round((it.val / totalSelected) * actualAmount); paidComps[it.key] = share; rem -= share; }
+              });
+            }
           }
         } else if (payComponents.length > 0 && payingNonTerm) {
-          // Non-term component selection
+          // Non-term component selection — distribute actual amount across selected components
           const feeMap = { book: Number(selectedFee.bookFee || 0), hostel: Number(selectedFee.hostelFee || 0), other: Number(selectedFee.otherFee || 0) };
-          paidComps = {};
+          const selectedItems = [];
           payComponents.forEach((k) => {
             if (feeMap[k] !== undefined) {
-              paidComps[k] = Math.round(feeMap[k]);
+              selectedItems.push({ key: k, val: feeMap[k] });
             } else {
-              // custom item — use readable name as key
               const ci = (selectedFee.customItems || []).find((c) => `custom-${c.id || c.name}` === k);
-              if (ci) paidComps[ci.name] = Math.round(Number(ci.amount || 0));
+              if (ci) selectedItems.push({ key: ci.name, val: Number(ci.amount || 0) });
             }
           });
+          const totalSelected = selectedItems.reduce((s, it) => s + it.val, 0);
+          paidComps = {};
+          if (selectedItems.length === 1) {
+            paidComps[selectedItems[0].key] = actualAmount;
+          } else if (totalSelected > 0) {
+            let rem = actualAmount;
+            selectedItems.forEach((it, i) => {
+              if (i === selectedItems.length - 1) { paidComps[it.key] = rem; }
+              else { const share = Math.round((it.val / totalSelected) * actualAmount); paidComps[it.key] = share; rem -= share; }
+            });
+          }
+        } else if (payingNonTerm && payComponents.length === 0) {
+          // "Pay All" non-term — distribute actual amount proportionally so per-component tracking works
+          const feeMap = { book: Number(selectedFee.bookFee || 0), hostel: Number(selectedFee.hostelFee || 0), other: Number(selectedFee.otherFee || 0) };
+          const allItems = [];
+          Object.entries(feeMap).forEach(([k, v]) => { if (v > 0) allItems.push({ key: k, val: v }); });
+          (selectedFee.customItems || []).forEach((ci) => { allItems.push({ key: ci.name, val: Number(ci.amount || 0) }); });
+          const totalAll = allItems.reduce((s, it) => s + it.val, 0);
+          if (totalAll > 0 && allItems.length > 0) {
+            paidComps = {};
+            let rem = actualAmount;
+            allItems.forEach((it, i) => {
+              if (i === allItems.length - 1) { paidComps[it.key] = rem; }
+              else { const share = Math.round((it.val / totalAll) * actualAmount); paidComps[it.key] = share; rem -= share; }
+            });
+          }
         }
         payload = {
           studentFeeId: selectedFee.id,
@@ -810,10 +846,15 @@ const CollectPaymentPage = ({ studentId }) => {
                       // Aggregate per-component paid from prior non-term payments
                       const nonTermPayments = payments?.filter((p) => !p.termNumber && p.status === "SUCCESS") || [];
                       const componentPaid = {};
+                      let totalAttributed = 0;
+                      let totalNonTermPaid = 0;
                       nonTermPayments.forEach((p) => {
+                        totalNonTermPaid += Number(p.amount || 0);
                         if (p.paidComponents && typeof p.paidComponents === "object") {
                           Object.entries(p.paidComponents).forEach(([k, v]) => {
-                            componentPaid[k] = (componentPaid[k] || 0) + Number(v);
+                            const val = Number(v);
+                            componentPaid[k] = (componentPaid[k] || 0) + val;
+                            totalAttributed += val;
                           });
                         }
                       });
@@ -823,17 +864,32 @@ const CollectPaymentPage = ({ studentId }) => {
                         ...(Number(selectedFee.hostelFee || 0) > 0 ? [{ key: "hostel", label: "Hostel Fee", val: Number(selectedFee.hostelFee), icon: "hotel" }] : []),
                         ...(Number(selectedFee.otherFee || 0) > 0 ? [{ key: "other", label: "Other Fee", val: Number(selectedFee.otherFee), icon: "more_horiz" }] : []),
                         ...((selectedFee.customItems || []).map((ci) => ({ key: `custom-${ci.id || ci.name}`, label: ci.name, val: Number(ci.amount || 0), icon: "label" }))),
-                      ].map((c) => ({
+                      ];
+
+                      // Distribute unattributed non-term payments proportionally (handles old "Pay All" payments without paidComponents)
+                      const unattributed = Math.round(totalNonTermPaid - totalAttributed);
+                      if (unattributed > 0) {
+                        const totalFeeVal = items.reduce((s, c) => s + c.val, 0);
+                        if (totalFeeVal > 0) {
+                          let rem = unattributed;
+                          items.forEach((c, i) => {
+                            if (i === items.length - 1) { componentPaid[c.key] = (componentPaid[c.key] || 0) + rem; }
+                            else { const share = Math.round((c.val / totalFeeVal) * unattributed); componentPaid[c.key] = (componentPaid[c.key] || 0) + share; rem -= share; }
+                          });
+                        }
+                      }
+
+                      const enrichedItems = items.map((c) => ({
                         ...c,
-                        paidAmount: componentPaid[c.key] || 0,
+                        paidAmount: Math.min(componentPaid[c.key] || 0, c.val),
                         isFullyPaid: (componentPaid[c.key] || 0) >= c.val,
                       }));
 
-                      const unpaidItems = items.filter((c) => !c.isFullyPaid);
+                      const unpaidItems = enrichedItems.filter((c) => !c.isFullyPaid);
                       const nonTermBal = Math.round(unpaidItems.reduce((s, c) => s + (c.val - c.paidAmount), 0));
 
                       const toggleNonTermComp = (key) => {
-                        const comp = items.find((c) => c.key === key);
+                        const comp = enrichedItems.find((c) => c.key === key);
                         if (comp?.isFullyPaid) return;
                         let next;
                         if (payComponents.includes(key)) {
@@ -847,7 +903,7 @@ const CollectPaymentPage = ({ studentId }) => {
                           setAmount(nonTermBal.toString());
                         } else {
                           const sum = Math.min(
-                            items.filter((c) => next.includes(c.key)).reduce((s, c) => s + Math.round(c.val - c.paidAmount), 0),
+                            enrichedItems.filter((c) => next.includes(c.key)).reduce((s, c) => s + Math.round(c.val - c.paidAmount), 0),
                             nonTermBal
                           );
                           setAmount(Math.round(sum).toString());
@@ -879,7 +935,7 @@ const CollectPaymentPage = ({ studentId }) => {
                             </p>
                           )}
                           <div className="flex flex-wrap gap-2">
-                            {items.map((c) => {
+                            {enrichedItems.map((c) => {
                               const isActive = payComponents.includes(c.key);
                               if (c.isFullyPaid) {
                                 return (
@@ -920,7 +976,7 @@ const CollectPaymentPage = ({ studentId }) => {
                           </div>
                           {payComponents.length > 0 && (
                             <div className="mt-2 text-[10px] text-tertiary font-bold">
-                              Paying: {payComponents.map((k) => items.find((c) => c.key === k)?.label).join(" + ")} = {fmt(amount)}
+                              Paying: {payComponents.map((k) => enrichedItems.find((c) => c.key === k)?.label).join(" + ")} = {fmt(amount)}
                             </div>
                           )}
                         </div>

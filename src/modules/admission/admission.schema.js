@@ -7,12 +7,32 @@ export const admissionSchema = yup.object({
   dob: yup.string().required('DOB is required'),
   community: yup.string().required('Community is required'),
 
-  fatherName: yup.string().required('Father name required'),
-  motherName: yup.string().required('Mother name required'),
+  fatherName: yup.string().nullable(),
+  motherName: yup.string().nullable(),
 
-  address: yup.string().required('Address required'),
-  pin: yup.string().required('PIN required'),
+  address: yup.string().nullable(),
+  pin: yup.string().nullable(),
 
   admissionFrom: yup.date().nullable(),
   admissionTo: yup.date().nullable(),
+
+  // Single parent & guardian
+  isSingleParent: yup.boolean().nullable(),
+  guardianName: yup.string().nullable(),
+  guardianRelation: yup.string().nullable(),
+
+  // Sibling details
+  sibling1Name: yup.string().nullable(),
+  sibling1Standard: yup.string().nullable(),
+  sibling1School: yup.string().nullable(),
+  sibling2Name: yup.string().nullable(),
+  sibling2Standard: yup.string().nullable(),
+  sibling2School: yup.string().nullable(),
+
+  // Board exam
+  boardExamType: yup.string().nullable(),
+  boardName: yup.string().nullable(),
+
+  // Photos received
+  photosReceived: yup.boolean().nullable(),
 });

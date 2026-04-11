@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Sidebar from "../components/Sidebar";
 import { Avatar, Dropdown, Modal } from "antd";
 import { useNavigate } from "react-router-dom";
 import {
@@ -32,6 +33,7 @@ import AssignTransportPage from "../modules/transport/pages/AssignTransportPage"
 import TransportViewPage from "../modules/transport/pages/TransportViewPage";
 import LiveTrackingPage from "../modules/transport/pages/LiveTrackingPage";
 import BusReportPage from "../modules/transport/pages/BusReportPage";
+import AllBusReportsPage from "../modules/transport/pages/AllBusReportsPage";
 import DriverListingPage from "../modules/transport/pages/DriverListingPage";
 
 import StaffManagementPage from "../modules/staff/pages/StaffManagementPage";
@@ -60,8 +62,25 @@ import IncomeExpensePage from "../modules/pos/pages/IncomeExpensePage";
 import DocRequestPage from "../modules/doc-request/pages/DocRequestPage";
 import HouseManagementPage from "../modules/house/pages/HouseManagementPage";
 import StaffDashboard from "./StaffDashboard";
+import AdmissionDeskDashboard from "./AdmissionDeskDashboard";
+import POSStorekeeperDashboard from "./POSStorekeeperDashboard";
+import TransportManagerDashboard from "./TransportManagerDashboard";
+import TeacherDashboard from "./TeacherDashboard";
 import { getAdminSettings } from "../modules/settings/settings.service";
-import { hasPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions";
+import { hasPermission, hasAnyPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions";
+
+const TRANSPORT_MANAGER_KEYS = new Set([
+  "dashboard",
+  "profile",
+  "transport-routes",
+  "transport-assign",
+  "transport-view",
+  "transport-live",
+  "transport-report",
+  "transport-all-reports",
+  "transport-drivers",
+  "transport-buses",
+]);
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -69,10 +88,15 @@ const Dashboard = () => {
   const [editData, setEditData] = useState(null);
   const [feeStudentId, setFeeStudentId] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [adminSettings, setAdminSettings] = useState(null);
   const currentUser = getCurrentUser();
   const displayName = currentUser?.name || currentUser?.email || "User";
   const userRole = currentUser?.role || "STAFF";
+  const isTeacher = (userRole === "STAFF" &&
+    (currentUser?.designation || "").toLowerCase() === "teacher") ||
+    (userRole === "STAFF" && hasPermission(PERMISSIONS.HR_LEAVE_MANAGE) && !hasPermission(PERMISSIONS.FEES_DASHBOARD) && !hasPermission(PERMISSIONS.SETTINGS_UPDATE));
+  const isTeacherOrStaffSelf = isTeacher || userRole === "TEACHER";
 
   React.useEffect(() => {
     const loadSettings = async () => {
@@ -102,12 +126,13 @@ const Dashboard = () => {
   const canReadSettings = hasPermission(PERMISSIONS.SETTINGS_READ);
 
   const canHRDashboard = hasPermission(PERMISSIONS.HR_DASHBOARD);
-  const canHRAttendance = hasPermission(PERMISSIONS.HR_ATTENDANCE_READ);
-  const canHRLeave = hasPermission(PERMISSIONS.HR_LEAVE_READ);
-  const canHRPermission = hasPermission(PERMISSIONS.HR_PERMISSION_READ);
+  const canHRAttendance = hasPermission(PERMISSIONS.HR_ATTENDANCE_READ) || isTeacherOrStaffSelf;
+  const canHRLeave = hasPermission(PERMISSIONS.HR_LEAVE_READ) || isTeacherOrStaffSelf;
+  const canHRPermission = hasPermission(PERMISSIONS.HR_PERMISSION_READ) || isTeacherOrStaffSelf;
   const canHRStatutory = hasPermission(PERMISSIONS.HR_STATUTORY_READ);
   const canHRESSL = hasPermission(PERMISSIONS.HR_ESSL_READ);
   const canHRPayroll = hasPermission(PERMISSIONS.HR_PAYROLL_READ);
+  const canHRAdvanceSelf = isTeacherOrStaffSelf;
 
   const canPOSDashboard = hasPermission(PERMISSIONS.POS_DASHBOARD);
   const canPOSRead = hasPermission(PERMISSIONS.POS_READ);
@@ -116,6 +141,13 @@ const Dashboard = () => {
   const canPOSPurchase = hasPermission(PERMISSIONS.POS_PURCHASE);
   const canDocRequest = hasPermission(PERMISSIONS.DOC_REQUEST_READ);
   const canHouseRead = hasPermission(PERMISSIONS.HOUSE_READ);
+  const isTransportManager = userRole === "TRANSPORT_MANAGER";
+
+  React.useEffect(() => {
+    if (isTransportManager && !TRANSPORT_MANAGER_KEYS.has(selectedKey)) {
+      setSelectedKey("dashboard");
+    }
+  }, [isTransportManager, selectedKey]);
 
   const onLogout = () => {
     Modal.confirm({
@@ -139,7 +171,9 @@ const Dashboard = () => {
 
   const userMenu = [
     { key: "profile", label: "My Profile", icon: <UserOutlined /> },
-    { key: "settings", label: "Settings", icon: <SettingOutlined />, disabled: !canReadSettings },
+    ...(!isTransportManager
+      ? [{ key: "settings", label: "Settings", icon: <SettingOutlined />, disabled: !canReadSettings }]
+      : []),
     { type: "divider" },
     { key: "logout", label: "Logout", icon: <LogoutOutlined />, danger: true },
   ];
@@ -188,6 +222,7 @@ const Dashboard = () => {
         { key: "transport-view", label: "View Transport", icon: "manage_search", permission: canTransportRead },
         { key: "transport-live", label: "Live Tracking", icon: "location_on", permission: canLocationRead },
         { key: "transport-report", label: "Bus Report", icon: "analytics", permission: canLocationRead },
+        { key: "transport-all-reports", label: "All Bus Reports", icon: "summarize", permission: canLocationRead },
         { key: "transport-drivers", label: "Drivers", icon: "person", permission: canTransportRouteAccess },
         { key: "transport-buses", label: "Buses", icon: "directions_bus_filled", permission: canTransportRouteAccess },
       ],
@@ -197,17 +232,17 @@ const Dashboard = () => {
       key: "hr-group",
       label: "HR",
       icon: "work",
-      permission: canHRDashboard,
+      permission: canHRDashboard || isTeacherOrStaffSelf,
       children: [
-        { key: "hr-dashboard", label: "Dashboard", icon: "space_dashboard", permission: canHRDashboard },
-        { key: "hr-attendance", label: "Attendance", icon: "schedule", permission: canHRAttendance },
-        { key: "hr-leaves", label: "Leaves", icon: "event_busy", permission: canHRLeave },
+        { key: "hr-dashboard", label: "Dashboard", icon: "space_dashboard", permission: canHRDashboard && !isTeacherOrStaffSelf },
+        { key: "hr-attendance", label: "My Attendance", icon: "schedule", permission: canHRAttendance },
+        { key: "hr-leaves", label: "My Leaves", icon: "event_busy", permission: canHRLeave },
         { key: "hr-permission", label: "Permission", icon: "timer", permission: canHRPermission },
-        { key: "hr-pf-esi", label: "PF & ESI", icon: "account_balance", permission: canHRStatutory },
-        { key: "hr-essl", label: "ESSL Sync", icon: "fingerprint", permission: canHRESSL },
-        { key: "hr-payroll", label: "Payroll", icon: "payments", permission: canHRPayroll },
-        { key: "hr-advance", label: "Advance / Loan", icon: "request_quote", permission: canHRPayroll },
-        { key: "hr-salary-abstract", label: "Salary Abstract", icon: "summarize", permission: canHRPayroll },
+        { key: "hr-pf-esi", label: "PF & ESI", icon: "account_balance", permission: canHRStatutory && !isTeacherOrStaffSelf },
+        { key: "hr-essl", label: "ESSL Sync", icon: "fingerprint", permission: canHRESSL && !isTeacherOrStaffSelf },
+        { key: "hr-payroll", label: "My Payslip", icon: "payments", permission: canHRPayroll || isTeacherOrStaffSelf },
+        { key: "hr-advance", label: "Advance / Loan", icon: "request_quote", permission: canHRPayroll || canHRAdvanceSelf },
+        { key: "hr-salary-abstract", label: "Salary Abstract", icon: "summarize", permission: canHRPayroll && !isTeacherOrStaffSelf },
       ],
     },
     {
@@ -245,15 +280,39 @@ const Dashboard = () => {
     },
   ];
 
+  const visibleSidebarLinks = isTransportManager
+    ? sidebarLinks.filter((link) => link.key === "dashboard" || link.key === "transport-group")
+    : sidebarLinks;
+
   const isChildSelected = (children) => children?.some((c) => c.key === selectedKey);
 
   const toggleGroup = (groupKey) => {
     setExpandedGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
   };
 
+  const getRoleDashboard = () => {
+    const nav = (key) => setSelectedKey(key);
+    if (userRole === "TEACHER" || isTeacher) return <TeacherDashboard onNavigate={nav} />;
+    if (userRole === "STAFF") return <StaffDashboard onNavigate={nav} />;
+    if (userRole === "ADMISSION_DESK") return <AdmissionDeskDashboard onNavigate={nav} />;
+    if (userRole === "STORE_KEEPER") return <POSStorekeeperDashboard onNavigate={nav} />;
+    if (userRole === "TRANSPORT_MANAGER") return <TransportManagerDashboard onNavigate={nav} />;
+    // Permission-based fallback for non-role-specific users
+    if (hasAnyPermission([PERMISSIONS.ADMISSION_READ, PERMISSIONS.ADMISSION_CREATE]) && !hasPermission(PERMISSIONS.FEES_DASHBOARD) && !hasPermission(PERMISSIONS.POS_DASHBOARD)) {
+      return <AdmissionDeskDashboard onNavigate={nav} />;
+    }
+    if (hasPermission(PERMISSIONS.POS_DASHBOARD) && !hasPermission(PERMISSIONS.FEES_DASHBOARD)) {
+      return <POSStorekeeperDashboard onNavigate={nav} />;
+    }
+    if (hasPermission(PERMISSIONS.TRANSPORT_ROUTE_READ) && !hasPermission(PERMISSIONS.FEES_DASHBOARD) && !hasPermission(PERMISSIONS.ADMISSION_READ)) {
+      return <TransportManagerDashboard onNavigate={nav} />;
+    }
+    return <DashboardSummary onNavigate={nav} />;
+  };
+
   const renderContent = () => {
     switch (selectedKey) {
-      case "dashboard":           return userRole === "STAFF" ? <StaffDashboard onNavigate={(key) => setSelectedKey(key)} /> : <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
+      case "dashboard":           return getRoleDashboard();
       case "admission":           return <AdmissionPage editData={editData} clearEditData={() => setEditData(null)} />;
       case "admission-view":      return <AdmissionView onEdit={(record) => { setEditData(record); setSelectedKey("admission"); }} />;
       case "admission-edit":      return <AdmissionEdit />;
@@ -265,7 +324,7 @@ const Dashboard = () => {
                                         />;
       case "approval":            return <ApprovalsView />;
       case "profile":             return <ProfilePage />;
-      case "admin-settings":      return <AdminSettings />;
+      case "admin-settings":      return isTransportManager ? getRoleDashboard() : <AdminSettings />;
       case "fees-structure":      return <FeeStructurePage />;
       case "fees-assign":         return <AssignFeePage initialStudentId={feeStudentId} onMounted={() => setFeeStudentId(null)} />;
 case "fees-collect":
@@ -280,17 +339,18 @@ case "fees-collect":
       case "transport-view":      return <TransportViewPage />;
       case "transport-live":      return <LiveTrackingPage />;
       case "transport-report":    return <BusReportPage />;
+      case "transport-all-reports": return <AllBusReportsPage />;
       case "transport-drivers":   return <DriverListingPage />;
       case "transport-buses":     return <BussesPage />;
       case "staff-management":    return <StaffManagementPage />;
       case "hr-dashboard":        return <HRDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
-      case "hr-attendance":       return <AttendancePage />;
-      case "hr-leaves":           return <LeaveManagementPage />;
-      case "hr-permission":       return <PermissionPage />;
+      case "hr-attendance":       return <AttendancePage selfOnly={isTeacherOrStaffSelf} />;
+      case "hr-leaves":           return <LeaveManagementPage selfOnly={isTeacherOrStaffSelf} />;
+      case "hr-permission":       return <PermissionPage selfOnly={isTeacherOrStaffSelf} />;
       case "hr-pf-esi":           return <PFESIPage />;
       case "hr-essl":             return <ESSLSyncPage />;
-      case "hr-payroll":          return <PayrollPage />;
-      case "hr-advance":          return <AdvanceRequestPage />;
+      case "hr-payroll":          return <PayrollPage selfOnly={isTeacherOrStaffSelf} />;
+      case "hr-advance":          return <AdvanceRequestPage selfOnly={isTeacherOrStaffSelf} />;
       case "hr-salary-abstract":  return <SalaryAbstractPage />;
       case "pos-dashboard":       return <POSDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
       case "pos-items":           return <StoreItemsPage />;
@@ -301,11 +361,11 @@ case "fees-collect":
       case "pos-transactions":    return <IncomeExpensePage />;
       case "doc-requests":        return <DocRequestPage />;
       case "house-management":    return <HouseManagementPage />;
-      default:                    return userRole === "STAFF" ? <StaffDashboard onNavigate={(key) => setSelectedKey(key)} /> : <DashboardSummary onNavigate={(key) => setSelectedKey(key)} />;
+      default:                    return getRoleDashboard();
     }
   };
 
-  const renderSidebarItem = (link) => {
+  const renderSidebarItem = (link, collapsed = false) => {
     if (!link.permission) return null;
 
     // Group with children (accordion)
@@ -326,7 +386,7 @@ case "fees-collect":
             }`}
           >
             <span className="material-symbols-outlined text-xl">{link.icon}</span>
-            <span className="font-headline tracking-tight flex-1 text-left">{link.label}</span>
+            {!collapsed && <span className="font-headline tracking-tight flex-1 text-left">{link.label}</span>}
             <span
               className="material-symbols-outlined text-base transition-transform duration-200"
               style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}
@@ -336,7 +396,7 @@ case "fees-collect":
           </button>
 
           {isExpanded && (
-            <div className="ml-5 mt-0.5 mb-1 space-y-0.5 border-l-2 border-primary/20 pl-2">
+            <div className={`ml-2 mt-0.5 mb-1 space-y-0.5 border-l-2 border-primary/20 pl-2 ${collapsed ? "" : "ml-5"}`}>
               {link.children.map((child) => {
                 if (!child.permission) return null;
                 const isActive = selectedKey === child.key;
@@ -356,9 +416,9 @@ case "fees-collect":
                     <span className={`material-symbols-outlined text-[16px] ${isActive ? "text-primary" : ""}`}>
                       {child.icon}
                     </span>
-                    <span className="font-headline tracking-tight">{child.label}</span>
-                    {isActive && (
-                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                    {!collapsed && <span className="font-headline tracking-tight">{child.label}</span>}
+                    {isActive && !collapsed && (
+                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                     )}
                   </button>
                 );
@@ -382,7 +442,7 @@ case "fees-collect":
         }`}
       >
         <span className="material-symbols-outlined text-xl">{link.icon}</span>
-        <span className="font-headline tracking-tight">{link.label}</span>
+        {!collapsed && <span className="font-headline tracking-tight">{link.label}</span>}
       </button>
     );
   };
@@ -390,44 +450,22 @@ case "fees-collect":
   return (
     <div className="flex bg-surface min-h-screen">
       {/* Sidebar */}
-      <aside className="h-screen w-64 fixed left-0 top-0 overflow-y-auto bg-surface-container-low dark:bg-primary flex flex-col py-6 z-50 border-r border-outline-variant/10">
-        <div className="px-6 mb-8">
-          <h1 className="text-xl font-bold text-primary dark:text-surface font-headline">Academic Architect</h1>
-          <p className="text-xs font-semibold tracking-tight text-on-surface-variant dark:text-surface-container/70">{userRole === "STAFF" ? "Staff Portal" : userRole === "STUDENT" ? "Student Portal" : "Admin Dashboard"}</p>
-        </div>
-
-        <nav className="flex-1 space-y-0.5 px-2">
-          {sidebarLinks.map((link) => renderSidebarItem(link))}
-        </nav>
-
-        <div className="mt-auto pt-4 border-t border-outline-variant/20 mx-4 space-y-1">
-          {canReadSettings && (
-            <button
-              onClick={() => setSelectedKey("admin-settings")}
-              className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all ${
-                selectedKey === "admin-settings"
-                  ? "bg-white text-primary font-semibold"
-                  : "text-on-surface-variant dark:text-surface-container/70 hover:bg-surface-container-high"
-              }`}
-            >
-              <span className="material-symbols-outlined text-xl">settings</span>
-              <span className="font-headline tracking-tight">Settings</span>
-            </button>
-          )}
-          <button
-            onClick={onLogout}
-            className="w-full text-left text-on-surface-variant dark:text-surface-container/70 hover:bg-surface-container-high dark:hover:bg-primary-container/50 px-4 py-3 rounded-xl flex items-center gap-3 transition-all"
-          >
-            <span className="material-symbols-outlined text-xl">logout</span>
-            <span className="font-headline tracking-tight">Logout</span>
-          </button>
-        </div>
-      </aside>
+      <Sidebar
+        sidebarLinks={visibleSidebarLinks}
+        renderSidebarItem={renderSidebarItem}
+        canReadSettings={isTransportManager ? false : canReadSettings}
+        selectedKey={selectedKey}
+        setSelectedKey={setSelectedKey}
+        onLogout={onLogout}
+        userRole={isTeacher ? "TEACHER" : userRole}
+        collapsed={sidebarCollapsed}
+        setCollapsed={setSidebarCollapsed}
+      />
 
       {/* Main Content */}
-      <div className="flex-1 ml-64 flex flex-col min-h-screen">
+      <div className={`flex-1 flex flex-col min-h-screen transition-all duration-200 ${sidebarCollapsed ? "ml-16" : "ml-64"}`}>
         {/* Header */}
-        <header className="fixed top-0 right-0 left-64 h-16 z-40 bg-white/80 dark:bg-primary/80 backdrop-blur-md shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex items-center justify-between px-8">
+        <header className={`fixed top-0 right-0 ${sidebarCollapsed ? "left-16" : "left-64"} h-16 z-40 bg-white/80 dark:bg-primary/80 backdrop-blur-md shadow-ambient flex items-center justify-between px-8 transition-all duration-200`}>
           <div className="flex items-center gap-4 flex-1">
             <div className="relative w-full max-w-md focus-within:ring-2 focus-within:ring-primary rounded-full transition-all">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
@@ -449,7 +487,7 @@ case "fees-collect":
                 <span className="material-symbols-outlined text-primary dark:text-surface">help_outline</span>
               </button>
             </div>
-            <div className="h-8 w-[1px] bg-outline-variant/30"></div>
+            <div className="h-8 w-px bg-outline-variant/30"></div>
             <Dropdown menu={{ items: userMenu, onClick: onUserMenuClick }} trigger={["click"]}>
               <div className="flex items-center gap-3 cursor-pointer">
                 <div className="text-right hidden xl:block">

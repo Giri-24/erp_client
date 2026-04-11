@@ -93,9 +93,11 @@ export const PERMISSIONS = {
 export const getCurrentUser = () => {
   try {
     const raw = localStorage.getItem('user');
+    console.log(JSON.parse(raw),"user from localStorage");
     if (!raw) return null;
     return JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    console.error('Failed to parse user from localStorage:', err);
     return null;
   }
 };

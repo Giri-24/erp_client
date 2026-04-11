@@ -362,6 +362,13 @@ const DashboardSummary = ({ onNavigate }) => {
             <span className="p-4 bg-surface-container-high group-hover:bg-white rounded-full text-on-surface-variant transition-colors material-symbols-outlined">settings_account_box</span>
             <span className="font-bold text-sm font-headline">Manage Access</span>
           </button>
+          <button 
+            onClick={() => onNavigate("transport-report")}
+            className="bg-white hover:bg-primary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
+          >
+            <span className="p-4 bg-primary-fixed group-hover:bg-white rounded-full text-primary transition-colors material-symbols-outlined">directions_bus</span>
+            <span className="font-bold text-sm font-headline">Bus Report</span>
+          </button>
         </div>
       </div>
     </div>

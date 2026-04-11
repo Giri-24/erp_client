@@ -30,7 +30,6 @@ import {
 import {
   applyPermission,
   getPermissions,
-  getMyPermissions,
   approvePermission,
   rejectPermission,
   getPermissionSummary,
@@ -51,7 +50,7 @@ const PERM_STATUS_COLORS = {
   cancelled: "default",
 };
 
-const PermissionPage = () => {
+const PermissionPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [permissions, setPermissions] = useState([]);
   const [myPermissions, setMyPermissions] = useState([]);
   const [summary, setSummary] = useState([]);
@@ -60,13 +59,14 @@ const PermissionPage = () => {
   const [applyModal, setApplyModal] = useState(false);
   const [detailModal, setDetailModal] = useState(false);
   const [selectedPerm, setSelectedPerm] = useState(null);
-  const [activeTab, setActiveTab] = useState("all");
   const [filterMonth, setFilterMonth] = useState(dayjs());
   const [form] = Form.useForm();
 
   const canManagePerm = hasPermission(PERMISSIONS.HR_PERMISSION_MANAGE);
   const canApprovePerm = hasPermission(PERMISSIONS.HR_PERMISSION_APPROVE);
   const currentUser = getCurrentUser();
+  const isSelfOnly = selfOnlyProp || (!canManagePerm && !canApprovePerm && !hasPermission(PERMISSIONS.HR_DASHBOARD));
+  const [activeTab, setActiveTab] = useState(isSelfOnly ? "my" : "all");
 
   const fetchPermissions = async () => {
     setLoading(true);
@@ -82,8 +82,10 @@ const PermissionPage = () => {
   const fetchMyPermissions = async () => {
     setLoading(true);
     try {
-      const data = await getMyPermissions({ month: filterMonth.format("YYYY-MM") });
-      setMyPermissions(data);
+      const staffId = currentUser?.staffId;
+      const data = await getPermissions({ staffId, month: filterMonth.format("YYYY-MM") });
+      const list = Array.isArray(data) ? data : data?.data || [];
+      setMyPermissions(staffId ? list.filter(p => p.staffId === staffId) : list);
     } catch {
       setMyPermissions([]);
     }
@@ -107,13 +109,15 @@ const PermissionPage = () => {
   };
 
   useEffect(() => {
-    fetchStaff();
+    if (!isSelfOnly) fetchStaff();
   }, []);
 
   useEffect(() => {
-    fetchPermissions();
+    if (!isSelfOnly) {
+      fetchPermissions();
+      fetchSummary();
+    }
     fetchMyPermissions();
-    fetchSummary();
   }, [filterMonth]);
 
   const calcHours = (from, to) => {
@@ -134,8 +138,13 @@ const PermissionPage = () => {
         message.error(`Single permission cannot exceed ${MAX_PERMISSION_HOURS} hours`);
         return;
       }
+      const staffId = values.staffId || currentUser?.staffId;
+      if (!staffId) {
+        message.error("Staff ID not found. Please logout and login again.");
+        return;
+      }
       await applyPermission({
-        staffId: values.staffId || currentUser?.staffId,
+        staffId,
         date: values.date.format("YYYY-MM-DD"),
         fromTime: values.fromTime.format("HH:mm"),
         toTime: values.toTime.format("HH:mm"),
@@ -265,10 +274,10 @@ const PermissionPage = () => {
             <span style={{ color: "#00152a", fontWeight: 700 }}>Permissions</span>
           </div>
           <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 28, fontWeight: 800, color: "#00152a", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
-            Permission Management
+            {isSelfOnly ? "My Permissions" : "Permission Management"}
           </h2>
           <p style={{ color: "#43474d", fontSize: 13, margin: 0, fontFamily: "'Public Sans', sans-serif" }}>
-            Short leave / permission — max {MAX_PERMISSION_HOURS} hours per month. Excess converts to LOP.
+            Short leave / permission — max {MAX_PERMISSION_HOURS} hours per month.{!isSelfOnly ? " Excess converts to LOP." : ""}
           </p>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => { form.resetFields(); setApplyModal(true); }}>
@@ -312,23 +321,27 @@ const PermissionPage = () => {
           onChange={(d) => d && setFilterMonth(d)}
           allowClear={false}
         />
-        <Select value={activeTab} onChange={setActiveTab} style={{ width: 200 }}>
-          <Option value="all">All Permissions</Option>
-          <Option value="pending">Pending Approvals</Option>
-          <Option value="my">My Permissions</Option>
-          <Option value="summary">Monthly Summary</Option>
-        </Select>
+        {!isSelfOnly && (
+          <Select value={activeTab} onChange={setActiveTab} style={{ width: 200 }}>
+            <Option value="all">All Permissions</Option>
+            <Option value="pending">Pending Approvals</Option>
+            <Option value="my">My Permissions</Option>
+            <Option value="summary">Monthly Summary</Option>
+          </Select>
+        )}
       </div>
 
       <div style={{ background: "#f0f4f8", borderRadius: 16, padding: 4 }}>
         <div style={{ background: "#fff", borderRadius: 14, padding: 24 }}>
-          {activeTab === "summary" ? (
+          {activeTab === "summary" && !isSelfOnly ? (
             <Table columns={summaryColumns} dataSource={summary} rowKey="staffId" loading={loading} scroll={{ x: 900 }} pagination={{ pageSize: 50 }} />
           ) : (
             <Table
               columns={columns}
               dataSource={
-                activeTab === "pending"
+                isSelfOnly
+                  ? myPermissions
+                  : activeTab === "pending"
                   ? permissions.filter((p) => p.status === "pending")
                   : activeTab === "my"
                   ? myPermissions
@@ -346,7 +359,7 @@ const PermissionPage = () => {
       {/* Apply Permission Modal */}
       <Modal title="Apply Permission" open={applyModal} onCancel={() => setApplyModal(false)} onOk={handleApply} width={480}>
         <Form form={form} layout="vertical">
-          {canManagePerm && (
+          {canManagePerm && !isSelfOnly && (
             <Form.Item name="staffId" label="Staff Member">
               <Select placeholder="Select staff (empty for self)" allowClear showSearch optionFilterProp="children">
                 {staff.map((s) => (

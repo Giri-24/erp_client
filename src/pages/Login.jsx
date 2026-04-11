@@ -14,8 +14,39 @@ const Login = () => {
   const onFinish = async (values) => {
     try {
       const res = await instance.post('/auth/login', values)
+      const user = res.data.user
       localStorage.setItem('token', res.data.access_token)
-      localStorage.setItem('user', JSON.stringify(res.data.user))
+
+      // Staff-linked users should carry staff context into the dashboard session.
+      if (user.role === 'STAFF' || user.role === 'TEACHER' || user.role === 'PRINCIPAL' || user.role === 'TRANSPORT_MANAGER') {
+        try {
+          // Staff list works if user has staff:read permission
+          const staffRes = await instance.get('/staff')
+          const staffList = Array.isArray(staffRes.data) ? staffRes.data : staffRes.data?.data || []
+          const myStaff = staffList.find(s => s.email === user.email)
+          if (myStaff) {
+            user.staffId = myStaff.id
+            user.designation = myStaff.designation
+          }
+        } catch {
+          // Fallback: check own leave applications (auto-filtered to current user)
+          try {
+            const leaveRes = await instance.get('/hr/leave/applications', { params: { limit: 1 } })
+            const leaves = Array.isArray(leaveRes.data) ? leaveRes.data : leaveRes.data?.data || []
+            if (leaves[0]?.staffId) user.staffId = leaves[0].staffId
+          } catch {}
+          // Also try permissions
+          if (!user.staffId) {
+            try {
+              const permRes = await instance.get('/hr/permission', { params: { limit: 1 } })
+              const perms = Array.isArray(permRes.data) ? permRes.data : permRes.data?.data || []
+              if (perms[0]?.staffId) user.staffId = perms[0].staffId
+            } catch {}
+          }
+        }
+      }
+
+      localStorage.setItem('user', JSON.stringify(user))
       await refresh()
       message.success('Login successful!')
       navigate('/dashboard')

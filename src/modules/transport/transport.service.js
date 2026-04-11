@@ -1,5 +1,16 @@
 import axios from '../../utils/axios';
 
+const triggerBrowserDownload = (blob, filename) => {
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+};
+
 // ─── ROUTES ─────────────────────────────────
 
 export const createTransportRoute = async (data) => {
@@ -19,6 +30,11 @@ export const getAllTransportRoutes = async () => {
 
 export const getTransportAcademicYears = async () => {
   const res = await axios.get('/transport/academic-years');
+  return res.data;
+};
+
+export const getTransportDashboard = async (academicYear) => {
+  const res = await axios.get('/transport/dashboard', { params: { academicYear } });
   return res.data;
 };
 
@@ -212,6 +228,34 @@ export const getBusReport = async (plateNo, date) => {
     const res = await axios.get('/transport/bus-report', { params: { plateNo, date } });
     return res.data;
   } catch { return null; }
+};
+
+export const getBusFuelReport = async (busId, { from, to } = {}) => {
+  const res = await axios.get(`/transport/buses/${busId}/fuel-report`, { params: { from, to } });
+  return res.data;
+};
+
+export const getBusMileageReport = async (busId, { from, to } = {}) => {
+  const res = await axios.get(`/transport/buses/${busId}/mileage-report`, { params: { from, to } });
+  return res.data;
+};
+
+export const exportBusFuelReport = async (busId, format, { from, to } = {}) => {
+  const res = await axios.get(`/transport/buses/${busId}/fuel-report/export/${format}`, {
+    params: { from, to },
+    responseType: 'blob',
+  });
+  const extension = format === 'pdf' ? 'pdf' : 'xlsx';
+  triggerBrowserDownload(res.data, `bus-fuel-report.${extension}`);
+};
+
+export const exportBusMileageReport = async (busId, format, { from, to } = {}) => {
+  const res = await axios.get(`/transport/buses/${busId}/mileage-report/export/${format}`, {
+    params: { from, to },
+    responseType: 'blob',
+  });
+  const extension = format === 'pdf' ? 'pdf' : 'xlsx';
+  triggerBrowserDownload(res.data, `bus-mileage-report.${extension}`);
 };
 
 /** Get fuel logs with optional filters */

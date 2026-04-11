@@ -226,11 +226,30 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
         admissionTo: editData.admission?.admissionTo ? dayjs(editData.admission.admissionTo) : null,
         admissionDate: editData.admission?.admissionDate ? dayjs(editData.admission.admissionDate) : null,
         examName: primaryAcademic.examName,
+        boardExamType: primaryAcademic.boardName && primaryAcademic.boardName !== 'State Board' ? 'Other' : 'State Board',
+        boardName: primaryAcademic.boardName && primaryAcademic.boardName !== 'State Board' ? primaryAcademic.boardName : undefined,
         academicStream: primaryAcademic.stream || editData.academicStream,
         registerNo: primaryAcademic.registerNo,
         monthYear: primaryAcademic.monthYear,
         totalPercentage: primaryAcademic.totalPercentage,
         subjects: (primaryAcademic.subjects || []).map(normalizeSubjectRow),
+
+        // Single parent & guardian
+        isSingleParent: editData.family?.isSingleParent || false,
+        guardianName: editData.family?.guardianName,
+        guardianPhone: editData.family?.guardianPhone,
+        guardianWhatsapp: editData.family?.guardianWhatsapp,
+        guardianAadhar: editData.family?.guardianAadhar,
+        guardianOccupation: editData.family?.guardianOccupation,
+        guardianRelation: editData.family?.guardianRelation,
+
+        // Sibling details
+        sibling1Name: editData.family?.sibling1Name,
+        sibling1Standard: editData.family?.sibling1Standard,
+        sibling1School: editData.family?.sibling1School,
+        sibling2Name: editData.family?.sibling2Name,
+        sibling2Standard: editData.family?.sibling2Standard,
+        sibling2School: editData.family?.sibling2School,
       };
 
       // Handle documents for checkbox group
@@ -250,6 +269,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
       if (doc.aadharMotherHardCopy) hardCopySelection.push("aadharMother");
       if (doc.transferCertHardCopy) hardCopySelection.push("transferCert");
       flatData.hardCopyDocs = hardCopySelection;
+      flatData.photosReceived = doc.photosReceived || false;
 
       // Handle photo structure assuming we are getting a valid image config
       if (doc.photo || doc.photoPath) {
@@ -370,6 +390,8 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
   const watchedStandard = Form.useWatch("standard", form);
   const watchedSubjects = Form.useWatch("subjects", form) || [];
   const siblingSchool = Form.useWatch("siblingSchool", form);
+  const isSingleParent = Form.useWatch("isSingleParent", form);
+  const boardExamType = Form.useWatch("boardExamType", form);
 
   useEffect(() => {
     if (!watchedSubjects || watchedSubjects.length === 0) return;
@@ -467,12 +489,13 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
                   </Form.Item>
                 </Col>
                  <Col span={12}>
-              <Form.Item name="academicYear" label="Academic Year">
+              <Form.Item name="academicYear" label="Academic Year" initialValue={`${new Date().getFullYear()}-${new Date().getFullYear() + 1}`}>
                 <Select placeholder="Select academic year" allowClear>
                   <Select.Option value="2024-2025">2024-2025</Select.Option>
                   <Select.Option value="2025-2026">2025-2026</Select.Option>
                   <Select.Option value="2026-2027">2026-2027</Select.Option>
                   <Select.Option value="2027-2028">2027-2028</Select.Option>
+                  <Select.Option value="2028-2029">2028-2029</Select.Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -596,24 +619,47 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
           <div className="mb-4">
             <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Provide information about parents, siblings, and contact preferences.</p>
           </div>
+          {/* Single Parent Checkbox */}
+          <Row gutter={16} className="mb-4">
+            <Col span={24}>
+              <Form.Item name="isSingleParent" valuePropName="checked">
+                <Checkbox>Single Parent</Checkbox>
+              </Form.Item>
+            </Col>
+          </Row>
+
           <Row gutter={16}>
             {/* LEFT — FATHER */}
             <Col span={12}>
               <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Father Particulars</h4>
-              <Form.Item name="fatherName" label="Father Name">
-                <Input />
+              <Form.Item name="fatherName" label="Father Name" rules={isSingleParent ? [] : []}>
+                <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
               </Form.Item>
-              <Form.Item name="fatherPhone" label="Father Phone">
-                <Input maxLength={10} />
+              <Form.Item name="fatherPhone" label="Father Mobile">
+                <Input maxLength={10} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
+              </Form.Item>
+              <Form.Item label="Father WhatsApp">
+                <Space.Compact style={{ width: '100%' }}>
+                  <Form.Item name="fatherWhatsAppNo" noStyle>
+                    <Input maxLength={10} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} style={{ width: 'calc(100% - 120px)' }} />
+                  </Form.Item>
+                  <Button
+                    type="default"
+                    onClick={() => {
+                      const phone = form.getFieldValue('fatherPhone');
+                      if (phone) form.setFieldsValue({ fatherWhatsAppNo: phone });
+                    }}
+                    disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'}
+                  >
+                    Same as Mobile
+                  </Button>
+                </Space.Compact>
               </Form.Item>
               <Form.Item name="fatherOccupation" label="Father Occupation">
-                <Input />
+                <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
               </Form.Item>
               <Form.Item name="fatherAadharNo" label="Father Aadhar">
-                <Input maxLength={12} />
-              </Form.Item>
-              <Form.Item name="fatherWhatsAppNo" label="Father WhatsApp">
-                <Input maxLength={10} />
+                <Input maxLength={12} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
               </Form.Item>
             </Col>
 
@@ -621,22 +667,96 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
             <Col span={12}>
               <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Mother Particulars</h4>
               <Form.Item name="motherName" label="Mother Name">
-                <Input />
+                <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
-              <Form.Item name="motherPhone" label="Mother Phone">
-                <Input maxLength={10} />
+              <Form.Item name="motherPhone" label="Mother Mobile">
+                <Input maxLength={10} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
+              </Form.Item>
+              <Form.Item label="Mother WhatsApp">
+                <Space.Compact style={{ width: '100%' }}>
+                  <Form.Item name="motherWhatsAppNo" noStyle>
+                    <Input maxLength={10} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} style={{ width: 'calc(100% - 120px)' }} />
+                  </Form.Item>
+                  <Button
+                    type="default"
+                    onClick={() => {
+                      const phone = form.getFieldValue('motherPhone');
+                      if (phone) form.setFieldsValue({ motherWhatsAppNo: phone });
+                    }}
+                    disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'}
+                  >
+                    Same as Mobile
+                  </Button>
+                </Space.Compact>
               </Form.Item>
               <Form.Item name="motherOccupation" label="Mother Occupation">
-                <Input />
+                <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
               <Form.Item name="motherAadharNo" label="Mother Aadhar">
-                <Input maxLength={12} />
-              </Form.Item>
-              <Form.Item name="motherWhatsAppNo" label="Mother WhatsApp">
-                <Input maxLength={10} />
+                <Input maxLength={12} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
             </Col>
           </Row>
+
+          {/* Guardian details for single parent */}
+          {isSingleParent && (
+            <div className="mt-6 pt-4 border-t border-outline-variant">
+              <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Guardian Details</h4>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item name="guardianRelation" label="Guardian Relation" rules={[{ required: true, message: 'Select guardian relation' }]}>
+                    <Select placeholder="Select relation">
+                      <Select.Option value="father">Father</Select.Option>
+                      <Select.Option value="mother">Mother</Select.Option>
+                      <Select.Option value="grandfather">Grandfather</Select.Option>
+                      <Select.Option value="grandmother">Grandmother</Select.Option>
+                      <Select.Option value="uncle">Uncle</Select.Option>
+                      <Select.Option value="aunt">Aunt</Select.Option>
+                      <Select.Option value="other">Other</Select.Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="guardianName" label="Guardian Name" rules={[{ required: true, message: 'Enter guardian name' }]}>
+                    <Input />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="guardianPhone" label="Guardian Phone">
+                    <Input maxLength={10} />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item label="Guardian WhatsApp">
+                    <Space.Compact style={{ width: '100%' }}>
+                      <Form.Item name="guardianWhatsapp" noStyle>
+                        <Input maxLength={10} style={{ width: 'calc(100% - 120px)' }} />
+                      </Form.Item>
+                      <Button
+                        type="default"
+                        onClick={() => {
+                          const phone = form.getFieldValue('guardianPhone');
+                          if (phone) form.setFieldsValue({ guardianWhatsapp: phone });
+                        }}
+                      >
+                        Same as Mobile
+                      </Button>
+                    </Space.Compact>
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="guardianAadhar" label="Guardian Aadhar">
+                    <Input maxLength={12} />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="guardianOccupation" label="Guardian Occupation">
+                    <Input />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+          )}
 
 
           <div className="mt-8 pt-4 border-t border-outline-variant">
@@ -674,6 +794,64 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
                   </Form.Item>
                 </Col>
               )}
+            </Row>
+
+            {/* Sibling 1 Details */}
+            <Divider orientation="left" style={{ fontSize: 13 }}>Sibling 1 Details</Divider>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item name="sibling1Name" label="Sibling 1 Name">
+                  <Input placeholder="Name of sibling" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="sibling1Standard" label="Sibling 1 Standard">
+                  <Select placeholder="Select standard" allowClear>
+                    <Select.Option value="LKG">LKG</Select.Option>
+                    <Select.Option value="UKG">UKG</Select.Option>
+                    {[...Array(12)].map((_, i) => (
+                      <Select.Option key={i + 1} value={String(i + 1)}>{`${i + 1}${['st','nd','rd'][i] || 'th'} Standard`}</Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="sibling1School" label="Sibling 1 School">
+                  <Select placeholder="Select school">
+                    <Select.Option value="Same School">Same School</Select.Option>
+                    <Select.Option value="Other">Other School</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {/* Sibling 2 Details */}
+            <Divider orientation="left" style={{ fontSize: 13 }}>Sibling 2 Details</Divider>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item name="sibling2Name" label="Sibling 2 Name">
+                  <Input placeholder="Name of sibling" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="sibling2Standard" label="Sibling 2 Standard">
+                  <Select placeholder="Select standard" allowClear>
+                    <Select.Option value="LKG">LKG</Select.Option>
+                    <Select.Option value="UKG">UKG</Select.Option>
+                    {[...Array(12)].map((_, i) => (
+                      <Select.Option key={i + 1} value={String(i + 1)}>{`${i + 1}${['st','nd','rd'][i] || 'th'} Standard`}</Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item name="sibling2School" label="Sibling 2 School">
+                  <Select placeholder="Select school">
+                    <Select.Option value="Same School">Same School</Select.Option>
+                    <Select.Option value="Other">Other School</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
             </Row>
 
             <Row gutter={16}>
@@ -761,17 +939,32 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
             {/* ── Qualifying Exam header ── */}
             <Divider orientation="left">Qualifying Examination Passed and Percentage of Mark Obtained</Divider>
             <Row gutter={16}>
-              <Col span={8}>
+              <Col span={6}>
                 <Form.Item name="examName" label="Name of Examination" rules={[requiredRule]}>
                   <Input placeholder="SSLC / MATRIC / CBSE" />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col span={6}>
+                <Form.Item name="boardExamType" label="Board" initialValue="State Board">
+                  <Select>
+                    <Select.Option value="State Board">State Board</Select.Option>
+                    <Select.Option value="Other">Other</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              {boardExamType === "Other" && (
+                <Col span={6}>
+                  <Form.Item name="boardName" label="Board Name" rules={[{ required: true, message: 'Enter board name' }]}>
+                    <Input placeholder="e.g. CBSE, ICSE" />
+                  </Form.Item>
+                </Col>
+              )}
+              <Col span={6}>
                 <Form.Item name="monthYear" label="Month and Year of Appearance">
                   <Input placeholder="e.g. March 2025" />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col span={6}>
                 <Form.Item name="registerNo" label="Register No">
                   <Input />
                 </Form.Item>
@@ -997,6 +1190,9 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
 
             {/* ✅ HARD COPY FLAGS */}
             <Divider orientation="left" style={{ fontSize: 13 }}>Hard Copy Received (mark if physical document is submitted)</Divider>
+            <Form.Item name="photosReceived" valuePropName="checked">
+              <Checkbox>3 Photos Received</Checkbox>
+            </Form.Item>
             <Form.Item name="hardCopyDocs" label="Hard Copy Documents">
               <Checkbox.Group>
                 <Checkbox value="birthCert">Birth Certificate</Checkbox>
@@ -1626,6 +1822,9 @@ const generatePDF = async () => {
                           }
                         });
 
+                        // Add photosReceived flag
+                        const photosReceivedFlag = values.photosReceived || false;
+
                         // Build the main data object
                         const data = {
                           name: values.name,
@@ -1645,7 +1844,7 @@ const generatePDF = async () => {
                           previousSchool: values.previouslyStudied,
                           transportMode: values.vanNeeded ? "Van" : "Local",
                           section: values.section || undefined,
-                          academicYear: values.academicYear || undefined,
+                          academicYear: values.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
                           family: {
                             fatherName: values.fatherName,
                             fatherPhone: values.fatherPhone,
@@ -1661,16 +1860,33 @@ const generatePDF = async () => {
                             siblings: String(values.sibblings || ""),
                             preferredPhone: values.preferredPhone || "father",
                             parentsEmail: values.parentsEmail,
+                            // Single parent & guardian
+                            isSingleParent: values.isSingleParent || false,
+                            guardianName: values.guardianName,
+                            guardianPhone: values.guardianPhone,
+                            guardianWhatsapp: values.guardianWhatsapp,
+                            guardianAadhar: values.guardianAadhar,
+                            guardianOccupation: values.guardianOccupation,
+                            guardianRelation: values.guardianRelation,
+                            // Sibling details
+                            sibling1Name: values.sibling1Name,
+                            sibling1Standard: values.sibling1Standard,
+                            sibling1School: values.sibling1School,
+                            sibling2Name: values.sibling2Name,
+                            sibling2Standard: values.sibling2Standard,
+                            sibling2School: values.sibling2School,
                           },
                           address: {
                             line1: values.line1,
                             line2: values.line2,
                             pin: values.pin,
                           },
-                          // documents:[],
+                          documents: documents,
+                          photosReceived: photosReceivedFlag,
                           academics: [
                             {
                               examName: values.examName || "SSLC",
+                              boardName: values.boardExamType === 'Other' ? (values.boardName || 'State Board') : 'State Board',
                               registerNo: values.registerNo,
                               monthYear: values.monthYear,
                               totalPercentage: values.totalPercentage ? Number(values.totalPercentage) : undefined,

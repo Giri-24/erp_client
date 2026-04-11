@@ -52,7 +52,7 @@ const PAY_STATUS_COLORS = {
 
 const PERMISSION_HOURS_LIMIT = 4; // 4 hrs/month
 
-const PayrollPage = () => {
+const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [payrollData, setPayrollData] = useState([]);
   const [lopReport, setLopReport] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -70,12 +70,15 @@ const PayrollPage = () => {
   const canManagePayroll = hasPermission(PERMISSIONS.HR_PAYROLL_MANAGE);
   const canApprovePayroll = hasPermission(PERMISSIONS.HR_PAYROLL_APPROVE);
   const currentUser = getCurrentUser();
+  const isSelfOnly = selfOnlyProp || (!canManagePayroll && !canApprovePayroll);
 
   const fetchPayroll = async () => {
     setLoading(true);
     try {
-      const data = await getPayroll({ month: selectedMonth.format("YYYY-MM") });
-      setPayrollData(data.map((p) => ({
+      const params = { month: selectedMonth.format("YYYY-MM") };
+      if (isSelfOnly && currentUser?.staffId) params.staffId = currentUser.staffId;
+      const data = await getPayroll(params);
+      const mapped = data.map((p) => ({
         ...p,
         staffName: p.staff?.name || p.staffName,
         employeeId: p.staff?.employeeId || p.employeeId,
@@ -83,7 +86,8 @@ const PayrollPage = () => {
         designation: p.staff?.designation || p.designation,
         category: p.staff?.category || p.category,
         paymentMode: p.staff?.paymentMode || p.paymentMode,
-      })));
+      }));
+      setPayrollData(isSelfOnly && currentUser?.staffId ? mapped.filter(p => p.staffId === currentUser.staffId) : mapped);
     } catch {
       setPayrollData([]);
     }
@@ -120,13 +124,15 @@ const PayrollPage = () => {
   };
 
   useEffect(() => {
-    fetchStaff();
-    fetchSettings();
+    if (!isSelfOnly) {
+      fetchStaff();
+      fetchSettings();
+    }
   }, []);
 
   useEffect(() => {
     if (activeTab === "payroll") fetchPayroll();
-    if (activeTab === "lop") fetchLOPReport();
+    if (activeTab === "lop" && !isSelfOnly) fetchLOPReport();
   }, [activeTab, selectedMonth]);
 
   const handleGenerate = async () => {
@@ -309,10 +315,10 @@ const PayrollPage = () => {
             <span style={{ color: "#00152a", fontWeight: 700 }}>Payroll</span>
           </div>
           <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 28, fontWeight: 800, color: "#00152a", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
-            Payroll & LOP Calculations
+            {isSelfOnly ? "My Payslip" : "Payroll & LOP Calculations"}
           </h2>
           <p style={{ color: "#43474d", fontSize: 13, margin: 0, fontFamily: "'Public Sans', sans-serif" }}>
-            Generate monthly payroll with PF, ESI, permission LOP, and attendance-based deductions.
+            {isSelfOnly ? "View your monthly payslip and salary breakup." : "Generate monthly payroll with PF, ESI, permission LOP, and attendance-based deductions."}
           </p>
         </div>
         {canManagePayroll && (
@@ -337,6 +343,7 @@ const PayrollPage = () => {
       </div>
 
       {/* Summary Cards */}
+      {!isSelfOnly && (
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}>
           <Card size="small">
@@ -359,11 +366,14 @@ const PayrollPage = () => {
           </Card>
         </Col>
       </Row>
+      )}
 
+      {!isSelfOnly && (
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
         { key: "payroll", label: "Payroll" },
         { key: "lop", label: "LOP Report" },
       ]} />
+      )}
 
       <div style={{ display: "flex", gap: 16, marginBottom: 16, alignItems: "center" }}>
         <DatePicker picker="month" value={selectedMonth} onChange={(d) => d && setSelectedMonth(d)} allowClear={false} />
