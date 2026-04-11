@@ -3,6 +3,42 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { notification } from "antd";
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
+/* ── Receipt Image Modal ── */
+const ReceiptModal = ({ imageUrl, onClose }) => {
+  if (!imageUrl) return null;
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="relative max-w-3xl max-h-[90vh] mx-4" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          className="absolute -top-3 -right-3 z-10 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-red-50 transition-colors"
+        >
+          <span className="material-symbols-outlined text-lg text-red-600">close</span>
+        </button>
+        <img
+          src={`${API_BASE}${imageUrl}`}
+          alt="Fuel receipt"
+          className="rounded-xl shadow-2xl max-h-[85vh] w-auto object-contain bg-white"
+          onError={(e) => { e.target.src = ''; e.target.alt = 'Failed to load image'; }}
+        />
+        <div className="mt-2 text-center">
+          <a
+            href={`${API_BASE}${imageUrl}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-white/80 hover:text-white"
+          >
+            <span className="material-symbols-outlined text-sm">open_in_new</span>
+            Open in new tab
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
 import { getAPMTrackingData } from "../apm.service";
 import {
   getDailyMileage,
@@ -80,6 +116,7 @@ const driverIcon = L.divIcon({
 // ═══════════════════════════════════════════════════════════════════════════
 
 const BusReportPage = () => {
+  const [receiptModalUrl, setReceiptModalUrl] = useState(null);
   /* ── state ── */
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -842,10 +879,21 @@ const BusReportPage = () => {
                                   <span>{fmtTime(log.timestamp)}</span>
                                 </div>
                                 {log.imageUrl && (
-                                  <a href={`${import.meta.env.VITE_API_URL || ''}${log.imageUrl}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 text-[10px] text-blue-600 hover:underline">
-                                    <span className="material-symbols-outlined text-xs">photo_camera</span>
-                                    View receipt photo
-                                  </a>
+                                  <button
+                                    onClick={() => setReceiptModalUrl(log.imageUrl)}
+                                    className="inline-flex items-center gap-2 mt-1.5 group"
+                                  >
+                                    <img
+                                      src={`${API_BASE}${log.imageUrl}`}
+                                      alt="Receipt"
+                                      className="w-10 h-10 rounded-lg object-cover border border-outline-variant/20 shadow-sm group-hover:shadow-md group-hover:border-blue-300 transition-all"
+                                      onError={(e) => { e.target.style.display = 'none'; }}
+                                    />
+                                    <span className="text-[10px] text-blue-600 group-hover:underline flex items-center gap-0.5">
+                                      <span className="material-symbols-outlined text-xs">photo_camera</span>
+                                      View receipt
+                                    </span>
+                                  </button>
                                 )}
                               </div>
                             </div>
@@ -925,8 +973,10 @@ const BusReportPage = () => {
           )}
         </div>
       </div>
+      {receiptModalUrl && <ReceiptModal imageUrl={receiptModalUrl} onClose={() => setReceiptModalUrl(null)} />}
     </div>
   );
 };
 
 export default BusReportPage;
+
