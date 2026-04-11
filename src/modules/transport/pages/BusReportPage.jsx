@@ -15,9 +15,17 @@ const API_BASE = (() => {
   }
 })();
 
+/* ── Resolve image URL (supports absolute Supabase URLs and relative local paths) ── */
+const resolveImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${API_BASE}${url}`;
+};
+
 /* ── Receipt Image Modal ── */
 const ReceiptModal = ({ imageUrl, onClose }) => {
   if (!imageUrl) return null;
+  const src = resolveImageUrl(imageUrl);
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="relative max-w-3xl max-h-[90vh] mx-4" onClick={(e) => e.stopPropagation()}>
@@ -28,14 +36,14 @@ const ReceiptModal = ({ imageUrl, onClose }) => {
           <span className="material-symbols-outlined text-lg text-red-600">close</span>
         </button>
         <img
-          src={`${API_BASE}${imageUrl}`}
+          src={src}
           alt="Fuel receipt"
           className="rounded-xl shadow-2xl max-h-[85vh] w-auto object-contain bg-white"
           onError={(e) => { e.target.src = ''; e.target.alt = 'Failed to load image'; }}
         />
         <div className="mt-2 text-center">
           <a
-            href={`${API_BASE}${imageUrl}`}
+            href={src}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs text-white/80 hover:text-white"
@@ -893,7 +901,7 @@ const BusReportPage = () => {
                                     className="inline-flex items-center gap-2 mt-1.5 group"
                                   >
                                     <img
-                                      src={`${API_BASE}${log.imageUrl}`}
+                                      src={resolveImageUrl(log.imageUrl)}
                                       alt="Receipt"
                                       className="w-10 h-10 rounded-lg object-cover border border-outline-variant/20 shadow-sm group-hover:shadow-md group-hover:border-blue-300 transition-all"
                                       onError={(e) => { e.target.style.display = 'none'; }}
