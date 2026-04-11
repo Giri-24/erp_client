@@ -4,7 +4,16 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { notification } from "antd";
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = (() => {
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    if (!apiUrl) return '';
+    const url = new URL(apiUrl, window.location.origin);
+    return url.origin;
+  } catch {
+    return '';
+  }
+})();
 
 /* ── Receipt Image Modal ── */
 const ReceiptModal = ({ imageUrl, onClose }) => {
