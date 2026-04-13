@@ -14,6 +14,25 @@ import { getAcademicYears, getAcademicYear as fetchCurrentYear } from "../module
 import { getAdminSettings } from "../modules/settings/settings.service";
 import { PERMISSIONS, usePermissionHelpers } from "../utils/permissions";
 
+const StatCard = ({ title, value, icon, color, trend }) => (
+  <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 group">
+    <div className="flex justify-between items-start mb-4">
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all group-hover:scale-110`} style={{ background: `${color}15`, color: color }}>
+        <span className="material-symbols-outlined">{icon}</span>
+      </div>
+      {trend && (
+        <div className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${trend > 0 ? 'bg-teal-50 text-teal-600' : 'bg-rose-50 text-rose-600'}`}>
+          {trend > 0 ? '+' : ''}{trend}%
+        </div>
+      )}
+    </div>
+    <div>
+      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{title}</h3>
+      <div className="text-2xl font-black text-slate-900 tracking-tighter">{value}</div>
+    </div>
+  </div>
+);
+
 const normalizeStandardValue = (value) => {
   if (value === null || value === undefined) return "";
   const raw = String(value).trim();
@@ -641,108 +660,106 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
   const renderDate = (date) => (date ? dayjs(date).format("YYYY-MM-DD") : "");
 
   const expandedRowRender = (record) => {
-    const detailGroup = (title, items) => (
-      <div className="expand-detail-group">
-        <h4 className="expand-detail-title">{title}</h4>
-        <div className="expand-detail-grid">
+    const detailGroup = (title, icon, items, color) => (
+      <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
+        <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-6 flex items-center gap-2">
+          <span className={`w-6 h-6 rounded-lg flex items-center justify-center`} style={{ background: `${color}15`, color: color }}>
+            <span className="material-symbols-outlined text-[14px]">{icon}</span>
+          </span>
+          {title}
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
           {items.map(([label, value]) => (
-            <div key={label} className="expand-detail-item">
-              <div className="expand-detail-label">{label}</div>
-              <div className="expand-detail-value">{value || '-'}</div>
+            <div key={label} className="flex flex-col gap-1">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
+              <span className="text-[12px] font-extrabold text-slate-900">{value || 'Not Disclosed'}</span>
             </div>
           ))}
         </div>
       </div>
     );
 
+    let photoPath = record.documents?.[0]?.photoPath;
+
     return (
-      <div className="expanded-row-container shadow-sm border border-outline-variant/20">
-        <div className="flex items-start gap-8 mb-8 pb-8 border-bottom border-outline-variant/20">
-          <div className="profile-photo-container">
-            {(() => {
-              let photoPath = null;
-              if (Array.isArray(record.documents) && record.documents.length > 0) {
-                photoPath = record.documents[0].photoPath;
-              } else if (record.documents && record.documents.photoPath) {
-                photoPath = record.documents.photoPath;
-              }
-              if (photoPath) {
-                return <img src={`/erp/api/${photoPath.replace(/\\/g, '/')}`} alt="student" className="w-24 h-24 rounded-2xl object-cover border-2 border-white shadow-md" />;
-              }
-              const initials = (record.name || '').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-              return <div className="avatar-initials w-24 h-24 text-2xl rounded-2xl">{initials || '?'}</div>;
-            })()}
+      <div className="p-8 bg-slate-50/50 rounded-3xl border border-slate-100 m-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Student Profile Overview */}
+          <div className="lg:col-span-3 flex flex-col items-center text-center">
+            <div className="relative mb-6">
+              {photoPath ? (
+                <img 
+                  src={`/erp/api/${photoPath.replace(/\\/g, '/')}`} 
+                  className="w-40 h-40 rounded-[40px] object-cover border-4 border-white shadow-2xl" 
+                  alt={record.name}
+                />
+              ) : (
+                <div className="w-40 h-40 rounded-[40px] bg-slate-200 text-slate-400 flex items-center justify-center text-5xl font-black border-4 border-white shadow-xl">
+                  {record.name?.charAt(0)}
+                </div>
+              )}
+              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg">
+                Roll #{record.admission?.admissionNo}
+              </div>
+            </div>
+            
+            <h2 className="text-2xl font-black text-slate-900 tracking-tighter mb-1">{record.name}</h2>
+            <div className="flex items-center gap-2 justify-center mb-6">
+               <span className="px-3 py-1 bg-teal-50 text-teal-600 text-[10px] font-black uppercase tracking-widest rounded-full">{record.gender}</span>
+               <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest rounded-full">{record.bloodGroup}</span>
+            </div>
+
+            <div className="w-full space-y-2">
+               <div className="flex justify-between items-center p-3 bg-white rounded-2xl border border-slate-100 text-xs shadow-sm">
+                  <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Admission Date</span>
+                  <span className="font-black text-slate-900">{renderDate(record.admission?.admissionDate)}</span>
+               </div>
+               <div className="flex justify-between items-center p-3 bg-white rounded-2xl border border-slate-100 text-xs shadow-sm">
+                  <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Current Grade</span>
+                  <span className="font-black text-slate-900">{formatStandardLabel(record.standard || record.admission?.standard)}</span>
+               </div>
+            </div>
           </div>
-          <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div>
-              <div className="expand-detail-label text-[10px] text-secondary font-bold mb-1">Date of Birth</div>
-              <div className="expand-detail-value font-headline text-primary text-lg">{renderDate(record.dob)}</div>
-            </div>
-            <div>
-              <div className="expand-detail-label text-[10px] text-secondary font-bold mb-1">Approval</div>
-              <span className={`status-badge ${record.admission?.isApproved ? 'approved' : 'pending'}`}>
-                {record.admission?.isApproved ? "Approved" : "Pending"}
-              </span>
-            </div>
-            <div>
-              <div className="expand-detail-label text-[10px] text-secondary font-bold mb-1">System Status</div>
-              <span className={`status-badge ${(record.users?.isActive ?? 1) ? 'active' : 'inactive'}`}>
-                {(record.users?.isActive ?? 1) ? "Active" : "Inactive"}
-              </span>
-            </div>
-            <div>
-              <div className="expand-detail-label text-[10px] text-secondary font-bold mb-1">Joined Date</div>
-              <div className="expand-detail-value font-headline text-primary text-lg">{renderDate(record.admission?.admissionDate)}</div>
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          <div>
-            {detailGroup("Student Details", [
-              ["Religion", record.religion],
-              ["Community", record.community],
-              ["Caste", record.caste],
-              ["Mother Tongue", record.motherTongue],
-              ["Aadhar No", record.aadharNo],
-              ["Blood Group", record.bloodGroup],
-              ["Identification 1", record.identification1],
-              ["Identification 2", record.identification2],
-              ["Previous School", record.previousSchool],
-              ["Transport Mode", record.transportMode],
-              ["RTE Student", renderBool(record.rte)],
-            ])}
-            {detailGroup("Address Information", [
-              ["Line 1", record.address?.line1],
-              ["Line 2", record.address?.line2],
-              ["Line 3", record.address?.line3],
-              ["PIN Code", record.address?.pin],
-            ])}
-          </div>
-          <div>
-            {detailGroup("Family Details", [
-              ["Father Name", record.family?.fatherName],
-              ["Father Phone", record.family?.fatherPhone],
-              ["Father WhatsApp", record.family?.fatherWhatsapp],
-              ["Father Aadhar", record.family?.fatherAadhar],
-              ["Father Occupation", record.family?.fatherOccupation],
-              ["Mother Name", record.family?.motherName],
-              ["Mother Phone", record.family?.motherPhone],
-              ["Mother WhatsApp", record.family?.motherWhatsapp],
-              ["Mother Aadhar", record.family?.motherAadhar],
-              ["Mother Occupation", record.family?.motherOccupation],
-              ["Family Income", record.family?.familyIncome],
-              ["Siblings", record.family?.siblings],
-              ["Hostel Required", renderBool(record.family?.hostelRequired)],
-            ])}
-            {detailGroup("Admission Administration", [
-              ["Admission Date", renderDate(record.admission?.admissionDate)],
-              ["Admission From", renderDate(record.admission?.admissionFrom)],
-              ["Admission To", renderDate(record.admission?.admissionTo)],
-              ["Staff Signature", record.admission?.staffSignature],
-              ["Principal Signature", record.admission?.principalSignature],
-              ["Approved By Role", record.admission?.approvedByRole],
-              ["Approved At", record.admission?.approvedAt ? dayjs(record.admission.approvedAt).format("YYYY-MM-DD HH:mm") : "-"],
-            ])}
+
+          {/* Detailed Bento Groups */}
+          <div className="lg:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {detailGroup("Governance Data", "verified_user", [
+               ["Religion", record.religion],
+               ["Community", record.community],
+               ["Caste", record.caste],
+               ["Mother Tongue", record.motherTongue],
+               ["Aadhar ID", record.aadharNo],
+               ["Identification", record.identification1],
+               ["School Origination", record.previousSchool],
+               ["Transport Mode", record.transportMode],
+            ], "#0f172a")}
+
+            {detailGroup("Family Matrix", "family_history", [
+               ["Father", record.family?.fatherName],
+               ["Father Mob.", record.family?.fatherPhone],
+               ["Mother", record.family?.motherName],
+               ["Mother Mob.", record.family?.motherPhone],
+               ["Primary Email", record.family?.parentsEmail],
+               ["Annual Income", `₹${record.family?.familyIncome || 0}`],
+               ["Sibling Registry", record.family?.siblings ? "Active" : "None"],
+               ["Residential Area", record.address?.city],
+            ], "#6366f1")}
+
+            {detailGroup("Academic Standing", "school", [
+               ["Registration No", record.admission?.registerNo],
+               ["Academic Period", record.admission?.academicYear],
+               ["Valid From", renderDate(record.admission?.admissionFrom)],
+               ["Valid To", renderDate(record.admission?.admissionTo)],
+               ["Hostel Request", renderBool(record.family?.hostelRequired)],
+               ["RTE Status", renderBool(record.rte)],
+            ], "#10b981")}
+
+            {detailGroup("Administrative Seal", "ink_pen", [
+               ["Staff Seal", record.admission?.staffSignature],
+               ["Principal Seal", record.admission?.principalSignature],
+               ["System Auditor", record.admission?.approvedByRole],
+               ["Audit Timestamp", record.admission?.approvedAt ? dayjs(record.admission.approvedAt).format("DD MMM YYYY, HH:mm") : "-"],
+            ], "#f59e0b")}
           </div>
         </div>
       </div>
@@ -751,78 +768,122 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
 
   const columns = [
     {
-      title: "Admission No", dataIndex: ["admission", "admissionNo"], sorter: true, fixed: "left", width: 140, onHeaderCell: () => ({ onClick: () => handleSort("admission.admissionNo") }),
-      render: (text) => <span style={{ fontWeight: 700, color: '#00152a', fontFamily: "'Manrope', sans-serif", fontSize: 13 }}>{text}</span>,
+      title: "Student Details",
+      dataIndex: "name",
+      sorter: true,
+      fixed: "left",
+      width: 280,
+      onHeaderCell: () => ({ onClick: () => handleSort("name") }),
+      render: (text, record) => {
+        const initials = text.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+        let photoPath = record.documents?.[0]?.photoPath;
+        return (
+          <div className="flex items-center gap-4">
+            <div className="flex-shrink-0">
+               {photoPath ? (
+                 <img src={`/erp/api/${photoPath.replace(/\\/g, '/')}`} className="w-10 h-10 rounded-xl object-cover avatar-ring" alt="" />
+               ) : (
+                 <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center font-black text-[10px] avatar-ring">
+                   {initials}
+                 </div>
+               )}
+            </div>
+            <div>
+              <div className="text-[13px] font-black text-slate-900 tracking-tight leading-none mb-1">{text}</div>
+              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                {record.admission?.admissionNo}
+              </div>
+            </div>
+          </div>
+        );
+      }
     },
     {
-      title: "Student Name", dataIndex: "name", sorter: true, fixed: "left", width: 180, onHeaderCell: () => ({ onClick: () => handleSort("name") }),
-      render: (text) => <span style={{ fontWeight: 600, color: '#171c1f' }}>{text}</span>
-    },
-    {
-      title: "Standard",
+      title: "Category",
       dataIndex: "standard",
-      width: 140,
-      render: (_, record) => formatStandardLabel(record.standard || record.admission?.standard),
-    },
-    { title: "Gender", dataIndex: "gender", width: 100 },
-    { title: "Section", dataIndex: "section", width: 100 },
-    { title: "Academic Year", dataIndex: "academicYear", width: 130 },
-    {
-      title: "Father Name",
       width: 150,
-      render: (_, record) => record.family?.fatherName || "-",
+      render: (_, record) => (
+        <div className="flex flex-col">
+          <span className="text-[11px] font-black text-slate-900">{formatStandardLabel(record.standard || record.admission?.standard)}</span>
+          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{record.academicYear} | {record.section || 'N/A'}</span>
+        </div>
+      )
     },
     {
-      title: "Sibling",
-      width: 100,
-      render: (_, record) => record.siblingGroupId ? <Tag color="blue">Yes</Tag> : <Tag>No</Tag>,
+      title: "Provenance",
+      width: 180,
+      render: (_, record) => (
+        <div className="flex flex-col">
+          <span className="text-[11px] font-black text-slate-900">{record.family?.fatherName || "No Family Contact"}</span>
+          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{record.gender} | Indian</span>
+        </div>
+      )
+    },
+    {
+      title: "Verification",
+      width: 140,
+      render: (_, record) => {
+        const approved = Boolean(record.admission?.isApproved);
+        return (
+          <span className={`status-tag ${approved ? 'bg-teal-50 text-teal-600' : 'bg-amber-50 text-amber-600'}`}>
+            {approved ? 'Verified' : 'Pending'}
+          </span>
+        );
+      }
+    },
+    {
+      title: "Vitality",
+      width: 120,
+      render: (_, record) => {
+        const active = (record.users?.isActive ?? 1);
+        return (
+          <span className={`status-tag ${active ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+            {active ? 'Active' : 'Inactive'}
+          </span>
+        );
+      }
     },
     {
       title: "Actions",
       fixed: "right",
       width: 320,
       render: (_, record) => (
-        <Space size={4}>
+        <Space size={8}>
           {mode !== "approval" && (
-            <Button size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} style={{ borderRadius: 8, border: 'none', background: '#f0f4f8', fontWeight: 600, fontSize: 12 }}>
+            <button 
+              onClick={() => handleEdit(record)}
+              className="px-4 py-1.5 bg-slate-50 text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-lg border border-slate-100 hover:bg-slate-100 transition-all flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[14px]">edit_note</span>
               Edit
-            </Button>
+            </button>
           )}
           {mode !== "approval" && (
-            <Popconfirm title="Delete this admission?" onConfirm={() => handleDelete(record?.users?.id)}>
-              <Button size="small" icon={<DeleteOutlined />} danger style={{ borderRadius: 8, border: 'none', fontSize: 12 }}>
-                Delete
-              </Button>
+            <Popconfirm title="Archive student record?" onConfirm={() => handleDelete(record?.users?.id)}>
+              <button 
+                className="px-4 py-1.5 bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-rose-100 hover:bg-rose-100 transition-all"
+              >
+                Archive
+              </button>
             </Popconfirm>
           )}
-          <Button size="small" icon={<PrinterOutlined />} onClick={() => handlePrintPDF(record)} style={{ borderRadius: 8, border: 'none', background: '#f0f4f8', fontSize: 12 }}>
-            PDF
-          </Button>
+          <button 
+            onClick={() => handlePrintPDF(record)}
+            className="px-4 py-1.5 bg-slate-50 text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-lg border border-slate-100 hover:bg-slate-100 transition-all flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[14px]">print</span>
+            Dossier
+          </button>
           {canApprove && (
-            <>
-              <Button
-                size="small"
-                type="primary"
-                icon={<CheckCircleOutlined />}
-                loading={approvalLoading[record.id]}
+            <div className="flex gap-2">
+              <button
                 disabled={Boolean(record.admission?.isApproved)}
                 onClick={() => handleSetApproval(record, true, undefined)}
-                style={{ borderRadius: 8, fontSize: 12 }}
+                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${record.admission?.isApproved ? 'bg-slate-100 text-slate-400 blur-[0.5px]' : 'bg-teal-600 text-white shadow-lg shadow-teal-500/20 hover:bg-teal-700'}`}
               >
-                Approve
-              </Button>
-              <Button
-                size="small"
-                danger
-                icon={<CloseCircleOutlined />}
-                loading={approvalLoading[record.id]}
-                disabled={!Boolean(record.admission?.isApproved)}
-                onClick={() => openMarkPendingModal(record)}
-                style={{ borderRadius: 8, fontSize: 12, border: 'none' }}
-              >
-                Pending
-              </Button>
-            </>
+                {record.admission?.isApproved ? 'Verified' : 'Verify'}
+              </button>
+            </div>
           )}
         </Space>
       ),
@@ -830,141 +891,183 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
   ];
 
   return (
-    <div style={{ display: 'flex', padding: 16, flexDirection: 'column', gap: 16 }}>
-      {/* Editorial page header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
+    <div className="admission-view-modern p-8 min-h-screen bg-[#fdfdfd]">
+      <style>{`
+        .admission-view-modern { font-family: 'Public Sans', sans-serif; }
+        .premium-table .ant-table-thead > tr > th { background: #f8fafc !important; font-weight: 800 !important; color: #64748b !important; text-transform: uppercase !important; letter-spacing: 0.1em !important; font-size: 10px !important; border-bottom: 1px solid #f1f5f9 !important; padding: 16px !important; }
+        .premium-table .ant-table-row td { padding: 16px !important; border-bottom: 1px solid #f8fafc !important; }
+        .premium-table .ant-table-row:hover td { background: #f8fafc !important; }
+        .filter-control { border-radius: 14px !important; border: 1px solid #f1f5f9 !important; background: #ffffff !important; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .filter-control:hover, .filter-control:focus { border-color: #00152a !important; box-shadow: 0 4px 12px rgba(0,21,42,0.05); }
+        .status-tag { border-radius: 9999px; font-weight: 800; font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 12px; }
+      `}</style>
+
+      {/* Header Section */}
+      <div className="flex justify-between items-end mb-8">
         <div>
-          <div className="page-breadcrumb">
-            <span>Admissions</span>
-            <span style={{ fontSize: 14 }}>›</span>
-            <span style={{ color: '#00152a', fontWeight: 700 }}>{mode === "approval" ? "Approvals" : "All Students"}</span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-3 py-1 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-full">Archive List</span>
+            <span className="text-slate-200">/</span>
+            <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{mode === "approval" ? "Queue" : "Repository"}</span>
           </div>
-          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 28, fontWeight: 800, color: '#00152a', margin: '0 0 4px', letterSpacing: '-0.02em' }}>
-            {mode === "approval" ? "Pending Approvals" : "Admission Records"}
-          </h2>
-          <p style={{ color: '#43474d', fontSize: 13, margin: 0, fontFamily: "'Public Sans', sans-serif" }}>
-            {filteredData.length} records found
-          </p>
+          <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-tight">
+            {mode === "approval" ? "Approval" : "Student"} <span className="text-teal-600">Applications</span>
+          </h1>
         </div>
-        <Space>
-          {canApprove && selectedRowKeys.length > 0 && (
-            <>
-              <button className="gradient-btn" style={{ padding: '8px 20px', fontSize: 13 }} onClick={() => handleBulkApproval(true)} disabled={bulkApprovalLoading}>
-                Approve ({selectedRowKeys.length})
-              </button>
-              <button className="ghost-btn" style={{ padding: '8px 20px', fontSize: 13, cursor: 'pointer', border: '1px solid #c3c6ce', borderRadius: 9999, background: 'transparent', fontFamily: "'Manrope', sans-serif", fontWeight: 700, color: '#ba1a1a' }} onClick={() => handleBulkApproval(false)} disabled={bulkApprovalLoading}>
-                Mark Pending ({selectedRowKeys.length})
-              </button>
-            </>
-          )}
-          <button onClick={exportCSV} className="ghost-btn" style={{ display: 'flex',  gap: 6, padding: '8px 16px', borderRadius: 9999, border: '1px solid #c3c6ce', background: 'transparent', cursor: 'pointer', fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12, color: '#00152a' }}>
-            <DownloadOutlined /> CSV
-          </button>
-        </Space>
+        
+        <div className="flex gap-4">
+           {canApprove && selectedRowKeys.length > 0 && (
+             <div className="flex gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
+                <button 
+                  onClick={() => handleBulkApproval(true)} 
+                  disabled={bulkApprovalLoading}
+                  className="px-6 py-2.5 bg-teal-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-teal-700 transition-all flex items-center gap-2"
+                >
+                  Verify {selectedRowKeys.length}
+                  <span className="material-symbols-outlined text-sm">verified</span>
+                </button>
+                <button 
+                  onClick={() => handleBulkApproval(false)} 
+                  disabled={bulkApprovalLoading}
+                  className="px-6 py-2.5 bg-white text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-50 transition-all"
+                >
+                  Hold
+                </button>
+             </div>
+           )}
+           <button 
+             onClick={exportCSV} 
+             className="px-6 py-2.5 bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-xl border border-slate-200 shadow-sm hover:border-slate-400 transition-all flex items-center gap-2"
+           >
+             <DownloadOutlined /> Export Dossier
+           </button>
+        </div>
       </div>
-      <div className="admission-filter-bar">
-        <Input
-          placeholder="Search admissions..."
-          value={searchText}
-          onChange={(e) => handleSearch(e.target.value)}
-          style={{ width: 220, borderRadius: 9999, background: '#f0f4f8', border: 'none' }}
-          prefix={<SearchOutlined style={{ color: '#43474d' }} />}
+
+      {/* Bento Grid Analytics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <StatCard 
+          title="Total Enrollments" 
+          value={data.length} 
+          icon="groups" 
+          color="#0f172a" 
+          trend={12} 
         />
-        <Select
-          allowClear
-          placeholder="Standard"
-          style={{ width: 140, borderRadius: 9999 }}
-          value={filterStandard}
-          onChange={handleStandard}
-          options={getUnique(data, ["admission", "standard"]).map((v) => ({
-            label: formatStandardLabel(v),
-            value: v,
-          }))}
+        <StatCard 
+          title="Academic Ready" 
+          value={data.filter(i => i.admission?.isApproved).length} 
+          icon="verified" 
+          color="#10b981" 
         />
-        <Select
-          allowClear
-          placeholder="Gender"
-          style={{ width: 120 }}
-          value={filterGender}
-          onChange={handleGender}
-          options={getUnique(data, "gender").map((v) => ({ label: v, value: v }))}
+        <StatCard 
+          title="Pending Queue" 
+          value={data.filter(i => !i.admission?.isApproved).length} 
+          icon="pending_actions" 
+          color="#f59e0b" 
         />
-        <Select
-          allowClear
-          placeholder="Status"
-          style={{ width: 120 }}
-          value={filterStatus}
-          onChange={handleStatus}
-          options={[
-            { label: "Active", value: "active" },
-            { label: "Inactive", value: "inactive" },
-          ]}
+        <StatCard 
+          title="Fresh Intake" 
+          value={data.filter(i => dayjs(i.admission?.admissionDate).isSame(dayjs(), 'day')).length} 
+          icon="new_releases" 
+          color="#6366f1" 
         />
-        <Select
-          allowClear
-          placeholder="Acd Year"
-          style={{ width: 120 }}
-          value={filterAcademicYear}
-          onChange={handleAcademicYear}
-          options={availableYears.map((v) => ({ label: v, value: v }))}
-        />
-        <Select
-          allowClear
-          placeholder="Approval"
-          style={{ width: 130 }}
-          value={filterApproval}
-          onChange={handleApprovalFilter}
-          options={[
-            { label: "Approved", value: "approved" },
-            { label: "Pending", value: "pending" },
-          ]}
-        />
-        <Select
-          allowClear
-          placeholder="Section"
-          style={{ width: 110 }}
-          value={filterSection}
-          onChange={handleSection}
-          options={getUnique(data, "section").map((v) => ({ label: v, value: v }))}
-        />
-        <Input
-          allowClear
-          placeholder="Father Name"
-          value={filterFatherName}
-          onChange={(e) => handleFatherName(e.target.value)}
-          style={{ width: 160, borderRadius: 9999, background: '#f0f4f8', border: 'none' }}
-        />
-        <Input
-          allowClear
-          placeholder="Area Search (City/Street/Pin)"
-          value={filterArea}
-          onChange={(e) => handleArea(e.target.value)}
-          style={{ width: 180, borderRadius: 9999, background: '#f0f4f8', border: 'none' }}
-          prefix={<SearchOutlined style={{ color: '#43474d' }} />}
-        />
-        <Select
-          allowClear
-          placeholder="Sibling"
-          style={{ width: 130 }}
-          value={filterSibling}
-          onChange={handleSibling}
-          options={[
-            { label: "Has Sibling", value: "has" },
-            { label: "No Sibling", value: "none" },
-          ]}
-        />
-        <DatePicker.RangePicker
-          style={{ width: 240 }}
-          value={filterDate}
-          onChange={handleDate}
-          placeholder={["From", "To"]}
-        />
-       
-        {mode === "approval" && (
-          <button onClick={fetchAdmissions} className="ghost-btn" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9999, border: '1px solid #c3c6ce', background: 'transparent', cursor: 'pointer', fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12, color: '#00152a' }}>
-            <ReloadOutlined /> Refresh
-          </button>
-        )}
+      </div>
+
+      {/* Control Bar */}
+      <div className="bg-gray-100 p-6 rounded-3xl border border-slate-100 shadow-sm mb-8">
+        <div className="flex flex-wrap gap-4 items-center">
+          <Input
+            placeholder="Search directory..."
+            value={searchText}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="filter-control !w-64"
+            prefix={<SearchOutlined className="text-slate-400" />}
+          />
+          <Select
+            allowClear
+            placeholder="Grade"
+            className="filter-control !w-36 h-auto"
+            variant="borderless"
+            value={filterStandard}
+            onChange={handleStandard}
+            options={getUnique(data, ["admission", "standard"]).map((v) => ({
+              label: formatStandardLabel(v),
+              value: v,
+            }))}
+          />
+          <Select
+            allowClear
+            placeholder="Gender"
+            className="filter-control !w-32 h-auto"
+            variant="borderless"
+            value={filterGender}
+            onChange={handleGender}
+            options={getUnique(data, "gender").map((v) => ({ label: v, value: v }))}
+          />
+          <Select
+            allowClear
+            placeholder="Status"
+            className="filter-control !w-32 h-auto"
+            variant="borderless"
+            value={filterStatus}
+            onChange={handleStatus}
+            options={[
+              { label: "Active Admissions", value: "active" },
+              { label: "Inactive Records", value: "inactive" },
+            ]}
+          />
+          <Select
+            allowClear
+            placeholder="Academic Year"
+            className="filter-control !w-40 h-auto"
+            variant="borderless"
+            value={filterAcademicYear}
+            onChange={handleAcademicYear}
+            options={availableYears.map((v) => ({ label: v, value: v }))}
+          />
+          <Select
+            allowClear
+            placeholder="Verification"
+            className="filter-control !w-40 h-auto"
+            variant="borderless"
+            value={filterApproval}
+            onChange={handleApprovalFilter}
+            options={[
+              { label: "Verified Only", value: "approved" },
+              { label: "Unverified Vault", value: "pending" },
+            ]}
+          />
+          <DatePicker.RangePicker
+            className="filter-control !w-64"
+            value={filterDate}
+            onChange={handleDate}
+            placeholder={["Joined From", "To"]}
+          />
+          {mode === "approval" && (
+            <button onClick={fetchAdmissions} className="w-10 h-10 rounded-xl bg-slate-50 text-slate-900 flex items-center justify-center hover:bg-slate-100 transition-all shadow-sm">
+              <ReloadOutlined />
+            </button>
+          )}
+        </div>
+        
+        <div className="flex gap-4 mt-4 pt-4 border-t border-slate-50">
+          <Input
+            allowClear
+            placeholder="Secondary Search: Father Name"
+            value={filterFatherName}
+            onChange={(e) => handleFatherName(e.target.value)}
+            className="filter-control !w-64 !bg-slate-50/50"
+            prefix={<span className="material-symbols-outlined text-slate-400 text-sm">person</span>}
+          />
+          <Input
+            allowClear
+            placeholder="Location: Area/Street/PIN"
+            value={filterArea}
+            onChange={(e) => handleArea(e.target.value)}
+            className="filter-control !w-64 !bg-slate-50/50"
+            prefix={<span className="material-symbols-outlined text-slate-400 text-sm">location_on</span>}
+          />
+        </div>
       </div>
       <Table
         columns={columns}
@@ -977,8 +1080,8 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
           columnWidth: 48,
         }}
         scroll={{ x: 1200 }}
-        pagination={{ pageSize: 10 }}
-        className="custom-ant-table-header"
+        pagination={{ pageSize: 12, showSizeChanger: false }}
+        className="premium-table"
       />
 
       {/* ── HIDDEN PDF TEMPLATE FOR VIEW LIST ── */}

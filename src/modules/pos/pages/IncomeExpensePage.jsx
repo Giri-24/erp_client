@@ -7,7 +7,7 @@ import { exportToCSV } from "../exportCsv";
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
 const TYPES = ["INCOME", "EXPENSE"];
-const CATEGORIES = ["SALE", "PURCHASE", "MAINTENANCE", "OTHER"];
+const CATEGORIES = ["SALE", "PURCHASE", "MAINTENANCE","TRANSPORT","OTHER"];
 
 const IncomeExpensePage = () => {
   const [transactions, setTransactions] = useState([]);

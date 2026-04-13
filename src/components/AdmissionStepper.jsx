@@ -37,7 +37,153 @@ import html2canvas from "html2canvas";
 import logo from "../assets/logo.jpeg";
 import { createAdmission, updateAdmission, getNextAdmissionNo } from "../modules/admission/admission.service";
 import dayjs from "dayjs";
-const { Title } = Typography;
+const { Title, Text } = Typography;
+
+// --- Premium Scholar Obsidian Styles ---
+const scholarStyles = `
+  .admission-container {
+    padding: 2.5rem;
+    background: #fdfdfd;
+    min-height: 100vh;
+  }
+
+  .glass-stepper-card {
+    background: #ffffff;
+    border-radius: 32px;
+    box-shadow: 0 30px 60px rgba(0, 21, 42, 0.05);
+    border: 1px solid #f1f5f9;
+    overflow: hidden;
+  }
+
+  .step-indicator-wrapper {
+    display: flex;
+    justify-content: space-between;
+    padding: 2.5rem 5rem;
+    background: #00152a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .step-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    flex: 1;
+    z-index: 1;
+  }
+
+  .step-node::after {
+    content: '';
+    position: absolute;
+    top: 28px;
+    left: 50%;
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    z-index: -1;
+  }
+
+  .step-node:last-child::after { display: none; }
+
+  .step-circle {
+    width: 56px;
+    height: 56px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .step-node.active .step-circle {
+    background: #ffffff;
+    color: #00152a;
+    transform: scale(1.1);
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.2);
+    border-color: #ffffff;
+  }
+
+  .step-node.completed .step-circle {
+    background: #10b981;
+    color: #ffffff;
+    border-color: #10b981;
+  }
+
+  .step-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: rgba(255, 255, 255, 0.3);
+    transition: color 0.3s ease;
+  }
+
+  .step-node.active .step-label { color: #ffffff; }
+  .step-node.completed .step-label { color: #10b981; }
+
+  .form-section-header {
+    margin-bottom: 3rem;
+  }
+
+  .premium-descriptions .ant-descriptions-item-label {
+    font-weight: 800 !important;
+    color: #64748b !important;
+    font-size: 0.7rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    background: #f8fafc !important;
+    width: 150px !important;
+  }
+
+  .premium-descriptions .ant-descriptions-item-content {
+    font-weight: 600 !important;
+    color: #00152a !important;
+    font-size: 0.85rem !important;
+  }
+
+  .nav-btn {
+    height: 56px;
+    padding: 0 2.5rem;
+    border-radius: 18px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.8rem;
+  }
+
+  .btn-primary {
+    background: #00152a;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 10px 25px rgba(0, 21, 42, 0.15);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 35px rgba(0, 21, 42, 0.25);
+    background: #002347;
+  }
+
+  .btn-ghost {
+    background: #f1f5f9;
+    border: none;
+    color: #475569;
+  }
+
+  .btn-ghost:hover {
+    background: #e2e8f0;
+    color: #00152a;
+  }
+`;
 
 const normalizeStandardValue = (value) => {
   if (value === null || value === undefined) return value;
@@ -480,7 +626,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
               <Row gutter={[16, 16]}>
                 <Col span={12}>
                   <Form.Item name="admissionNo" label="Admission No">
-                    <Input disabled placeholder="Auto-generated" />
+                    <Input style={{color:"red"}} disabled placeholder="Auto-generated" />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
@@ -1280,138 +1426,223 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
       title: "Review",
       icon: <CheckCircleOutlined />,
       content: (
-        <div className="space-y-6">
-          <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Verify all information before submission.</p>
+        <div className="space-y-10">
+          <div className="form-section-header">
+            <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Academic Dossier Validation</h3>
+            <p className="text-slate-500 text-sm font-medium">Verify the integrity of all data vectors before final academic sealing.</p>
           </div>
-          <Card>
-            <Descriptions bordered column={2}>
-              {Object.entries(formData).map(([k, v]) => {
-                if (k === "rteApplied" || k === "vanNeeded") return null;
-                // 🔥 HANDLE PHOTO SEPARATELY
-                if (k === "profilePhoto" && v?.length > 0) {
-                  const url =
-                    v[0].url ||
-                    v[0].thumbUrl ||
-                    (v[0].originFileObj ? URL.createObjectURL(v[0].originFileObj) : "");
+          
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+             {/* Part 1: Persona & Identity */}
+             <div className="xl:col-span-2 space-y-8">
+                <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm transition-all hover:shadow-md h-full">
+                   <div className="flex justify-between items-start mb-8">
+                      <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-xl bg-teal-500/10 flex items-center justify-center">
+                          <UserOutlined className="text-teal-600 text-xs" />
+                        </span>
+                        Persona Profile
+                      </h4>
+                      {formData.profilePhoto?.[0] && (
+                        <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-white shadow-xl rotate-3">
+                           <img 
+                             src={formData.profilePhoto[0].url || (formData.profilePhoto[0].originFileObj ? URL.createObjectURL(formData.profilePhoto[0].originFileObj) : "")} 
+                             alt="Student" 
+                             className="w-full h-full object-cover"
+                           />
+                        </div>
+                      )}
+                   </div>
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                      <Descriptions column={1} size="small" className="premium-descriptions">
+                         <Descriptions.Item label="Full Name">{formData.name}</Descriptions.Item>
+                         <Descriptions.Item label="Standard">{formData.standard}</Descriptions.Item>
+                         <Descriptions.Item label="Academic Year">{formData.academicYear}</Descriptions.Item>
+                         <Descriptions.Item label="Birth Date">{formData.dob?.format?.("DD MMM YYYY")}</Descriptions.Item>
+                         <Descriptions.Item label="Gender">{formData.gender}</Descriptions.Item>
+                         <Descriptions.Item label="Aadhar No">{formData.aadharNo}</Descriptions.Item>
+                      </Descriptions>
+                      <Descriptions column={1} size="small" className="premium-descriptions">
+                         <Descriptions.Item label="Religion">{formData.religion}</Descriptions.Item>
+                         <Descriptions.Item label="Community">{formData.community} ({formData.caste})</Descriptions.Item>
+                         <Descriptions.Item label="Mother Tongue">{formData.motherTongue}</Descriptions.Item>
+                         <Descriptions.Item label="Blood Group">{formData.bloodGroup}</Descriptions.Item>
+                         <Descriptions.Item label="Resident Pin">{formData.pin}</Descriptions.Item>
+                         <Descriptions.Item label="Transport">{formData.vanNeeded ? "School Van" : "Local Transit"}</Descriptions.Item>
+                      </Descriptions>
+                   </div>
 
-                  return (
-                    <Descriptions.Item key={k} label="Photo">
-                      {url ? <img src={url} alt="student" width={100} /> : "No Photo"}
-                    </Descriptions.Item>
-                  );
-                }
-                else if (k === "birthCertFile" && v?.length > 0) {
-                  const file = v[0];
-                  const url = file.url || file.thumbUrl || (file.originFileObj ? URL.createObjectURL(file.originFileObj) : "");
-                  const isPdf = file.type === "application/pdf" || file.name?.toLowerCase().endsWith(".pdf") || url.toLowerCase().includes(".pdf");
+                   <div className="mt-8 pt-8 border-t border-slate-50">
+                      <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-3">Residential Vector</h5>
+                      <p className="text-sm font-extrabold text-slate-900 leading-relaxed">
+                         {formData.line1}, {formData.line2}
+                      </p>
+                   </div>
+                </div>
+             </div>
 
-                  return (
-                    <Descriptions.Item key={k} label="Birth Certificate" span={2}>
-                      {url ? (
-                        isPdf ? (
-                          <div className="flex flex-col gap-2">
-                            <iframe src={url} width="100%" height="200px" title="Birth Certificate" className="border rounded" />
-                            <a href={url} target="_blank" rel="noreferrer" className="text-secondary text-xs hover:underline flex items-center gap-1">
-                              <span className="material-symbols-outlined text-sm">open_in_new</span> Open Full PDF
-                            </a>
+             {/* Part 2: Academic Summary */}
+             <div className="bg-slate-900 p-8 rounded-[32px] text-white shadow-2xl shadow-slate-200">
+                <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-8 flex items-center gap-2">
+                   <BookOutlined className="text-teal-400" /> Academic Standing
+                </h4>
+                
+                <div className="space-y-6">
+                   <div className="p-5 bg-white/5 rounded-2xl border border-white/10">
+                      <div className="text-[9px] font-black uppercase text-teal-400 tracking-widest mb-1">Last Examination</div>
+                      <div className="text-xl font-black">{formData.examName}</div>
+                      <div className="text-xs text-white/40 mt-1">{formData.boardExamType} | Reg: {formData.registerNo}</div>
+                   </div>
+
+                   <div className="p-5 bg-teal-500 rounded-2xl shadow-lg shadow-teal-500/20">
+                      <div className="text-[9px] font-black uppercase text-white/70 tracking-widest mb-1">Aggregate Performance</div>
+                      <div className="text-3xl font-black text-white">{formData.totalPercentage}%</div>
+                   </div>
+
+                   <div className="space-y-3">
+                      <div className="text-[9px] font-black uppercase text-white/40 tracking-widest">Subject Breakdown</div>
+                      {formData.subjects?.filter(s => s.subjectName).map((sub, idx) => (
+                        <div key={idx} className="flex justify-between items-center py-2 border-b border-white/5 text-xs">
+                           <span className="font-bold">{sub.subjectName}</span>
+                           <span className="font-black text-teal-400">{sub.obtainedMarks} / {sub.maxMarks}</span>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+             {/* Part 3: Family matrix */}
+             <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm h-full">
+                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-8 flex items-center gap-2">
+                   <TeamOutlined className="text-blue-600" /> Family Matrix
+                </h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                      <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Paternal</h5>
+                      <div className="space-y-1">
+                         <div className="text-sm font-black text-slate-900">{formData.fatherName}</div>
+                         <div className="text-xs font-bold text-slate-500">{formData.fatherOccupation}</div>
+                         <div className="text-xs font-bold text-blue-600 flex items-center gap-1 mt-2">
+                            <span className="material-symbols-outlined text-[14px]">call</span>
+                            {formData.fatherPhone}
+                         </div>
+                      </div>
+                   </div>
+                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                      <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Maternal</h5>
+                      <div className="space-y-1">
+                         <div className="text-sm font-black text-slate-900">{formData.motherName}</div>
+                         <div className="text-xs font-bold text-slate-500">{formData.motherOccupation}</div>
+                         <div className="text-xs font-bold text-blue-600 flex items-center gap-1 mt-2">
+                            <span className="material-symbols-outlined text-[14px]">call</span>
+                            {formData.motherPhone}
+                         </div>
+                      </div>
+                   </div>
+                </div>
+
+                {formData.isSingleParent && (
+                   <div className="mb-8 p-6 bg-amber-50 rounded-2xl border border-amber-100">
+                      <h5 className="text-[9px] font-black uppercase text-amber-600 tracking-widest mb-2 flex items-center gap-2">
+                         <span className="material-symbols-outlined text-sm">shield_person</span> Guardian Nexus
+                      </h5>
+                      <div className="flex justify-between items-center text-xs">
+                         <span className="font-extrabold text-slate-900">{formData.guardianName} ({formData.guardianRelation})</span>
+                         <span className="font-bold text-slate-500">{formData.guardianPhone}</span>
+                      </div>
+                   </div>
+                )}
+
+                <div className="space-y-4">
+                   <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Sibling Context</h5>
+                   <div className="flex gap-4">
+                      {formData.sibling1Name && (
+                        <div className="px-5 py-3 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700 border border-slate-100">
+                           {formData.sibling1Name} <span className="text-slate-400 mx-1">|</span> {formData.sibling1Standard}
+                        </div>
+                      )}
+                      {formData.sibling2Name && (
+                        <div className="px-5 py-3 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700 border border-slate-100">
+                           {formData.sibling2Name} <span className="text-slate-400 mx-1">|</span> {formData.sibling2Standard}
+                        </div>
+                      )}
+                      {!formData.sibling1Name && !formData.sibling2Name && (
+                        <div className="text-xs text-slate-400 italic">No siblings registered in current matrix.</div>
+                      )}
+                   </div>
+                </div>
+             </div>
+
+             {/* Part 4: Verification Vault */}
+             <div className="bg-slate-50 p-8 rounded-[32px] border border-slate-100">
+                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-8 flex items-center gap-2">
+                   <FileTextOutlined className="text-indigo-600" /> Verification Vault
+                </h4>
+                
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                   {[
+                     { label: "Birth Cert", file: formData.birthCertFile, key: "birthCert" },
+                     { label: "Community", file: formData.communityCertFile, key: "communityCert" },
+                     { label: "Aadhar", file: formData.aadharStudentFile, key: "aadharStudent" }
+                   ].map((doc, idx) => {
+                     const isChecked = formData.documentsChecked?.includes(doc.key);
+                     const isUploaded = doc.file?.[0];
+                     const fileUrl = isUploaded ? (doc.file[0].url || (doc.file[0].originFileObj ? URL.createObjectURL(doc.file[0].originFileObj) : "")) : null;
+                     const isPdf = doc.file?.[0]?.type === "application/pdf" || doc.file?.[0]?.name?.toLowerCase().endsWith(".pdf");
+
+                     return (
+                       <div key={idx} className={`relative group aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all ${isChecked ? 'border-teal-500 shadow-lg' : 'border-slate-200 opacity-60'}`}>
+                          {fileUrl ? (
+                             isPdf ? (
+                               <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-4">
+                                  <span className="material-symbols-outlined text-teal-400 text-3xl mb-2">picture_as_pdf</span>
+                                  <span className="text-[8px] font-black text-white uppercase text-center">{doc.label}</span>
+                               </div>
+                             ) : (
+                               <img src={fileUrl} className="w-full h-full object-cover" alt={doc.label} />
+                             )
+                          ) : (
+                             <div className="w-full h-full bg-white flex flex-col items-center justify-center p-4">
+                                <span className="material-symbols-outlined text-slate-200 text-2xl mb-2">upload_file</span>
+                                <span className="text-[8px] font-black text-slate-400 uppercase text-center">{doc.label}</span>
+                             </div>
+                          )}
+                          <div className="absolute top-2 right-2">
+                             <span className={`w-5 h-5 rounded-lg flex items-center justify-center text-[10px] ${isChecked ? 'bg-teal-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                <span className="material-symbols-outlined text-xs">{isChecked ? 'check' : 'close'}</span>
+                             </span>
                           </div>
-                        ) : (
-                          <img src={url} alt="birth certificate" width={100} className="rounded shadow-sm border" />
-                        )
-                      ) : "No Birth Certificate"}
-                    </Descriptions.Item>
-                  );
-                }
-                else if (k === "communityCertFile" && v?.length > 0) {
-                  const file = v[0];
-                  const url = file.url || file.thumbUrl || (file.originFileObj ? URL.createObjectURL(file.originFileObj) : "");
-                  const isPdf = file.type === "application/pdf" || file.name?.toLowerCase().endsWith(".pdf") || url.toLowerCase().includes(".pdf");
-
-                  return (
-                    <Descriptions.Item key={k} label="Community Certificate" span={2}>
-                      {url ? (
-                        isPdf ? (
-                          <div className="flex flex-col gap-2">
-                            <iframe src={url} width="100%" height="200px" title="Community Certificate" className="border rounded" />
-                            <a href={url} target="_blank" rel="noreferrer" className="text-secondary text-xs hover:underline flex items-center gap-1">
-                              <span className="material-symbols-outlined text-sm">open_in_new</span> Open Full PDF
-                            </a>
-                          </div>
-                        ) : (
-                          <img src={url} alt="community certificate" width={100} className="rounded shadow-sm border" />
-                        )
-                      ) : "No Community Certificate"}
-                    </Descriptions.Item>
-                  );
-                }
-                else if (k === "aadharStudentFile" && v?.length > 0) {
-                  const file = v[0];
-                  const url = file.url || file.thumbUrl || (file.originFileObj ? URL.createObjectURL(file.originFileObj) : "");
-                  const isPdf = file.type === "application/pdf" || file.name?.toLowerCase().endsWith(".pdf") || url.toLowerCase().includes(".pdf");
-
-                  return (
-                    <Descriptions.Item key={k} label="Aadhar" span={2}>
-                      {url ? (
-                        isPdf ? (
-                          <div className="flex flex-col gap-2">
-                            <iframe src={url} width="100%" height="200px" title="Aadhar" className="border rounded" />
-                            <a href={url} target="_blank" rel="noreferrer" className="text-secondary text-xs hover:underline flex items-center gap-1">
-                              <span className="material-symbols-outlined text-sm">open_in_new</span> Open Full PDF
-                            </a>
-                          </div>
-                        ) : (
-                          <img src={url} alt="aadhar" width={100} className="rounded shadow-sm border" />
-                        )
-                      ) : "No Aadhar"}
-                    </Descriptions.Item>
-                  );
-                }
-
-
-
-                // 🔥 NORMAL FIELDS — skip file-upload keys (already handled above)
-                if (['profilePhoto', 'birthCertFile', 'communityCertFile', 'aadharStudentFile', 'profilePhotoChecked'].includes(k)) {
-                  return null;
-                }
-                // Skip null / undefined / empty values
-                if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) {
-                  return null;
-                }
-
-                const formatLabel = (key) =>
-                  key
-                    .replace(/([A-Z])/g, " $1")
-                    .replace(/^./, (str) => str.toUpperCase());
-                return (
-
-                  <Descriptions.Item key={k} label={formatLabel(k)}>
-                    {typeof v === "object"
-                      ? v?.format
-                        ? v.format("DD-MM-YYYY")
-                        : Array.isArray(v)
-                          ? v.map((item) =>
-                            typeof item === 'object'
-                              ? item.subjectName || JSON.stringify(item)
-                              : String(item)
-                          ).join(', ')
-                          : JSON.stringify(v)
-                      : String(v)}
-                  </Descriptions.Item>
-                );
-              })}
-            </Descriptions>
-
-            <Descriptions bordered column={2} style={{ marginTop: 16 }}>
-              <Descriptions.Item label="Transport">
-                {formData.vanNeeded ? "Van" : "Local"}
-              </Descriptions.Item>
-
-              <Descriptions.Item label="RTE Applied">
-                {formData.rteApplied ? "Yes" : "No"}
-              </Descriptions.Item>
-            </Descriptions>
-          </Card>
+                       </div>
+                     );
+                   })}
+                   
+                   {/* Verification Tags */}
+                   <div className="col-span-full pt-4 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                         {formData.vanNeeded && (
+                           <Tag className="rounded-full px-4 py-1 border-blue-200 bg-blue-50 text-blue-700 font-extrabold text-[9px] uppercase shadow-sm">
+                              Transport Requested
+                           </Tag>
+                         )}
+                         {formData.rteApplied && (
+                           <Tag className="rounded-full px-4 py-1 border-rose-200 bg-rose-50 text-rose-700 font-extrabold text-[9px] uppercase shadow-sm">
+                              RTE Quota Applied
+                           </Tag>
+                         )}
+                         {formData.photosReceived && (
+                           <Tag className="rounded-full px-4 py-1 border-teal-200 bg-teal-50 text-teal-700 font-extrabold text-[9px] uppercase shadow-sm">
+                              Photos Verified
+                           </Tag>
+                         )}
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
         </div>
       ),
     }
@@ -1665,364 +1896,302 @@ const generatePDF = async () => {
 };
 
   return (
-    <div className="min-h-screen bg-surface p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        
+    <div className="admission-container">
+      <style>{scholarStyles}</style>
+      
+      <div className="max-w-6xl mx-auto">
         {/* Header Section */}
-        <div className="flex justify-between items-end px-4">
+        <div className="flex justify-between items-end mb-12">
           <div>
-            <h2 className="font-headline text-3xl font-extrabold text-primary">Admission Desk</h2>
-            <p className="text-on-surface-variant font-medium mt-1">Manage new student enrollments and academic records.</p>
+            <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-tight">
+              Academic <span className="text-teal-600">Application</span>
+            </h1>
+            <p className="text-slate-500 font-bold flex items-center gap-2 mt-3 uppercase tracking-widest text-[10px]">
+              <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
+              Secure Admissions & Student Dossier Creation
+            </p>
           </div>
-          <div className="hidden lg:flex items-center gap-3 bg-surface-container-low px-4 py-2 rounded-full border border-outline-variant/20">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-            <span className="text-xs font-bold text-primary uppercase tracking-tighter">Academic Session 2026-27</span>
-          </div>
-        </div>
-
-
-        {/* Custom Stepper Designer UI */}
-        <div className="grid grid-cols-7 gap-x-1 gap-y-4 mb-10 mt-6 px-4">
-          {steps.map((step, index) => {
-            const isActive = index === current;
-            const isCompleted = index < current;
-
-            return (
-              <div
-                key={index}
-                className="flex flex-col items-center gap-2 group cursor-pointer"
-                onClick={() => setCurrent(index)}
-              >
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300
-                    ${isActive
-                      ? "bg-primary text-white shadow-lg shadow-primary/20 scale-110"
-                      : isCompleted
-                        ? "bg-primary/80 text-white shadow-md"
-                        : "bg-surface-container-high text-on-surface-variant group-hover:bg-primary-fixed"
-                    }`}
-                >
-                  {isCompleted ? <span className="material-symbols-outlined text-[1.2rem]" style={{ fontVariationSettings: "'FILL' 1, 'wght' 700, 'GRAD' 0, 'opsz' 20" }}>check</span> : index + 1}
-                </div>
-                <span
-                  className={`text-[11px] font-bold uppercase tracking-wider text-center transition-colors duration-300
-                    ${isActive ? "text-primary" : "text-on-surface-variant"}`}
-                >
-                  {step.title}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-
-        {/* Main Form Card */}
-        <div className="bg-surface-container-lowest rounded-xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] overflow-hidden">
-          <div className="p-8 border-b border-surface-container-low flex justify-between items-center">
-            <div>
-              <h3 className="font-headline text-2xl font-extrabold text-primary">{steps[current].title} Details</h3>
-              <p className="text-on-surface-variant text-sm mt-1">Step {current + 1} of {steps.length}: Please provide the following information.</p>
-            </div>
-            <button
-              className="px-5 py-2.5 bg-surface-container-high hover:bg-surface-container-highest text-primary font-bold text-sm rounded-xl transition-all flex items-center gap-2 active:scale-95"
+          
+          <div className="flex gap-4">
+            <Button 
+              className="btn-ghost shadow-sm" 
+              icon={<span className="material-symbols-outlined text-sm">auto_fix_high</span>}
               onClick={fillRandomData}
             >
-              <span className="material-symbols-outlined text-lg">auto_fix_high</span>
-              Fill Random Indian Data
-            </button>
+              Fill Mockup
+            </Button>
+            <Button 
+              className="btn-ghost shadow-sm" 
+              icon={<span className="material-symbols-outlined text-sm">save</span>}
+              onClick={handleSaveDraft}
+            >
+              Save Progress
+            </Button>
+          </div>
+        </div>
+
+        <div className="glass-stepper-card mb-12">
+          {/* Custom Step Indicator */}
+          <div className="step-indicator-wrapper">
+            {steps.map((step, idx) => (
+              <div 
+                key={idx} 
+                className={`step-node ${current === idx ? 'active' : ''} ${current > idx ? 'completed' : ''}`}
+              >
+                <div className="step-circle">
+                  {current > idx ? <span className="material-symbols-outlined">check</span> : step.icon}
+                </div>
+                <span className="step-label">{step.title}</span>
+              </div>
+            ))}
           </div>
 
-          <Form
-            form={form}
-            layout="vertical"
-            onValuesChange={(_, all) => setFormData(all)}
-            className="p-8"
-          >
-            <div className="min-h-[400px]">
-              {steps[current].content}
-            </div>
-          </Form>
-
-          {/* Footer Actions */}
-          <div className="px-8 py-6 bg-surface-container-low flex justify-between items-center">
-            <button
-              className="px-6 py-3 text-primary font-bold text-sm hover:underline flex items-center gap-2 transition-all active:scale-95"
-              onClick={() => {
-                form.resetFields();
-                setFormData({});
-                setCurrent(0);
-                handleClearDraft();
-                if (clearEditData) clearEditData();
-              }}
+          <div className="p-16">
+            <Form
+              form={form}
+              layout="vertical"
+              requiredMark={false}
+              className="admission-form"
+              onValuesChange={(_, all) => setFormData(all)}
             >
-              <span className="material-symbols-outlined text-lg">close</span>
-              Discard Application
-            </button>
-            <div className="flex gap-4">
-              {current > 0 && (
-                <button
-                  className="px-8 py-3 bg-white border border-outline-variant text-primary font-bold text-sm rounded-xl hover:bg-surface-container-lowest shadow-sm transition-all active:scale-95 flex items-center gap-2"
-                  onClick={prev}
-                >
-                  <span className="material-symbols-outlined text-lg rotate-180">arrow_forward</span>
-                  Prev
-                </button>
-              )}
+              {steps[current].content}
+            </Form>
 
-              <button
-                className="px-8 py-3 bg-white border border-outline-variant text-primary font-bold text-sm rounded-xl hover:bg-surface-container-lowest shadow-sm transition-all active:scale-95"
-                onClick={handleSaveDraft}
-              >
-                Save as Draft
-              </button>
-
-              {current < steps.length - 1 ? (
-                <button
-                  style={{
-                    background: 'linear-gradient(to right, #00152a, #102a43)'
-                  }}
-                  className="px-10 py-3 bg-gradient-to-r from-primary to-primary-container text-white font-bold text-sm rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 active:scale-95"
-                  onClick={next}
-                >
-                  Next Stage
-                  <span className="material-symbols-outlined text-lg">arrow_forward</span>
-                </button>
-              ) : (
-                <div className="flex gap-4">
-                  <button
-                    className="px-8 py-3 bg-white border border-outline-variant text-primary font-bold text-sm rounded-xl hover:bg-surface-container-lowest shadow-sm transition-all active:scale-95 flex items-center gap-2"
-                    onClick={generatePDF}
+            <div className="mt-20 pt-10 border-t border-slate-100 flex justify-between items-center">
+              <div>
+                {current > 0 && (
+                  <button 
+                    onClick={prev} 
+                    className="nav-btn btn-ghost"
                   >
-                    <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
-                    PDF
+                    <span className="material-symbols-outlined text-lg">arrow_back</span>
+                    Previous Sector
                   </button>
+                )}
+              </div>
+              
+              <div className="flex gap-4">
+                {current < steps.length - 1 ? (
+                  <button 
+                    onClick={next} 
+                    className="nav-btn btn-primary"
+                  >
+                    Advance to {steps[current + 1].title}
+                    <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                  </button>
+                ) : (
                   <button
-                    className="px-10 py-3 bg-gradient-to-r from-primary to-primary-container text-white font-bold text-sm rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 active:scale-95"
+                    className="nav-btn btn-primary bg-teal-600 hover:bg-teal-700"
                     onClick={async () => {
-
                       try {
-                        await form.validateFields();
                         const values = form.getFieldsValue(true);
-
-                        // Build the documents array
-                        const documents = [];
-                        const hardCopyDocs = values.hardCopyDocs || [];
-                        // Profile photo
-                        if (values.profilePhotoChecked) {
-                          documents.push({ key: "profilePhoto", photoPath: "" }); // backend will set photoPath
-                        }
-                        // Other documents (with hardCopy flag)
-                        (values.documentsChecked || []).forEach(docKey => {
-                          documents.push({ key: docKey, photoPath: "", hardCopy: hardCopyDocs.includes(docKey) });
-                        });
-                        // Hard-copy only docs (not in documentsChecked but marked as hard copy)
-                        hardCopyDocs.forEach(docKey => {
-                          if (!(values.documentsChecked || []).includes(docKey)) {
-                            documents.push({ key: docKey, uploaded: false, hardCopy: true });
-                          }
-                        });
-
-                        // Add photosReceived flag
-                        const photosReceivedFlag = values.photosReceived || false;
-
-                        // Build the main data object
-                        const data = {
-                          name: values.name,
-                          standard: values.standard || "10th",
-                          rte: values.rteApplied || false,
-                          gender: values.gender,
-                          dob: values.dob ? values.dob.toISOString() : undefined,
-                          religion: values.religion,
-                          community: values.community,
-                          caste: values.caste,
-                          customCommunity: values.community === "OTHERS" ? values.communityOther : undefined,
-                          motherTongue: values.motherTongue,
-                          aadharNo: values.aadharNo,
-                          bloodGroup: values.bloodGroup,
-                          identification1: values.identityMark1,
-                          identification2: values.identityMark2,
-                          previousSchool: values.previouslyStudied,
-                          transportMode: values.vanNeeded ? "Van" : "Local",
-                          section: values.section || undefined,
-                          academicYear: values.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
-                          family: {
-                            fatherName: values.fatherName,
-                            fatherPhone: values.fatherPhone,
-                            fatherAadhar: values.fatherAadharNo,
-                            fatherOccupation: values.fatherOccupation,
-                            fatherWhatsapp: values.fatherWhatsAppNo,
-                            motherName: values.motherName,
-                            motherPhone: values.motherPhone,
-                            motherAadhar: values.motherAadharNo,
-                            motherOccupation: values.motherOccupation,
-                            motherWhatsapp: values.motherWhatsAppNo,
-                            familyIncome: Number(values.familyIncome) || 0,
-                            siblings: String(values.sibblings || ""),
-                            preferredPhone: values.preferredPhone || "father",
-                            parentsEmail: values.parentsEmail,
-                            // Single parent & guardian
-                            isSingleParent: values.isSingleParent || false,
-                            guardianName: values.guardianName,
-                            guardianPhone: values.guardianPhone,
-                            guardianWhatsapp: values.guardianWhatsapp,
-                            guardianAadhar: values.guardianAadhar,
-                            guardianOccupation: values.guardianOccupation,
-                            guardianRelation: values.guardianRelation,
-                            // Sibling details
-                            sibling1Name: values.sibling1Name,
-                            sibling1Standard: values.sibling1Standard,
-                            sibling1School: values.sibling1School,
-                            sibling2Name: values.sibling2Name,
-                            sibling2Standard: values.sibling2Standard,
-                            sibling2School: values.sibling2School,
-                          },
-                          address: {
-                            line1: values.line1,
-                            line2: values.line2,
-                            pin: values.pin,
-                          },
-                          documents: documents,
-                          photosReceived: photosReceivedFlag,
-                          academics: [
-                            {
-                              examName: values.examName || "SSLC",
-                              boardName: values.boardExamType === 'Other' ? (values.boardName || 'State Board') : 'State Board',
-                              registerNo: values.registerNo,
-                              monthYear: values.monthYear,
-                              totalPercentage: values.totalPercentage ? Number(values.totalPercentage) : undefined,
-                              subjects: (values.subjects || [])
-                                .filter(s => s?.subjectName)
-                                .map(s => ({
-                                  subjectName: s.subjectName,
-                                  maxMarks: Number(s.maxMarks) || 0,
-                                  obtainedMarks: Number(s.obtainedMarks) || 0,
-                                })),
-                              stream: values.academicStream || undefined,
-                            }
-                          ],
-                          admission: {
-                            admissionNo: values.admissionNo || 'AUTO',
-                            academicYear: values.academicYear || undefined,
-                            admissionFrom: values.admissionFrom ? values.admissionFrom.toISOString() : undefined,
-                            admissionTo: values.admissionTo ? values.admissionTo.toISOString() : undefined,
-                            admissionDate: values.admissionDate ? values.admissionDate.toISOString() : new Date().toISOString(),
-                            standard: values.standard || "10th",
-                            principalSignature: "Pending",
-                          }
-                        };
-
-                        // Prepare FormData for multipart/form-data
-
-                        const formDataToSend = new FormData();
-                        formDataToSend.append('data', JSON.stringify(data));
-
-                        // --- Place this block here ---
-                        if (values.profilePhotoChecked) {
-                          const fileObj = values.profilePhoto?.[0];
-                          if (fileObj?.originFileObj) {
-                            const file = fileObj.originFileObj;
-                            if (file.size > 1024 * 1024) {
-                              message.error("Profile photo too large. Max 1MB");
-                              return;
-                            }
-                            formDataToSend.append("profilePhoto", file);
-                          } else if (fileObj?.url) {
-                            const path = fileObj.url.replace(/^https?:\/\/[^/]+\//, "");
-                            formDataToSend.append("profilePhotoPath", path);
-                          }
-                        }
-                        // --- End block ---
-
-                        // birth cert, community cert, aadhar - only append if checkbox is checked and file is present, also check file size <= 1MB
-
-                        if (
-                          values.documentsChecked?.includes("birthCert") &&
-                          values.birthCertFile?.[0]?.originFileObj
-                        ) {
-                          const file = values.birthCertFile[0].originFileObj;
-
-                          if (file.size > 1024 * 1024) {
-                            message.error("Birth Certificate too large");
-                            return;
-                          }
-
-                          formDataToSend.append("birthCert", file);
-
-                          // documents.birthCert.path = ""; // 🔥 important
-                        }
-
-                        if (
-                          values.documentsChecked?.includes("communityCert") &&
-                          values.communityCertFile?.[0]?.originFileObj
-                        ) {
-                          const file = values.communityCertFile[0].originFileObj;
-
-                          if (file.size > 1024 * 1024) {
-                            message.error("Community Certificate too large");
-                            return;
-                          }
-
-                          formDataToSend.append("communityCert", file);
-
-                          // documents.communityCert.path = ""; // 🔥 important
-                        }
-
-                        if (
-                          values.documentsChecked?.includes("aadharStudent") &&
-                          values.aadharStudentFile?.[0]?.originFileObj
-                        ) {
-                          const file = values.aadharStudentFile[0].originFileObj;
-                          if (file.size > 1024 * 1024) {
-                            message.error("Aadhar file too large");
-                            return;
-                          }
-                          formDataToSend.append("aadharStudent", file);
-
-                          // documents.aadharStudent.path = ""; // 🔥 important
-                        }
-
-                        // Attach document files if present and check size <= 1MB
-                        //if birthcert true make birthcert checkbox active and show the file in review step, if the file is changed then send the new file to backend, if not changed then send the existing file path to backend, same for other documents
+                        
+                         // Build the documents array
+                         const documents = [];
+                         const hardCopyDocs = values.hardCopyDocs || [];
+                         // Profile photo
+                         if (values.profilePhotoChecked) {
+                           documents.push({ key: "profilePhoto", photoPath: "" }); // backend will set photoPath
+                         }
+                         // Other documents (with hardCopy flag)
+                         (values.documentsChecked || []).forEach(docKey => {
+                           documents.push({ key: docKey, photoPath: "", hardCopy: hardCopyDocs.includes(docKey) });
+                         });
+                         // Hard-copy only docs (not in documentsChecked but marked as hard copy)
+                         hardCopyDocs.forEach(docKey => {
+                           if (!(values.documentsChecked || []).includes(docKey)) {
+                             documents.push({ key: docKey, uploaded: false, hardCopy: true });
+                           }
+                         });
+ 
+                         // Add photosReceived flag
+                         const photosReceivedFlag = values.photosReceived || false;
+ 
+                         // Build the main data object
+                         const data = {
+                           name: values.name,
+                           standard: values.standard || "10th",
+                           rte: values.rteApplied || false,
+                           gender: values.gender,
+                           dob: values.dob ? values.dob.toISOString() : undefined,
+                           religion: values.religion,
+                           community: values.community,
+                           caste: values.caste,
+                           customCommunity: values.community === "OTHERS" ? values.communityOther : undefined,
+                           motherTongue: values.motherTongue,
+                           aadharNo: values.aadharNo,
+                           bloodGroup: values.bloodGroup,
+                           identification1: values.identityMark1,
+                           identification2: values.identityMark2,
+                           previousSchool: values.previouslyStudied,
+                           transportMode: values.vanNeeded ? "Van" : "Local",
+                           section: values.section || undefined,
+                           academicYear: values.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+                           family: {
+                             fatherName: values.fatherName,
+                             fatherPhone: values.fatherPhone,
+                             fatherAadhar: values.fatherAadharNo,
+                             fatherOccupation: values.fatherOccupation,
+                             fatherWhatsapp: values.fatherWhatsAppNo,
+                             motherName: values.motherName,
+                             motherPhone: values.motherPhone,
+                             motherAadhar: values.motherAadharNo,
+                             motherOccupation: values.motherOccupation,
+                             motherWhatsapp: values.motherWhatsAppNo,
+                             familyIncome: Number(values.familyIncome) || 0,
+                             siblings: String(values.sibblings || ""),
+                             preferredPhone: values.preferredPhone || "father",
+                             parentsEmail: values.parentsEmail,
+                             // Single parent & guardian
+                             isSingleParent: values.isSingleParent || false,
+                             guardianName: values.guardianName,
+                             guardianPhone: values.guardianPhone,
+                             guardianWhatsapp: values.guardianWhatsapp,
+                             guardianAadhar: values.guardianAadhar,
+                             guardianOccupation: values.guardianOccupation,
+                             guardianRelation: values.guardianRelation,
+                             // Sibling details
+                             sibling1Name: values.sibling1Name,
+                             sibling1Standard: values.sibling1Standard,
+                             sibling1School: values.sibling1School,
+                             sibling2Name: values.sibling2Name,
+                             sibling2Standard: values.sibling2Standard,
+                             sibling2School: values.sibling2School,
+                           },
+                           address: {
+                             line1: values.line1,
+                             line2: values.line2,
+                             pin: values.pin,
+                           },
+                           documents: documents,
+                           photosReceived: photosReceivedFlag,
+                           academics: [
+                             {
+                               examName: values.examName || "SSLC",
+                               boardName: values.boardExamType === 'Other' ? (values.boardName || 'State Board') : 'State Board',
+                               registerNo: values.registerNo,
+                               monthYear: values.monthYear,
+                               totalPercentage: values.totalPercentage ? Number(values.totalPercentage) : undefined,
+                               subjects: (values.subjects || [])
+                                 .filter(s => s?.subjectName)
+                                 .map(s => ({
+                                   subjectName: s.subjectName,
+                                   maxMarks: Number(s.maxMarks) || 0,
+                                   obtainedMarks: Number(s.obtainedMarks) || 0,
+                                 })),
+                               stream: values.academicStream || undefined,
+                             }
+                           ],
+                           admission: {
+                             admissionNo: values.admissionNo || 'AUTO',
+                             academicYear: values.academicYear || undefined,
+                             admissionFrom: values.admissionFrom ? values.admissionFrom.toISOString() : undefined,
+                             admissionTo: values.admissionTo ? values.admissionTo.toISOString() : undefined,
+                             admissionDate: values.admissionDate ? values.admissionDate.toISOString() : new Date().toISOString(),
+                             standard: values.standard || "10th",
+                             principalSignature: "Pending",
+                           }
+                         };
+ 
+                         // Prepare FormData for multipart/form-data
+ 
+                         const formDataToSend = new FormData();
+                         formDataToSend.append('data', JSON.stringify(data));
+ 
+                         // --- Place this block here ---
+                         if (values.profilePhotoChecked) {
+                           const fileObj = values.profilePhoto?.[0];
+                           if (fileObj?.originFileObj) {
+                             const file = fileObj.originFileObj;
+                             if (file.size > 1024 * 1024) {
+                               message.error("Profile photo too large. Max 1MB");
+                               return;
+                             }
+                             formDataToSend.append("profilePhoto", file);
+                           } else if (fileObj?.url) {
+                             const path = fileObj.url.replace(/^https?:\/\/[^/]+\//, "");
+                             formDataToSend.append("profilePhotoPath", path);
+                           }
+                         }
+                         // --- End block ---
+ 
+                         // birth cert, community cert, aadhar - only append if checkbox is checked and file is present, also check file size <= 1MB
+ 
+                         if (
+                           values.documentsChecked?.includes("birthCert") &&
+                           values.birthCertFile?.[0]?.originFileObj
+                         ) {
+                           const file = values.birthCertFile[0].originFileObj;
+ 
+                           if (file.size > 1024 * 1024) {
+                             message.error("Birth Certificate too large");
+                             return;
+                           }
+ 
+                           formDataToSend.append("birthCert", file);
+                         }
+ 
+                         if (
+                           values.documentsChecked?.includes("communityCert") &&
+                           values.communityCertFile?.[0]?.originFileObj
+                         ) {
+                           const file = values.communityCertFile[0].originFileObj;
+ 
+                           if (file.size > 1024 * 1024) {
+                             message.error("Community Certificate too large");
+                             return;
+                           }
+ 
+                           formDataToSend.append("communityCert", file);
+                         }
+ 
+                         if (
+                           values.documentsChecked?.includes("aadharStudent") &&
+                           values.aadharStudentFile?.[0]?.originFileObj
+                         ) {
+                           const file = values.aadharStudentFile[0].originFileObj;
+                           if (file.size > 1024 * 1024) {
+                             message.error("Aadhar file too large");
+                             return;
+                           }
+                           formDataToSend.append("aadharStudent", file);
+                         }
 
                         if (editData) {
-                          console.log("Updating with data:", formDataToSend);
                           await updateAdmission(editData.id, formDataToSend);
-                          message.success("Admission updated successfully!");
-                          // if (clearEditData) clearEditData();
+                          message.success("Admission dossier updated successfully!");
                         } else {
                           await createAdmission(formDataToSend);
-                          message.success("Admission created successfully!");
-                          form.resetFields();
-                          setFormData({});
-                          setCurrent(0);
-                          handleClearDraft();
+                          message.success("Student successfully enrolled!");
                         }
+                        
+                        localStorage.removeItem("admission_draft");
+                        if (clearEditData) clearEditData();
+                        
                       } catch (err) {
                         console.error("Admission error:", err);
                         message.error("Error creating admission. Check required fields or try again.");
-                      } finally {
-                        // Optional: Resetting or navigating away if needed
                       }
                     }}
-                    style={{
-                      background: 'linear-gradient(to right, #00152a, #102a43)'
-                    }}
                   >
-                    {editData ? "Update Application" : "Submit Enrollment"}
-                    <span className="material-symbols-outlined text-lg">check_circle</span>
+                    Seal Dossier & Finalize
+                    <span className="material-symbols-outlined text-lg">verified</span>
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* AI Insight Chip */}
-        <div className="flex justify-center pb-8">
-          <div className="inline-flex items-center gap-3 bg-surface-container-lowest px-6 py-3 rounded-full shadow-ambient border border-outline-variant/10">
-            <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse transition-all"></span>
-            <p className="text-xs font-medium text-on-surface-variant">
-              <span className="font-extrabold text-primary uppercase tracking-tighter">Admission Insight:</span> Aadhar validation is recommended before finalizing academic records.
+        {/* Insight Ticker */}
+        <div className="flex justify-center mb-16">
+          <div className="bg-slate-50 px-8 py-4 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="w-8 h-8 rounded-xl bg-teal-500/10 flex items-center justify-center">
+              <span className="material-symbols-outlined text-teal-600 text-sm animate-pulse">lightbulb</span>
+            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex gap-2">
+              <span className="text-teal-600">Architect Intel:</span> 
+              Academic year {dayjs().format('YYYY')}-{(parseInt(dayjs().format('YYYY'))+1)} is active by default.
             </p>
           </div>
         </div>

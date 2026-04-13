@@ -80,6 +80,7 @@ const TRANSPORT_MANAGER_KEYS = new Set([
   "transport-all-reports",
   "transport-drivers",
   "transport-buses",
+  "pos-transactions",
 ]);
 
 const Dashboard = () => {
@@ -96,7 +97,7 @@ const Dashboard = () => {
   const isTeacher = (userRole === "STAFF" &&
     (currentUser?.designation || "").toLowerCase() === "teacher") ||
     (userRole === "STAFF" && hasPermission(PERMISSIONS.HR_LEAVE_MANAGE) && !hasPermission(PERMISSIONS.FEES_DASHBOARD) && !hasPermission(PERMISSIONS.SETTINGS_UPDATE));
-  const isTeacherOrStaffSelf = isTeacher || userRole === "TEACHER";
+  const isTeacherOrStaffSelf = isTeacher || userRole === "TEACHER" || userRole === "STAFF";
 
   React.useEffect(() => {
     const loadSettings = async () => {
@@ -187,9 +188,9 @@ const Dashboard = () => {
       permission: canAdmissionRead,
       children: [
         { key: "admission-view", label: "All Admissions", icon: "list_alt", permission: canAdmissionRead },
-        { key: "admission", label: "New Application", icon: "add_circle", permission: canAdmissionRead },
+        { key: "admission", label: "Applications", icon: "add_circle", permission: canAdmissionRead },
         { key: "approval", label: "Approvals Queue", icon: "rule", permission: canAdmissionRead && (adminSettings?.requireApprovalForAdmission ?? true) },
-        { key: "bulk-upload", label: "Bulk Upload", icon: "upload", permission: canAdmissionRead },
+        { key: "bulk-upload", label: "Bulk", icon: "upload", permission: canAdmissionRead },
         { key: "promotion", label: "Student Promotion", icon: "swap_horiz", permission: canAdmissionRead },
       ],
     },

@@ -27,6 +27,7 @@ import {
 } from "@ant-design/icons";
 import {
   getLeaveTypes,
+  getLeavePermissionPolicy,
   getLeaveApplications,
   applyLeave,
   approveLeave,
@@ -43,11 +44,13 @@ const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 
 const LEAVE_STATUS_COLORS = {
-  pending: "gold",
-  approved: "green",
-  rejected: "red",
-  cancelled: "default",
+  PENDING: "gold",
+  APPROVED: "green",
+  REJECTED: "red",
+  CANCELLED: "default",
 };
+
+const normalizeLeaveStatus = (status) => String(status || "").toUpperCase();
 
 const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [leaveTypes, setLeaveTypes] = useState([]);
@@ -55,6 +58,7 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [myLeaves, setMyLeaves] = useState([]);
   const [balances, setBalances] = useState([]);
   const [myBalance, setMyBalance] = useState([]);
+  const [leavePolicy, setLeavePolicy] = useState(null);
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(false);
   const [applyModal, setApplyModal] = useState(false);
@@ -84,6 +88,15 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
       setLeaveTypes(data?.length ? data : defaultLeaveTypes);
     } catch {
       setLeaveTypes(defaultLeaveTypes);
+    }
+  };
+
+  const fetchLeavePolicy = async () => {
+    try {
+      const policy = await getLeavePermissionPolicy(currentUser?.staffId);
+      setLeavePolicy(policy?.effective || null);
+    } catch {
+      setLeavePolicy(null);
     }
   };
 
@@ -139,6 +152,7 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
 
   useEffect(() => {
     fetchLeaveTypes();
+    fetchLeavePolicy();
     if (!isSelfOnly) fetchStaff();
   }, []);
 
@@ -235,9 +249,9 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
     {
       title: "Status",
       dataIndex: "status",
-      render: (v) => <Tag color={LEAVE_STATUS_COLORS[v] || "default"}>{(v || "").toUpperCase()}</Tag>,
-      filters: Object.keys(LEAVE_STATUS_COLORS).map((k) => ({ text: k.toUpperCase(), value: k })),
-      onFilter: (value, record) => record.status === value,
+      render: (v) => <Tag color={LEAVE_STATUS_COLORS[normalizeLeaveStatus(v)] || "default"}>{normalizeLeaveStatus(v)}</Tag>,
+      filters: Object.keys(LEAVE_STATUS_COLORS).map((k) => ({ text: k, value: k })),
+      onFilter: (value, record) => normalizeLeaveStatus(record.status) === value,
     },
     {
       title: "Applied On",
@@ -250,7 +264,7 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
       render: (_, record) => (
         <Space>
           <Button icon={<EyeOutlined />} size="small" onClick={() => openDetail(record)} />
-          {canApproveLeave && record.status === "pending" && (
+          {canApproveLeave && normalizeLeaveStatus(record.status) === "PENDING" && (
             <>
               <Popconfirm title="Approve this leave?" onConfirm={() => handleApprove(record.id)}>
                 <Button icon={<CheckOutlined />} size="small" type="primary" />
@@ -260,7 +274,7 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
               </Popconfirm>
             </>
           )}
-          {record.status === "pending" && record.staffId === currentUser?.staffId && (
+          {normalizeLeaveStatus(record.status) === "PENDING" && record.staffId === currentUser?.staffId && (
             <Popconfirm title="Cancel this leave?" onConfirm={() => handleCancel(record.id)}>
               <Button icon={<DeleteOutlined />} size="small" danger />
             </Popconfirm>
@@ -343,7 +357,7 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
               columns={appColumns}
               dataSource={
                 activeTab === "approvals"
-                  ? applications.filter((a) => a.status === "pending")
+                  ? applications.filter((a) => normalizeLeaveStatus(a.status) === "PENDING")
                   : activeTab === "my-leaves"
                   ? myLeaves
                   : applications
@@ -372,7 +386,12 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
           <Form.Item name="leaveTypeId" label="Leave Type" rules={[{ required: true, message: "Select leave type" }]}>
             <Select placeholder="Select leave type">
               {(leaveTypes || []).map((lt) => (
-                <Option key={lt.id} value={lt.id}>{lt.name} ({lt.code})</Option>
+                <Option key={lt.id} value={lt.id}>
+                  {lt.name} ({lt.code})
+                  {Number.isFinite(leavePolicy?.leaveEntitlements?.[lt.code] ?? lt.maxPerYear)
+                    ? ` - Max ${(leavePolicy?.leaveEntitlements?.[lt.code] ?? lt.maxPerYear)}`
+                    : ''}
+                </Option>
               ))}
             </Select>
           </Form.Item>
@@ -402,7 +421,7 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
             <Descriptions.Item label="From">{selectedLeave.fromDate ? dayjs(selectedLeave.fromDate).format("DD MMM YYYY") : "-"}</Descriptions.Item>
             <Descriptions.Item label="To">{selectedLeave.toDate ? dayjs(selectedLeave.toDate).format("DD MMM YYYY") : "-"}</Descriptions.Item>
             <Descriptions.Item label="Status" span={2}>
-              <Tag color={LEAVE_STATUS_COLORS[selectedLeave.status]}>{(selectedLeave.status || "").toUpperCase()}</Tag>
+              <Tag color={LEAVE_STATUS_COLORS[normalizeLeaveStatus(selectedLeave.status)]}>{normalizeLeaveStatus(selectedLeave.status)}</Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Reason" span={2}>{selectedLeave.reason || "-"}</Descriptions.Item>
             <Descriptions.Item label="Applied On">{selectedLeave.createdAt ? dayjs(selectedLeave.createdAt).format("DD MMM YYYY") : "-"}</Descriptions.Item>
