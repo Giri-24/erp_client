@@ -53,6 +53,12 @@ const PERM_STATUS_COLORS = {
 
 const normalizePermissionStatus = (status) => String(status || "").toUpperCase();
 
+const resolveApproverId = (user) => {
+  const candidate = [user?.staffId, user?.id, user?.employeeId, user?.username, user?.email]
+    .find((value) => value !== null && value !== undefined && String(value).trim().length > 0);
+  return String(candidate || "").trim();
+};
+
 const PermissionPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [permissions, setPermissions] = useState([]);
   const [myPermissions, setMyPermissions] = useState([]);
@@ -190,7 +196,12 @@ const PermissionPage = ({ selfOnly: selfOnlyProp } = {}) => {
 
   const handleApprove = async (id) => {
     try {
-      await approvePermission(id, { approvedBy: currentUser?.id });
+      const approvedBy = resolveApproverId(currentUser);
+      if (!approvedBy) {
+        message.error("Approver identity missing. Please login again.");
+        return;
+      }
+      await approvePermission(id, { approvedBy });
       message.success("Permission approved");
       fetchPermissions();
     } catch (err) {

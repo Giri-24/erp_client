@@ -52,6 +52,12 @@ const LEAVE_STATUS_COLORS = {
 
 const normalizeLeaveStatus = (status) => String(status || "").toUpperCase();
 
+const resolveApproverId = (user) => {
+  const candidate = [user?.staffId, user?.id, user?.employeeId, user?.username, user?.email]
+    .find((value) => value !== null && value !== undefined && String(value).trim().length > 0);
+  return String(candidate || "").trim();
+};
+
 const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [applications, setApplications] = useState([]);
@@ -114,11 +120,18 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const fetchMyLeaves = async () => {
     setLoading(true);
     try {
-      const staffId = String(currentUser?.staffId);
+      if (!currentUser?.staffId) {
+        console.warn('Cannot fetch my leaves: missing staff ID', { staffId: currentUser?.staffId });
+        setMyLeaves([]);
+        setLoading(false);
+        return;
+      }
+      const staffId = String(currentUser.staffId);
       const data = await getLeaveApplications({ staffId, year: filterMonth.format("YYYY") });
       const list = Array.isArray(data) ? data : data?.data || [];
-      setMyLeaves(staffId ? list.filter(l => l.staffId === staffId) : list);
-    } catch {
+      setMyLeaves(list.filter(l => l.staffId === staffId));
+    } catch (err) {
+      console.error('Failed to fetch my leaves:', err);
       setMyLeaves([]);
     }
     setLoading(false);
@@ -134,11 +147,16 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
   };
 
   const fetchMyBalance = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id || !currentUser?.staffId) {
+      console.warn('Cannot fetch my balance: missing user ID or staff ID', { userId: currentUser?.id, staffId: currentUser?.staffId });
+      setMyBalance([]);
+      return;
+    }
     try {
       const data = await getAllLeaveBalances({ staffId: currentUser.staffId, year: filterMonth.format("YYYY") });
       setMyBalance(Array.isArray(data) ? data : data?.data || []);
-    } catch {
+    } catch (err) {
+      console.error('Failed to fetch my leave balance:', err);
       setMyBalance([]);
     }
   };
@@ -197,7 +215,12 @@ const LeaveManagementPage = ({ selfOnly: selfOnlyProp } = {}) => {
 
   const handleApprove = async (id) => {
     try {
-      await approveLeave(id, { approvedBy: currentUser?.staffId });
+      const approvedBy = resolveApproverId(currentUser);
+      if (!approvedBy) {
+        message.error("Approver identity missing. Please login again.");
+        return;
+      }
+      await approveLeave(id, { approvedBy });
       message.success("Leave approved");
       fetchApplications();
     } catch (err) {
