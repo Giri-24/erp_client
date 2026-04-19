@@ -995,7 +995,7 @@ const AttendancePage = ({ selfOnly: selfOnlyProp } = {}) => {
               <FileTextOutlined />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: 20 }}>Activity Dossier</h3>
+              <h3 style={{ margin: 0, fontSize: 20 }}>Activity </h3>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 500, opacity: 0.6 }}>{monthlyStaffLabel}</p>
             </div>
           </div>

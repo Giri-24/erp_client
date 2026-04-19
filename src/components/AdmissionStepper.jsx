@@ -137,7 +137,9 @@ const scholarStyles = `
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
     background: #f8fafc !important;
-    width: 150px !important;
+    min-width: 110px !important;
+    width: auto !important;
+    white-space: normal !important;
   }
 
   .premium-descriptions .ant-descriptions-item-content {
@@ -366,6 +368,8 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
         parentsEmail: editData.family?.parentsEmail,
         line1: editData.address?.line1,
         line2: editData.address?.line2,
+        doorNo: editData.address?.line1,
+        street: editData.address?.line2,
         pin: editData.address?.pin,
         admissionNo: editData.admission?.admissionNo,
         admissionFrom: editData.admission?.admissionFrom ? dayjs(editData.admission.admissionFrom) : null,
@@ -513,7 +517,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
     setFormData(randomData);
     message.success("Filled with random Indian standard data!");
   };
-
+const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   // Validation rules
   const requiredRule = { required: true, message: "This field is required" };
   const aadharRule = {
@@ -536,6 +540,8 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
   const watchedStandard = Form.useWatch("standard", form);
   const watchedSubjects = Form.useWatch("subjects", form) || [];
   const siblingSchool = Form.useWatch("siblingSchool", form);
+  const sibling1School = Form.useWatch("sibling1School", form);
+  const sibling2School = Form.useWatch("sibling2School", form);
   const isSingleParent = Form.useWatch("isSingleParent", form);
   const boardExamType = Form.useWatch("boardExamType", form);
 
@@ -708,8 +714,8 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="dob" label="DOB" rules={[requiredRule]}>
-                <DatePicker style={{ width: "100%" }} />
+              <Form.Item name="dob" label="Date of Birth" rules={[requiredRule]}>
+                <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -841,8 +847,17 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
               <Form.Item name="motherAadharNo" label="Mother Aadhar">
                 <Input maxLength={12} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
+              
             </Col>
           </Row>
+
+          <Row justify="left" className="mt-4">
+  <Col span={8}>
+    <Form.Item name="familyIncome" label="Family Income">
+      <Input />
+    </Form.Item>
+  </Col>
+</Row>
 
           {/* Guardian details for single parent */}
           {isSingleParent && (
@@ -908,42 +923,58 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
           <div className="mt-8 pt-4 border-t border-outline-variant">
             <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Siblings & Preferences</h4>
             <Row gutter={16}>
+             
               <Col span={12}>
-                <Form.Item name="familyIncome" label="Family Income">
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="sibblings" label="Siblings">
-                  <Input />
-                </Form.Item>
+                <Form.Item name="siblingsCount" label="Number of Siblings">
+  <Input type="number" min={0} placeholder="Enter number" />
+</Form.Item>
               </Col>
             </Row>
 
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item name="siblingSchool" label="Sibling School">
-                  <Select placeholder="Select option">
-                    <Select.Option value="same">Same School</Select.Option>
-                    <Select.Option value="other">Other School</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              {siblingSchool === "other" && (
-                <Col span={12}>
-                  <Form.Item
-                    name="otherSchoolName"
-                    label="Other School Name"
-                    rules={[{ required: true, message: "Enter school name" }]}
-                  >
-                    <Input placeholder="Enter school name" />
-                  </Form.Item>
-                </Col>
-              )}
-            </Row>
+            {Array.from({ length: siblingCount }).map((_, index) => (
+  <div key={index} className="mt-4">
+    
+    <h4 className="text-sm font-semibold mb-2">
+      Sibling {index + 1} Details
+    </h4>
+
+    <Row gutter={16}>
+      
+      <Col span={12}>
+        <Form.Item
+          name={`sibling${index + 1}School`}
+          label={`Sibling ${index + 1} School`}
+        >
+          <Select placeholder="Select option">
+            <Select.Option value="same">Same School</Select.Option>
+            <Select.Option value="other">Other School</Select.Option>
+          </Select>
+        </Form.Item>
+      </Col>
+
+      <Form.Item shouldUpdate noStyle>
+        {({ getFieldValue }) =>
+          getFieldValue(`sibling${index + 1}School`) === "other" && (
+            <Col span={12}>
+              <Form.Item
+                name={`sibling${index + 1}OtherSchoolName`}
+                label="Other School Name"
+                rules={[{ required: false, message: "Enter school name" }]}
+              >
+                <Input placeholder="Enter school name" />
+              </Form.Item>
+            </Col>
+          )
+        }
+      </Form.Item>
+
+    </Row>
+
+  </div>
+))}
 
             {/* Sibling 1 Details */}
-            <Divider orientation="left" style={{ fontSize: 13 }}>Sibling 1 Details</Divider>
+           {/* <Divider orientation="left" style={{ fontSize: 13 }}>Sibling 1 Details</Divider>
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item name="sibling1Name" label="Sibling 1 Name">
@@ -963,16 +994,31 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
               </Col>
               <Col span={8}>
                 <Form.Item name="sibling1School" label="Sibling 1 School">
-                  <Select placeholder="Select school">
+                  <Select placeholder="Select school" onChange={() => {
+                    if (sibling1School !== "Other School") {
+                      form.setFieldsValue({ sibling1OtherSchoolName: undefined });
+                    }
+                  }}>
                     <Select.Option value="Same School">Same School</Select.Option>
-                    <Select.Option value="Other">Other School</Select.Option>
+                    <Select.Option value="Other School">Other School</Select.Option>
                   </Select>
                 </Form.Item>
               </Col>
             </Row>
 
+            {/* Sibling 1 — Other School Input */}
+           {/* {sibling1School === "Other School" && (
+              <Row gutter={16} style={{ marginTop: 8 }}>
+                <Col span={8}>
+                  <Form.Item name="sibling1OtherSchoolName" label="School Name" rules={[{ required: true, message: "Enter school name" }]}>
+                    <Input placeholder="Enter school name" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            )}
+
             {/* Sibling 2 Details */}
-            <Divider orientation="left" style={{ fontSize: 13 }}>Sibling 2 Details</Divider>
+           {/* <Divider orientation="left" style={{ fontSize: 13 }}>Sibling 2 Details</Divider>
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item name="sibling2Name" label="Sibling 2 Name">
@@ -992,22 +1038,52 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
               </Col>
               <Col span={8}>
                 <Form.Item name="sibling2School" label="Sibling 2 School">
-                  <Select placeholder="Select school">
+                  <Select placeholder="Select school" onChange={() => {
+                    if (sibling2School !== "Other School") {
+                      form.setFieldsValue({ sibling2OtherSchoolName: undefined });
+                    }
+                  }}>
                     <Select.Option value="Same School">Same School</Select.Option>
-                    <Select.Option value="Other">Other School</Select.Option>
+                    <Select.Option value="Other School">Other School</Select.Option>
                   </Select>
                 </Form.Item>
               </Col>
             </Row>
 
+            {/* Sibling 2 — Other School Input */}
+           {/* {sibling2School === "Other School" && (
+              <Row gutter={16} style={{ marginTop: 8 }}>
+                <Col span={8}>
+                  <Form.Item name="sibling2OtherSchoolName" label="School Name" rules={[{ required: true, message: "Enter school name" }]}>
+                    <Input placeholder="Enter school name" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            )}
+           } */}
+
+            <div className="mt-8 pt-4 border-t border-outline-variant">
+  <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">
+    Contact Details
+  </h4>
+</div>
+
+
+
             <Row gutter={16}>
               <Col span={12}>
-                <Form.Item name="preferredPhone" label="Preferred Contact" initialValue="father">
-                  <Radio.Group>
-                    <Radio value="father">Father</Radio>
-                    <Radio value="mother">Mother</Radio>
-                  </Radio.Group>
-                </Form.Item>
+                <Form.Item
+  name="preferredPhone"
+  label="Preferred Contact"
+  initialValue={["father"]}
+>
+  <Checkbox.Group
+    options={[
+      { label: "Father", value: "father" },
+      { label: "Mother", value: "mother" },
+    ]}
+  />
+</Form.Item>
               </Col>
               <Col span={12}>
                 <Form.Item name="parentsEmail" label="Parents Email ID" rules={[{ type: 'email', message: 'Please enter a valid email' }]}>
@@ -1428,7 +1504,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
       content: (
         <div className="space-y-10">
           <div className="form-section-header">
-            <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Academic Dossier Validation</h3>
+            <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Student Admission</h3>
             <p className="text-slate-500 text-sm font-medium">Verify the integrity of all data vectors before final academic sealing.</p>
           </div>
           
@@ -1459,7 +1535,7 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
                          <Descriptions.Item label="Full Name">{formData.name}</Descriptions.Item>
                          <Descriptions.Item label="Standard">{formData.standard}</Descriptions.Item>
                          <Descriptions.Item label="Academic Year">{formData.academicYear}</Descriptions.Item>
-                         <Descriptions.Item label="Birth Date">{formData.dob?.format?.("DD MMM YYYY")}</Descriptions.Item>
+                         <Descriptions.Item label="Date of Birth">{formData.dob?.format?.("DD/MM/YYYY")}</Descriptions.Item>
                          <Descriptions.Item label="Gender">{formData.gender}</Descriptions.Item>
                          <Descriptions.Item label="Aadhar No">{formData.aadharNo}</Descriptions.Item>
                       </Descriptions>
@@ -1476,7 +1552,9 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
                    <div className="mt-8 pt-8 border-t border-slate-50">
                       <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-3">Residential Vector</h5>
                       <p className="text-sm font-extrabold text-slate-900 leading-relaxed">
-                         {formData.line1}, {formData.line2}
+                         {[formData.doorNo || formData.line1, formData.street || formData.line2, formData.city, formData.state]
+                           .filter(Boolean)
+                           .join(", ") || "—"}
                       </p>
                    </div>
                 </div>
@@ -1908,8 +1986,7 @@ const generatePDF = async () => {
             </h1>
             <p className="text-slate-500 font-bold flex items-center gap-2 mt-3 uppercase tracking-widest text-[10px]">
               <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
-              Secure Admissions & Student Dossier Creation
-            </p>
+Enroll Admission            </p>
           </div>
           
           <div className="flex gap-4">
@@ -2059,8 +2136,8 @@ const generatePDF = async () => {
                              sibling2School: values.sibling2School,
                            },
                            address: {
-                             line1: values.line1,
-                             line2: values.line2,
+                             line1: values.doorNo,
+                             line2: values.street,
                              pin: values.pin,
                            },
                            documents: documents,
@@ -2159,7 +2236,7 @@ const generatePDF = async () => {
 
                         if (editData) {
                           await updateAdmission(editData.id, formDataToSend);
-                          message.success("Admission dossier updated successfully!");
+                          message.success("Admission updated successfully!");
                         } else {
                           await createAdmission(formDataToSend);
                           message.success("Student successfully enrolled!");
@@ -2174,7 +2251,7 @@ const generatePDF = async () => {
                       }
                     }}
                   >
-                    Seal Dossier & Finalize
+                    Enroll the  student
                     <span className="material-symbols-outlined text-lg">verified</span>
                   </button>
                 )}
@@ -2236,8 +2313,8 @@ const generatePDF = async () => {
 
              <div style={styles.row}>
                 <div style={{...styles.field, flex: 0.6}}>
-                  <span style={styles.label}>Birth Date :</span>
-                  <span style={styles.value}>{formData.dob?.format?.("DD / MM / YYYY") || ".... / .... / ...."}</span>
+                  <span style={styles.label}>Date of Birth :</span>
+                  <span style={styles.value}>{formData.dob?.format?.("DD/MM/YYYY") || ".... / .... / ...."}</span>
                 </div>
                 <div style={{...styles.field, flex: 0.4}}>
                   <span style={styles.label}>Gender :</span>

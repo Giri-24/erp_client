@@ -599,7 +599,7 @@ const StaffManagementPage = () => {
       {/* Summary Stats Bento Grid */}
       <Row gutter={[20, 20]} style={{ marginBottom: 32 }}>
         <Col xs={24} sm={12} lg={6}>
-          <StatCard title="Total Force" value={staff.length} icon={<TeamOutlined />} color="var(--primary)" />
+          <StatCard title="Total Staff" value={staff.length} icon={<TeamOutlined />} color="var(--primary)" />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <StatCard title="Academic" value={staff.filter(s => s.category?.startsWith("TEACHING")).length} icon={<EditOutlined />} color="#10b981" />
@@ -626,7 +626,7 @@ const StaffManagementPage = () => {
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <div className="filter-item">
-              <span className="filter-label">SEARCH DIRECTORY</span>
+              <span className="filter-label">SEARCH Staff</span>
               <Input
                 placeholder="ID or Personnel Name"
                 value={searchTerm}
@@ -1002,7 +1002,7 @@ const StaffManagementPage = () => {
                   <div style={{ marginBottom: 40 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
                       <div style={{ width: 10, height: 32, background: 'var(--primary)', borderRadius: 5 }}></div>
-                      <span style={{ fontWeight: 900, fontSize: 24, letterSpacing: '-0.02em', color: 'var(--primary)' }}>Personnel Dossier</span>
+                      <span style={{ fontWeight: 900, fontSize: 24, letterSpacing: '-0.02em', color: 'var(--primary)' }}>Personnel Documents</span>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-100 rounded-3xl overflow-hidden border border-slate-100 shadow-sm">

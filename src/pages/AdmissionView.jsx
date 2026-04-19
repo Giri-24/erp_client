@@ -799,7 +799,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
       }
     },
     {
-      title: "Category",
+      title: "STD | Sec",
       dataIndex: "standard",
       width: 150,
       render: (_, record) => (
@@ -810,7 +810,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
       )
     },
     {
-      title: "Provenance",
+      title: "Parent",
       width: 180,
       render: (_, record) => (
         <div className="flex flex-col">
@@ -832,7 +832,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
       }
     },
     {
-      title: "Vitality",
+      title: "Status",
       width: 120,
       render: (_, record) => {
         const active = (record.users?.isActive ?? 1);
@@ -872,7 +872,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
             className="px-4 py-1.5 bg-slate-50 text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-lg border border-slate-100 hover:bg-slate-100 transition-all flex items-center gap-2"
           >
             <span className="material-symbols-outlined text-[14px]">print</span>
-            Dossier
+            Issue PDF
           </button>
           {canApprove && (
             <div className="flex gap-2">
@@ -897,8 +897,19 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
         .premium-table .ant-table-thead > tr > th { background: #f8fafc !important; font-weight: 800 !important; color: #64748b !important; text-transform: uppercase !important; letter-spacing: 0.1em !important; font-size: 10px !important; border-bottom: 1px solid #f1f5f9 !important; padding: 16px !important; }
         .premium-table .ant-table-row td { padding: 16px !important; border-bottom: 1px solid #f8fafc !important; }
         .premium-table .ant-table-row:hover td { background: #f8fafc !important; }
-        .filter-control { border-radius: 14px !important; border: 1px solid #f1f5f9 !important; background: #ffffff !important; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        .filter-control:hover, .filter-control:focus { border-color: #00152a !important; box-shadow: 0 4px 12px rgba(0,21,42,0.05); }
+        .filter-control { border-radius: 12px !important; border: 1px solid #e2e8f0 !important; background: #ffffff !important; transition: all 0.2s ease; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+        .filter-control, .filter-control .ant-select-selector, .filter-control .ant-picker, .filter-control .ant-input-affix-wrapper {
+          min-height: 2.5rem !important;
+          height: 2.5rem !important;
+          border-radius: 0.75rem !important;
+        }
+        .filter-control .ant-picker-range, .filter-control .ant-input {
+          line-height: 1.3 !important;
+        }
+        .filter-control:hover, .filter-control:focus { border-color: #cbd5e1 !important; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06); }
+        .filter-control .material-symbols-outlined { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+        .filter-toolbar { border: 1px solid rgba(148, 163, 184, 0.25); background: rgba(248, 250, 252, 0.9); border-radius: 18px; padding: 0.75rem 0.9rem; }
+        .filter-toolbar > .flex { gap: 0.5rem; }
         .status-tag { border-radius: 9999px; font-weight: 800; font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 12px; }
       `}</style>
 
@@ -939,7 +950,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
              onClick={exportCSV} 
              className="px-6 py-2.5 bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-xl border border-slate-200 shadow-sm hover:border-slate-400 transition-all flex items-center gap-2"
            >
-             <DownloadOutlined /> Export Dossier
+             <DownloadOutlined /> Admission Application
            </button>
         </div>
       </div>
@@ -973,100 +984,142 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
         />
       </div>
 
-      {/* Control Bar */}
-      <div className="bg-gray-100 p-6 rounded-3xl border border-slate-100 shadow-sm mb-8">
-        <div className="flex flex-wrap gap-4 items-center">
-          <Input
-            placeholder="Search directory..."
-            value={searchText}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="filter-control !w-64"
-            prefix={<SearchOutlined className="text-slate-400" />}
-          />
-          <Select
-            allowClear
-            placeholder="Grade"
-            className="filter-control !w-36 h-auto"
-            variant="borderless"
-            value={filterStandard}
-            onChange={handleStandard}
-            options={getUnique(data, ["admission", "standard"]).map((v) => ({
-              label: formatStandardLabel(v),
-              value: v,
-            }))}
-          />
-          <Select
-            allowClear
-            placeholder="Gender"
-            className="filter-control !w-32 h-auto"
-            variant="borderless"
-            value={filterGender}
-            onChange={handleGender}
-            options={getUnique(data, "gender").map((v) => ({ label: v, value: v }))}
-          />
-          <Select
-            allowClear
-            placeholder="Status"
-            className="filter-control !w-32 h-auto"
-            variant="borderless"
-            value={filterStatus}
-            onChange={handleStatus}
-            options={[
-              { label: "Active Admissions", value: "active" },
-              { label: "Inactive Records", value: "inactive" },
-            ]}
-          />
-          <Select
-            allowClear
-            placeholder="Academic Year"
-            className="filter-control !w-40 h-auto"
-            variant="borderless"
-            value={filterAcademicYear}
-            onChange={handleAcademicYear}
-            options={availableYears.map((v) => ({ label: v, value: v }))}
-          />
-          <Select
-            allowClear
-            placeholder="Verification"
-            className="filter-control !w-40 h-auto"
-            variant="borderless"
-            value={filterApproval}
-            onChange={handleApprovalFilter}
-            options={[
-              { label: "Verified Only", value: "approved" },
-              { label: "Unverified Vault", value: "pending" },
-            ]}
-          />
-          <DatePicker.RangePicker
-            className="filter-control !w-64"
-            value={filterDate}
-            onChange={handleDate}
-            placeholder={["Joined From", "To"]}
-          />
-          {mode === "approval" && (
-            <button onClick={fetchAdmissions} className="w-10 h-10 rounded-xl bg-slate-50 text-slate-900 flex items-center justify-center hover:bg-slate-100 transition-all shadow-sm">
-              <ReloadOutlined />
+      {/* Compact Filter Toolbar */}
+      <div className="filter-toolbar mb-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-black uppercase tracking-[0.35em] text-slate-500">Filters</span>
+
+          <div className="min-w-[220px] flex-1">
+            <label className="sr-only">Search Student</label>
+            <Input
+              placeholder="Search Student"
+              value={searchText}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="filter-control !w-full !h-10"
+              prefix={<SearchOutlined className="text-slate-400" />}
+            />
+          </div>
+
+          <div className="min-w-[150px] max-w-[180px]">
+            <label className="sr-only">Grade</label>
+            <Select
+              allowClear
+              placeholder="Grade"
+              className="filter-control !w-full !h-10"
+              variant="borderless"
+              value={filterStandard}
+              onChange={handleStandard}
+              options={getUnique(data, ["admission", "standard"]).map((v) => ({
+                label: formatStandardLabel(v),
+                value: v,
+              }))}
+            />
+          </div>
+
+          <div className="min-w-[130px] max-w-[150px]">
+            <label className="sr-only">Gender</label>
+            <Select
+              allowClear
+              placeholder="Gender"
+              className="filter-control !w-full !h-10"
+              variant="borderless"
+              value={filterGender}
+              onChange={handleGender}
+              options={getUnique(data, "gender").map((v) => ({ label: v, value: v }))}
+            />
+          </div>
+
+          <div className="min-w-[140px] max-w-[160px]">
+            <label className="sr-only">Status</label>
+            <Select
+              allowClear
+              placeholder="Status"
+              className="filter-control !w-full !h-10"
+              variant="borderless"
+              value={filterStatus}
+              onChange={handleStatus}
+              options={[
+                { label: "Active", value: "active" },
+                { label: "Inactive", value: "inactive" },
+              ]}
+            />
+          </div>
+
+          <div className="min-w-[150px] max-w-[180px]">
+            <label className="sr-only">Academic Year</label>
+            <Select
+              allowClear
+              placeholder="Year"
+              className="filter-control !w-full !h-10"
+              variant="borderless"
+              value={filterAcademicYear}
+              onChange={handleAcademicYear}
+              options={availableYears.map((v) => ({ label: v, value: v }))}
+            />
+          </div>
+
+          <div className="min-w-[180px] max-w-[220px]">
+            <label className="sr-only">Joined Date</label>
+            <DatePicker.RangePicker
+              className="filter-control !w-full !h-10"
+              value={filterDate}
+              onChange={handleDate}
+              placeholder={["Joined From", "To"]}
+            />
+          </div>
+
+          <div className="min-w-[180px] max-w-[220px]">
+            <label className="sr-only">Area / Street / PIN</label>
+            <Input
+              allowClear
+              placeholder="Area / Street / PIN"
+              value={filterArea}
+              onChange={(e) => handleArea(e.target.value)}
+              className="filter-control !w-full !h-10 !bg-slate-50/60"
+              prefix={<span className="material-symbols-outlined text-slate-400 text-base leading-none">location_on</span>}
+            />
+          </div>
+
+          <div className="min-w-[180px] max-w-[220px]">
+            <label className="sr-only">Parent / Guardian</label>
+            <Input
+              allowClear
+              placeholder="Parent / Guardian"
+              value={filterFatherName}
+              onChange={(e) => handleFatherName(e.target.value)}
+              className="filter-control !w-full !h-10 !bg-slate-50/60"
+              prefix={<span className="material-symbols-outlined text-slate-400 text-base leading-none">person</span>}
+            />
+          </div>
+
+          <div className="ml-auto flex items-center gap-2">
+            {mode === "approval" && (
+              <button
+                onClick={fetchAdmissions}
+                className="h-10 w-10 rounded-xl bg-slate-50 text-slate-900 flex items-center justify-center hover:bg-slate-100 transition-all border border-slate-200"
+              >
+                <ReloadOutlined />
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setSearchText("");
+                setFilterStandard("");
+                setFilterGender("");
+                setFilterStatus("");
+                setFilterApproval("");
+                setFilterDate(null);
+                setFilterAcademicYear("");
+                setFilterSection("");
+                setFilterFatherName("");
+                setFilterSibling("");
+                setFilterArea("");
+              }}
+              className="h-10 px-4 bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-sm"
+            >
+              Reset
             </button>
-          )}
-        </div>
-        
-        <div className="flex gap-4 mt-4 pt-4 border-t border-slate-50">
-          <Input
-            allowClear
-            placeholder="Secondary Search: Father Name"
-            value={filterFatherName}
-            onChange={(e) => handleFatherName(e.target.value)}
-            className="filter-control !w-64 !bg-slate-50/50"
-            prefix={<span className="material-symbols-outlined text-slate-400 text-sm">person</span>}
-          />
-          <Input
-            allowClear
-            placeholder="Location: Area/Street/PIN"
-            value={filterArea}
-            onChange={(e) => handleArea(e.target.value)}
-            className="filter-control !w-64 !bg-slate-50/50"
-            prefix={<span className="material-symbols-outlined text-slate-400 text-sm">location_on</span>}
-          />
+          </div>
         </div>
       </div>
       <Table

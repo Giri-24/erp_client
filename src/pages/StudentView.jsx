@@ -200,6 +200,15 @@ const [fees, setFees] = useState([]);
         .filter-input { border-radius: 14px !important; border: 1px solid #f1f5f9 !important; background: #ffffff !important; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .filter-input:hover, .filter-input:focus { border-color: #00152a !important; box-shadow: 0 4px 12px rgba(0,21,42,0.05); }
         .status-tag { border-radius: 9999px; font-weight: 800; font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 12px; }
+        .student-view-modern .material-symbols-outlined { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+        .student-view-modern .material-symbols-outlined.text-sm,
+        .student-view-modern .material-symbols-outlined.text-base,
+        .student-view-modern .material-symbols-outlined.text-[18px],
+        .student-view-modern .material-symbols-outlined.text-[14px] {
+          line-height: 1;
+          height: 1em;
+          min-width: 1em;
+        }
       `}</style>
 
       {/* Header Section */}
@@ -211,21 +220,21 @@ const [fees, setFees] = useState([]);
             <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">Active Directory</span>
           </div>
           <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-tight">
-            Student <span className="text-teal-600">Registry</span>
+            Student <span className="text-teal-600">Management</span>
           </h1>
         </div>
         <button
           onClick={() => message.info("Export protocol initiated")}
           className="px-6 py-2.5 bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-xl border border-slate-200 shadow-sm hover:border-slate-400 transition-all flex items-center gap-2"
         >
-          <span className="material-symbols-outlined text-sm">file_download</span>
+          <span className="material-symbols-outlined text-sm leading-none">file_download</span>
           Export Archive
         </button>
       </div>
 
       {/* Summary Stats Bento Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <StatCard title="Total Force" value={totalEnrollment} icon="groups" color="#0f172a" trend={8} />
+        <StatCard title="Total Students" value={totalEnrollment} icon="groups" color="#0f172a" trend={8} />
         <StatCard title="Active Profile" value={activeStudents} icon="verified" color="#10b981" />
         <StatCard title="Filtered Scope" value={filtered.length} icon="filter_alt" color="#6366f1" />
         <StatCard title="Siblings Group" value={students.filter(s => s.siblingGroupId).length} icon="family_restroom" color="#f59e0b" />
@@ -234,16 +243,19 @@ const [fees, setFees] = useState([]);
       {/* Filter Control Bar */}
       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm mb-8">
         <div className="flex flex-wrap gap-4 items-center">
-          <div className="relative flex-grow min-w-[300px]">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
-            <input
-              type="text"
-              value={searchText}
-              onChange={(e) => { setSearchText(e.target.value); setPage(1); }}
-              placeholder="Search directory (Name, ID, Guardian)..."
-              className="w-full filter-input py-3 pl-11 pr-4 text-xs font-bold outline-none"
-            />
-          </div>
+          <div className="relative flex-grow min-w-[300px] h-11">
+  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-base leading-none">
+    search
+  </span>
+
+  <input
+    type="text"
+    value={searchText}
+    onChange={(e) => { setSearchText(e.target.value); setPage(1); }}
+    placeholder="Search Student (Name, ID, Guardian)..."
+    className="w-full h-full filter-input pl-10 pr-4 text-sm outline-none"
+  />
+</div>
 
           <div className="flex flex-wrap gap-3">
             <select
@@ -282,7 +294,7 @@ const [fees, setFees] = useState([]);
 
         <div className="flex gap-4 mt-4 pt-4 border-t border-slate-50">
            <div className="relative w-64">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">location_on</span>
+              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm leading-none">location_on</span>
               <input
                 type="text"
                 value={areaFilter}
@@ -292,12 +304,12 @@ const [fees, setFees] = useState([]);
               />
            </div>
            <div className="relative w-64">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">person</span>
+              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm leading-none">person</span>
               <input
                 type="text"
                 value={fatherFilter}
                 onChange={(e) => { setFatherFilter(e.target.value); setPage(1); }}
-                placeholder="Paternal Identifier"
+                placeholder="Parent / Guardian Name"
                 className="w-full filter-input py-2.5 pl-11 pr-4 text-[10px] font-bold outline-none !bg-slate-50/50"
               />
            </div>
@@ -306,7 +318,7 @@ const [fees, setFees] = useState([]);
                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setAreaFilter(""); setFatherFilter(""); setSiblingFilter(""); setSearchText(""); setPage(1); }}
                className="px-4 py-2 flex items-center gap-1 text-rose-600 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all"
              >
-               <span className="material-symbols-outlined text-sm">close</span>
+               <span className="material-symbols-outlined text-sm leading-none">close</span>
                Reset
              </button>
            )}
@@ -319,10 +331,10 @@ const [fees, setFees] = useState([]);
             <thead>
               <tr>
                 <th className="w-12" />
-                <th>Personnel Details</th>
-                <th>Academic Track</th>
-                <th>Provenance</th>
-                <th>Vitality</th>
+                <th>Student Details</th>
+                <th>Academic STD</th>
+                <th>Father's Name</th>
+                <th>Status</th>
                 <th className="text-right">Operations</th>
               </tr>
             </thead>
@@ -349,7 +361,7 @@ const [fees, setFees] = useState([]);
                             onClick={() => setExpandedId(isExpanded ? null : s.id)}
                             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${isExpanded ? 'bg-slate-900 text-white rotate-180' : 'text-slate-300 hover:text-slate-900 hover:bg-slate-100'}`}
                           >
-                            <span className="material-symbols-outlined text-sm">expand_more</span>
+                            <span className="material-symbols-outlined text-sm leading-none">expand_more</span>
                           </button>
                         </td>
                         <td>
@@ -389,28 +401,28 @@ const [fees, setFees] = useState([]);
                                className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center hover:bg-teal-600 hover:text-white transition-all shadow-sm"
                                title="Fee Ledger"
                              >
-                               <span className="material-symbols-outlined text-[18px]">payments</span>
+                               <span className="material-symbols-outlined text-[18px] leading-none">payments</span>
                              </button>
                              <button
                                onClick={() => openLinkModal(s)}
                                className="w-9 h-9 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm"
-                               title="Kinship Link"
+                               title="Siblings Link"
                              >
-                               <span className="material-symbols-outlined text-[18px]">add_link</span>
+                               <span className="material-symbols-outlined text-[18px] leading-none">add_link</span>
                              </button>
                              <button
                                onClick={() => { setDetailStudent(s); setDetailModalOpen(true); }}
                                className="w-9 h-9 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm"
                                title="Full Bio"
                              >
-                               <span className="material-symbols-outlined text-[18px]">badge</span>
+                               <span className="material-symbols-outlined text-[18px] leading-none">badge</span>
                              </button>
                              <button
                                onClick={() => onEdit && onEdit(s)}
                                className="w-9 h-9 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm"
                                title="Edit"
                              >
-                               <span className="material-symbols-outlined text-[18px]">edit_note</span>
+                               <span className="material-symbols-outlined text-[18px] leading-none">edit_note</span>
                              </button>
                           </div>
                         </td>
@@ -421,7 +433,7 @@ const [fees, setFees] = useState([]);
                           <td colSpan={6} className="px-12 py-6">
                              <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
                                 <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-6 flex items-center gap-2">
-                                   <span className="material-symbols-outlined text-sm">family_history</span> Kinship Matrix
+                                   <span className="material-symbols-outlined text-sm">family_history</span> Student
                                 </h4>
                                 {s.siblings?.length === 0 ? (
                                   <div className="text-[11px] font-bold text-slate-400 italic">No sibling records associated with this profile.</div>
@@ -508,11 +520,12 @@ const [fees, setFees] = useState([]);
         title={
           <div className="flex items-center gap-4 py-2">
             <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center shadow-sm">
-               <span className="material-symbols-outlined">add_link</span>
+               <span className="material-symbols-outlined leading-none">add_link</span>
             </div>
             <div>
                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Family Matrix</div>
-               <div className="text-xl font-black text-slate-900 tracking-tight">Kinship Linkage — {selectedStudent?.name}</div>
+               <div className="text-xl font-black text-slate-900 tracking-tight">Siblings Link
+                 — {selectedStudent?.name}</div>
             </div>
           </div>
         }
@@ -520,7 +533,7 @@ const [fees, setFees] = useState([]);
         <div className="py-6 space-y-8">
           <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 italic">
              <p className="text-slate-500 text-[13px] font-bold leading-relaxed">
-               Establishing a kinship link enables shared financial auditing and consolidated family communication logs. This action maps the selected individuals into a singular family unit.
+               Link siblings to group students with the same parents into one family for unified records, shared fees tracking, and streamlined communication.
              </p>
           </div>
           <div className="space-y-3">
@@ -530,7 +543,7 @@ const [fees, setFees] = useState([]);
             <Select
               mode="multiple"
               showSearch
-              placeholder="Search directory by name or Admission ID..."
+              placeholder="Search Student by name or Admission ID..."
               className="premium-select w-full"
               style={{ width: "100%" }}
               size="large"
@@ -551,7 +564,7 @@ const [fees, setFees] = useState([]);
         </div>
       </Modal>
 
-      {/* ── Student Profile Dossier Modal ── */}
+      {/* ── Student Profile Application Modal ── */}
       <Modal
         open={detailModalOpen}
         onCancel={() => { setDetailModalOpen(false); setDetailStudent(null); }}
@@ -590,7 +603,7 @@ const [fees, setFees] = useState([]);
 
              <div className="p-12">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                   {/* Main Dossier Content */}
+                   {/* Main Application Content */}
                    <div className="lg:col-span-8 space-y-10">
                       <div>
                          <div className="flex items-center gap-3 mb-8">
@@ -682,7 +695,9 @@ const [fees, setFees] = useState([]);
                             </div>
 
                             <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
-                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Sibling Linkage</div>
+                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Sibling Link
+                                
+                               </div>
                                <div className="text-lg font-black text-slate-900 flex items-center justify-between">
                                   {detailStudent.siblingGroupId ? 'Verified Family' : 'Independent'}
                                   <span className="material-symbols-outlined text-slate-200">family_restroom</span>
