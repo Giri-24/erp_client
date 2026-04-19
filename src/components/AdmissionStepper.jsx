@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Button,
   Form,
@@ -18,6 +18,7 @@ import {
   Checkbox,
   Divider,
   Radio,
+  Modal,
 } from "antd";
 import {
   UploadOutlined,
@@ -71,6 +72,11 @@ const scholarStyles = `
     position: relative;
     flex: 1;
     z-index: 1;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    text-align: center;
+    cursor: pointer;
   }
 
   .step-node::after {
@@ -86,6 +92,12 @@ const scholarStyles = `
 
   .step-node:last-child::after { display: none; }
 
+  .step-node:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.45);
+    outline-offset: 8px;
+    border-radius: 24px;
+  }
+
   .step-circle {
     width: 56px;
     height: 56px;
@@ -98,6 +110,11 @@ const scholarStyles = `
     background: rgba(255, 255, 255, 0.03);
     color: rgba(255, 255, 255, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .step-node:hover .step-circle {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.2);
   }
 
   .step-node.active .step-circle {
@@ -290,6 +307,11 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
     message.success("Progress saved as draft locally!");
     setDraftExists(true);
   };
+
+ const [selectedDoc, setSelectedDoc] = useState(null);
+const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+ 
+      
 
   const handleClearDraft = () => {
     localStorage.removeItem("admission_draft");
@@ -544,6 +566,32 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   const sibling2School = Form.useWatch("sibling2School", form);
   const isSingleParent = Form.useWatch("isSingleParent", form);
   const boardExamType = Form.useWatch("boardExamType", form);
+  const siblingReviewItems = (() => {
+    const configuredCount = Number(formData?.siblingsCount) || 0;
+    const discoveredCount = Object.keys(formData || {}).reduce((max, key) => {
+      const match = key.match(/^sibling(\d+)School$/);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+    const totalSiblings = Math.max(configuredCount, discoveredCount);
+
+    return Array.from({ length: totalSiblings }, (_, index) => {
+      const siblingNumber = index + 1;
+      const schoolType = formData?.[`sibling${siblingNumber}School`];
+      const otherSchoolName = formData?.[`sibling${siblingNumber}OtherSchoolName`]?.trim();
+
+      if (!schoolType && !otherSchoolName) {
+        return null;
+      }
+
+      const isSameSchool = schoolType === "same" || schoolType === "Same School";
+
+      return {
+        siblingNumber,
+        label: isSameSchool ? "Same School" : otherSchoolName || "Other School",
+        schoolTypeLabel: isSameSchool ? "Same School" : "Other School",
+      };
+    }).filter(Boolean);
+  })();
 
   useEffect(() => {
     if (!watchedSubjects || watchedSubjects.length === 0) return;
@@ -1354,6 +1402,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     // 🔥 DOCUMENTS
     {
       title: "Documents",
+      icon: <FileTextOutlined />,
       content: (
         <div className="space-y-6">
           <div className="mb-4">
@@ -1361,70 +1410,124 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
           </div>
           <>
             {/* ✅ PROFILE PHOTO */}
-            <Form.Item label="Profile Photo" required>
-              <Form.Item
-                name="profilePhotoChecked"
-                valuePropName="checked"
-                noStyle
-              >
-                <Checkbox>Upload Profile Photo</Checkbox>
-              </Form.Item>
-
-              {profilePhotoChecked && (
-                <Form.Item
-                  name="profilePhoto"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                  initialValue={getDefaultFile(
-                    editData?.documents?.[0]?.photoPath,
-                    "Profile Photo"
-                  )}
-                  rules={[{ required: true, message: "Upload photo" }]}
-                >
-                  <Upload
-                    listType="picture"
-                    beforeUpload={(file) => {
-                      if (file.size > 1024 * 1024) {
-                        message.error("Max 1MB allowed");
-                        return Upload.LIST_IGNORE;
-                      }
-                      return false;
-                    }}
-                  >
-                    <Button icon={<UploadOutlined />}>Upload</Button>
-                  </Upload>
-                </Form.Item>
-              )}
-            </Form.Item>
+           <Form.Item
+  label="Profile Photo"
+  name="profilePhoto"
+  valuePropName="fileList"
+  getValueFromEvent={(e) => e?.fileList}
+  initialValue={getDefaultFile(
+    editData?.documents?.[0]?.photoPath,
+    "Profile Photo"
+  )}
+  rules={[
+    { required: true, message: "Profile photo is required" },
+    {
+      validator: (_, fileList) =>
+        fileList && fileList.length === 1
+          ? Promise.resolve()
+          : Promise.reject("Upload exactly 1 photo"),
+    },
+  ]}
+>
+  <Upload
+    listType="picture-card"
+    maxCount={1}
+    accept="image/*"
+  >
+    <div className="flex flex-col items-center">
+      <span className="material-symbols-outlined text-2xl">
+        add_a_photo
+      </span>
+      <p className="text-xs mt-1">Upload</p>
+    </div>
+  </Upload>
+</Form.Item>
 
             {/* ✅ DOCUMENT CHECKBOX */}
-            <Form.Item
-              name="documentsChecked"
-              label="Documents"
-              rules={[{ required: true }]}
-            >
-              <Checkbox.Group>
-                <Checkbox value="birthCert">Birth Certificate</Checkbox>
-                <Checkbox value="communityCert">Community Certificate</Checkbox>
-                <Checkbox value="aadharStudent">Aadhar</Checkbox>
-              </Checkbox.Group>
-            </Form.Item>
+            <Form.Item label="Documents" required>
+  <div className="grid grid-cols-3 gap-4">
+
+    {/* Birth Certificate */}
+    <Form.Item
+      name="birthCertFile"
+      valuePropName="fileList"
+      getValueFromEvent={(e) => e?.fileList}
+      rules={[{ required: true, message: "Upload Birth Certificate" }]}
+    >
+      <Upload listType="picture-card" maxCount={1}>
+        <div className="text-center">
+          <span className="material-symbols-outlined text-2xl">description</span>
+          <p className="text-xs mt-1">Birth Cert</p>
+        </div>
+      </Upload>
+    </Form.Item>
+
+    {/* Community Certificate */}
+    <Form.Item
+      name="communityCertFile"
+      valuePropName="fileList"
+      getValueFromEvent={(e) => e?.fileList}
+    >
+      <Upload listType="picture-card" maxCount={1}>
+        <div className="text-center">
+          <span className="material-symbols-outlined text-2xl">badge</span>
+          <p className="text-xs mt-1">Community</p>
+        </div>
+      </Upload>
+    </Form.Item>
+
+    {/* Aadhaar */}
+    <Form.Item
+      name="aadharStudentFile"
+      valuePropName="fileList"
+      getValueFromEvent={(e) => e?.fileList}
+      rules={[{ required: true, message: "Upload Aadhaar" }]}
+    >
+      <Upload listType="picture-card" maxCount={1}>
+        <div className="text-center">
+          <span className="material-symbols-outlined text-2xl">credit_card</span>
+          <p className="text-xs mt-1">Aadhaar</p>
+        </div>
+      </Upload>
+    </Form.Item>
+
+    {/* Transfer Certificate */}
+<Form.Item
+  name="transferCertFile"
+  valuePropName="fileList"
+  getValueFromEvent={(e) => e?.fileList}
+  rules={[{ required: false, message: "Upload Transfer Certificate" }]}
+>
+  <Upload listType="picture-card" maxCount={1}>
+    <div className="text-center">
+      <span className="material-symbols-outlined text-2xl">
+        description
+      </span>
+      <p className="text-xs mt-1">Transfer Cert</p>
+    </div>
+  </Upload>
+</Form.Item>
+
+  </div>
+</Form.Item>
 
             {/* ✅ HARD COPY FLAGS */}
-            <Divider orientation="left" style={{ fontSize: 13 }}>Hard Copy Received (mark if physical document is submitted)</Divider>
-            <Form.Item name="photosReceived" valuePropName="checked">
-              <Checkbox>3 Photos Received</Checkbox>
-            </Form.Item>
-            <Form.Item name="hardCopyDocs" label="Hard Copy Documents">
-              <Checkbox.Group>
-                <Checkbox value="birthCert">Birth Certificate</Checkbox>
-                <Checkbox value="communityCert">Community Certificate</Checkbox>
-                <Checkbox value="aadharStudent">Aadhar (Student)</Checkbox>
-                <Checkbox value="aadharFather">Aadhar (Father)</Checkbox>
-                <Checkbox value="aadharMother">Aadhar (Mother)</Checkbox>
-                <Checkbox value="transferCert">Transfer Certificate</Checkbox>
-              </Checkbox.Group>
-            </Form.Item>
+           <Form.Item name="hardCopyDocs" label="Hard Copy Documents">
+  <Select
+    mode="multiple"
+    placeholder="Select submitted documents"
+    className="w-full"
+    options={[
+      { value: "birthCert", label: "Birth Certificate" },
+      { value: "communityCert", label: "Community Certificate" },
+      { value: "aadharStudent", label: "Aadhar (Student)" },
+      { value: "aadharFather", label: "Aadhar (Father)" },
+      { value: "aadharMother", label: "Aadhar (Mother)" },
+      { value: "transferCert", label: "Transfer Certificate" },
+      { value: "3 Photos received", label: "3 Hot Copy photos" },
+    ]}
+  />
+</Form.Item>
 
             {/* ✅ BIRTH CERT */}
             {documentsChecked?.includes("birthCert") && (
@@ -1637,18 +1740,21 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
 
                 <div className="space-y-4">
                    <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Sibling Context</h5>
-                   <div className="flex gap-4">
-                      {formData.sibling1Name && (
-                        <div className="px-5 py-3 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700 border border-slate-100">
-                           {formData.sibling1Name} <span className="text-slate-400 mx-1">|</span> {formData.sibling1Standard}
+                   <div className="flex flex-wrap gap-4">
+                      {siblingReviewItems.map((sibling) => (
+                        <div
+                          key={sibling.siblingNumber}
+                          className="px-5 py-3 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700 border border-slate-100"
+                        >
+                           <span className="text-slate-900">Sibling {sibling.siblingNumber}</span>
+                           <span className="text-slate-400 mx-1">-</span>
+                           <span>{sibling.label}</span>
+                           <div className="mt-1 text-[9px] uppercase tracking-wider text-slate-400">
+                              {sibling.schoolTypeLabel}
+                           </div>
                         </div>
-                      )}
-                      {formData.sibling2Name && (
-                        <div className="px-5 py-3 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700 border border-slate-100">
-                           {formData.sibling2Name} <span className="text-slate-400 mx-1">|</span> {formData.sibling2Standard}
-                        </div>
-                      )}
-                      {!formData.sibling1Name && !formData.sibling2Name && (
+                      ))}
+                      {siblingReviewItems.length === 0 && (
                         <div className="text-xs text-slate-400 italic">No siblings registered in current matrix.</div>
                       )}
                    </div>
@@ -1673,7 +1779,13 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                      const isPdf = doc.file?.[0]?.type === "application/pdf" || doc.file?.[0]?.name?.toLowerCase().endsWith(".pdf");
 
                      return (
-                       <div key={idx} className={`relative group aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all ${isChecked ? 'border-teal-500 shadow-lg' : 'border-slate-200 opacity-60'}`}>
+                       <div key={idx} 
+                        onClick={() => {
+  if (!fileUrl) return;
+  setSelectedDoc({ ...doc, fileUrl, isPdf });
+  setIsPreviewOpen(true);
+}}
+                       className={`relative group aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all ${isChecked ? 'border-teal-500 shadow-lg' : 'border-slate-200 opacity-60'}`}>
                           {fileUrl ? (
                              isPdf ? (
                                <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-4">
@@ -1695,8 +1807,33 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                              </span>
                           </div>
                        </div>
+
+                       
                      );
                    })}
+
+                   {isPreviewOpen && selectedDoc && (
+  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+<div className="bg-white p-6 rounded-xl w-[900px] max-w-[95%]">
+      <h2 className="text-lg font-bold mb-4">{selectedDoc.label}</h2>
+{selectedDoc.isPdf ? (
+  <iframe
+    src={`${selectedDoc.fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+    className="w-full h-[80vh] rounded-lg border"
+  />
+) : (
+  <img
+    src={selectedDoc.fileUrl}
+    className="w-full max-h-[80vh] object-contain mx-auto rounded-lg"
+  />
+)}
+      <div className="flex justify-end mt-4">
+        <button onClick={() => setIsPreviewOpen(false)}>Close</button>
+      </div>
+
+    </div>
+  </div>
+)}
                    
                    {/* Verification Tags */}
                    <div className="col-span-full pt-4 space-y-3">
@@ -1726,18 +1863,36 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     }
   ];
 
-  const next = async () => {
-    try {
-      await form.validateFields();
-      const values = form.getFieldsValue(true);
-      setFormData(values);
-      setCurrent(current + 1);
-    } catch (err) {
-      message.error("Please fill all required fields correctly.");
-    }
+  const syncFormData = () => {
+    const values = form.getFieldsValue(true);
+    setFormData(values);
+    return values;
   };
 
-  const prev = () => setCurrent(current - 1);
+  const goToStep = async (targetStep) => {
+    if (targetStep < 0 || targetStep >= steps.length || targetStep === current) {
+      return;
+    }
+
+    if (targetStep > current) {
+      try {
+        await form.validateFields();
+      } catch (err) {
+        message.error("Please fill all required fields correctly.");
+        return;
+      }
+    }
+
+    syncFormData();
+    setCurrent(targetStep);
+  };
+
+  const next = () => goToStep(current + 1);
+
+  const prev = () => {
+    syncFormData();
+    setCurrent(current - 1);
+  };
   const getImageDimensions = (src) =>
     new Promise((resolve) => {
       const img = new Image();
@@ -2011,15 +2166,19 @@ Enroll Admission            </p>
           {/* Custom Step Indicator */}
           <div className="step-indicator-wrapper">
             {steps.map((step, idx) => (
-              <div 
+              <button
+                type="button"
                 key={idx} 
                 className={`step-node ${current === idx ? 'active' : ''} ${current > idx ? 'completed' : ''}`}
+                onClick={() => void goToStep(idx)}
+                aria-current={current === idx ? "step" : undefined}
+                aria-label={`Go to ${step.title} step`}
               >
                 <div className="step-circle">
                   {current > idx ? <span className="material-symbols-outlined">check</span> : step.icon}
                 </div>
                 <span className="step-label">{step.title}</span>
-              </div>
+              </button>
             ))}
           </div>
 
@@ -2236,14 +2395,18 @@ Enroll Admission            </p>
 
                         if (editData) {
                           await updateAdmission(editData.id, formDataToSend);
+                          localStorage.removeItem("admission_draft");
                           message.success("Admission updated successfully!");
+                          if (clearEditData) clearEditData();
                         } else {
                           await createAdmission(formDataToSend);
-                          message.success("Student successfully enrolled!");
+                          localStorage.removeItem("admission_draft");
+                          message.success("Student successfully enrolled! Preparing a fresh admission form...");
+                          setTimeout(() => {
+                            window.location.reload();
+                          }, 800);
+                          return;
                         }
-                        
-                        localStorage.removeItem("admission_draft");
-                        if (clearEditData) clearEditData();
                         
                       } catch (err) {
                         console.error("Admission error:", err);
