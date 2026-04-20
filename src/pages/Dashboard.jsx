@@ -35,6 +35,7 @@ import LiveTrackingPage from "../modules/transport/pages/LiveTrackingPage";
 import BusReportPage from "../modules/transport/pages/BusReportPage";
 import AllBusReportsPage from "../modules/transport/pages/AllBusReportsPage";
 import DriverListingPage from "../modules/transport/pages/DriverListingPage";
+import TransportExpensePage from "../modules/transport/pages/TransportExpensePage";
 
 import StaffManagementPage from "../modules/staff/pages/StaffManagementPage";
 import ApprovalsView from "./ApprovalsView";
@@ -68,6 +69,7 @@ import TransportManagerDashboard from "./TransportManagerDashboard";
 import TeacherDashboard from "./TeacherDashboard";
 import { getAdminSettings } from "../modules/settings/settings.service";
 import { hasPermission, hasAnyPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions";
+
 
 const TRANSPORT_MANAGER_KEYS = new Set([
   "dashboard",
@@ -226,6 +228,7 @@ const Dashboard = () => {
         { key: "transport-all-reports", label: "All Bus Reports", icon: "summarize", permission: canLocationRead },
         { key: "transport-drivers", label: "Drivers", icon: "person", permission: canTransportRouteAccess },
         { key: "transport-buses", label: "Buses", icon: "directions_bus_filled", permission: canTransportRouteAccess },
+        { key: "transport-expense", label: "Transport Expense", icon: "payments", permission: canTransportRouteAccess },
       ],
     },
     { key: "staff-management", label: "Staff", icon: "badge", permission: canStaffAccess },
@@ -343,6 +346,7 @@ case "fees-collect":
       case "transport-all-reports": return <AllBusReportsPage />;
       case "transport-drivers":   return <DriverListingPage />;
       case "transport-buses":     return <BussesPage />;
+      case "transport-expense": return <TransportExpensePage />;
       case "staff-management":    return <StaffManagementPage />;
       case "hr-dashboard":        return <HRDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
       case "hr-attendance":       return <AttendancePage selfOnly={isTeacherOrStaffSelf} />;

@@ -859,6 +859,7 @@ const StaffManagementPage = () => {
                     <Option value="Lab Assistant">Lab Assistant</Option>
                     <Option value="Librarian">Librarian</Option>
                     <Option value="Peon">Peon</Option>
+                    <Option value="Other">Acting-drivers</Option>
                     <Option value="Other">Other</Option>
                   </Select>
                 </Form.Item>
