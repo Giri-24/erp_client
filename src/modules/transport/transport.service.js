@@ -287,3 +287,16 @@ export const deleteBus = async (id) => {
   const res = await axios.delete(`/transport/buses/${id}`);
   return res.data;
 };
+
+
+// ─── TRANSPORT EXPENSE ─────────────────
+
+export const createTransportExpense = async (data) => {
+  const res = await axios.post('/transport-expense', data);
+  return res.data;
+};
+
+export const getTransportExpenses = async () => {
+  const res = await axios.get('/transport-expense');
+  return res.data;
+};
