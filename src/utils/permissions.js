@@ -87,6 +87,15 @@ export const PERMISSIONS = {
   HOUSE_READ: 'house:read',
   HOUSE_UPDATE: 'house:update',
   HOUSE_DELETE: 'house:delete',
+
+  // Exam Module
+  EXAM_CREATE: 'exam:create',
+  EXAM_READ: 'exam:read',
+  EXAM_SUBJECT_MANAGE: 'exam:subject:manage',
+  EXAM_HALL_MANAGE: 'exam:hall:manage',
+  EXAM_TIMETABLE_MANAGE: 'exam:timetable:manage',
+  EXAM_ROLL_GENERATE: 'exam:roll:generate',
+  EXAM_SEAT_ALLOCATE: 'exam:seat:allocate',
 };
 
 // ── localStorage-based helpers (work everywhere, no hooks needed) ──────

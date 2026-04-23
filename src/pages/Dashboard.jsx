@@ -62,6 +62,11 @@ import StaffAllowancePage from "../modules/pos/pages/StaffAllowancePage";
 import IncomeExpensePage from "../modules/pos/pages/IncomeExpensePage";
 import DocRequestPage from "../modules/doc-request/pages/DocRequestPage";
 import HouseManagementPage from "../modules/house/pages/HouseManagementPage";
+import SubjectCreationPage from "../modules/exam/pages/SubjectCreationPage";
+import RollGenerationPage from "../modules/exam/pages/RollGenerationPage";
+import HallCreationPage from "../modules/exam/pages/HallCreationPage";
+import ExamTimetablePage from "../modules/exam/pages/ExamTimetablePage";
+import SeatAllocationPage from "../modules/exam/pages/SeatAllocationPage";
 import StaffDashboard from "./StaffDashboard";
 import AdmissionDeskDashboard from "./AdmissionDeskDashboard";
 import POSStorekeeperDashboard from "./POSStorekeeperDashboard";
@@ -144,6 +149,13 @@ const Dashboard = () => {
   const canPOSPurchase = hasPermission(PERMISSIONS.POS_PURCHASE);
   const canDocRequest = hasPermission(PERMISSIONS.DOC_REQUEST_READ);
   const canHouseRead = hasPermission(PERMISSIONS.HOUSE_READ);
+  const canExamRead = hasPermission(PERMISSIONS.EXAM_READ);
+  const canExamCreate = hasPermission(PERMISSIONS.EXAM_CREATE);
+  const canExamSubjectManage = hasPermission(PERMISSIONS.EXAM_SUBJECT_MANAGE);
+  const canExamHallManage = hasPermission(PERMISSIONS.EXAM_HALL_MANAGE);
+  const canExamTimetableManage = hasPermission(PERMISSIONS.EXAM_TIMETABLE_MANAGE);
+  const canExamRollGenerate = hasPermission(PERMISSIONS.EXAM_ROLL_GENERATE);
+  const canExamSeatAllocate = hasPermission(PERMISSIONS.EXAM_SEAT_ALLOCATE);
   const isTransportManager = userRole === "TRANSPORT_MANAGER";
 
   React.useEffect(() => {
@@ -282,6 +294,19 @@ const Dashboard = () => {
         { key: "house-management", label: "House Management", icon: "groups", permission: canHouseRead },
       ],
     },
+    {
+      key: "exam-group",
+      label: "Exams",
+      icon: "school",
+      permission: canExamRead || canExamCreate || canExamSubjectManage || canExamHallManage || canExamTimetableManage || canExamRollGenerate || canExamSeatAllocate,
+      children: [
+        { key: "exam-subjects", label: "Subject Creation", icon: "menu_book", permission: canExamSubjectManage || canExamCreate },
+        { key: "exam-rolls", label: "Auto Roll Generation", icon: "badge", permission: canExamRollGenerate },
+        { key: "exam-halls", label: "Hall Creation", icon: "meeting_room", permission: canExamHallManage },
+        { key: "exam-timetable", label: "Exam Timetable", icon: "event_note", permission: canExamTimetableManage },
+        { key: "exam-seats", label: "Seat Allocation", icon: "airline_seat_recline_normal", permission: canExamSeatAllocate || canExamRead },
+      ],
+    },
   ];
 
   const visibleSidebarLinks = isTransportManager
@@ -366,6 +391,11 @@ case "fees-collect":
       case "pos-transactions":    return <IncomeExpensePage />;
       case "doc-requests":        return <DocRequestPage />;
       case "house-management":    return <HouseManagementPage />;
+      case "exam-subjects":       return <SubjectCreationPage />;
+      case "exam-rolls":          return <RollGenerationPage />;
+      case "exam-halls":          return <HallCreationPage />;
+      case "exam-timetable":      return <ExamTimetablePage />;
+      case "exam-seats":          return <SeatAllocationPage />;
       default:                    return getRoleDashboard();
     }
   };

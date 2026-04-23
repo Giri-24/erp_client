@@ -18,6 +18,8 @@ import {
   Alert,
   Popconfirm,
   Divider,
+  InputNumber,
+  Typography,
 } from "antd";
 import {
   DollarOutlined,
@@ -26,6 +28,8 @@ import {
   DownloadOutlined,
   CalculatorOutlined,
   WarningOutlined,
+  CloseCircleOutlined,
+  GiftOutlined,
 } from "@ant-design/icons";
 import {
   generatePayroll,
@@ -35,12 +39,15 @@ import {
   bulkApprovePayroll,
   getLOPReport,
   getPFESISettings,
+  cancelPayrollLOP,
+  updatePayrollManual,
 } from "../hr.service";
 import { getAllStaff } from "../../staff/staff.service";
 import dayjs from "dayjs";
 import { hasPermission, PERMISSIONS, getCurrentUser } from "../../../utils/permissions";
 
 const { Option } = Select;
+const { Text } = Typography;
 
 const PAY_STATUS_COLORS = {
   draft: "default",
@@ -52,6 +59,16 @@ const PAY_STATUS_COLORS = {
 
 const PERMISSION_HOURS_LIMIT = 4; // 4 hrs/month
 
+const CATEGORY_LABELS = {
+  TEACHING_REGULAR: "Teaching Regular",
+  TEACHING_TRAINEE: "Teaching Trainee",
+  TEACHING_PART_TIME: "Part-Time Teacher",
+  NON_TEACHING_REGULAR: "Non-Teaching Regular",
+  NON_TEACHING_TRAINEE: "Non-Teaching Trainee",
+  NON_TEACHING_SECURITY: "Security (Daily Rate)",
+  NON_TEACHING_SPORTS: "Sports Staff (Daily Rate)",
+};
+
 const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [payrollData, setPayrollData] = useState([]);
   const [lopReport, setLopReport] = useState([]);
@@ -62,10 +79,13 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [payslipModal, setPayslipModal] = useState(false);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [generateModal, setGenerateModal] = useState(false);
+  const [bonusModal, setBonusModal] = useState(false);
+  const [bonusRecord, setBonusRecord] = useState(null);
   const [activeTab, setActiveTab] = useState("payroll");
   const [selectedMonth, setSelectedMonth] = useState(dayjs());
   const [selectedRows, setSelectedRows] = useState([]);
   const [generateForm] = Form.useForm();
+  const [bonusForm] = Form.useForm();
 
   const canManagePayroll = hasPermission(PERMISSIONS.HR_PAYROLL_MANAGE);
   const canApprovePayroll = hasPermission(PERMISSIONS.HR_PAYROLL_APPROVE);
@@ -177,6 +197,34 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
     }
   };
 
+  const handleCancelLOP = async (record) => {
+    try {
+      await cancelPayrollLOP(record.id);
+      message.success("LOP cancelled — full salary will be paid");
+      fetchPayroll();
+    } catch (err) {
+      message.error(err?.response?.data?.message || "Failed to cancel LOP");
+    }
+  };
+
+  const openBonusModal = (record) => {
+    setBonusRecord(record);
+    bonusForm.setFieldsValue({ bonusIncentive: record.bonusIncentive || 0, extraAllowance: record.extraAllowance || 0 });
+    setBonusModal(true);
+  };
+
+  const handleBonusSave = async () => {
+    try {
+      const values = await bonusForm.validateFields();
+      await updatePayrollManual(bonusRecord.id, values);
+      message.success("Bonus/Incentive updated");
+      setBonusModal(false);
+      fetchPayroll();
+    } catch (err) {
+      message.error(err?.response?.data?.message || "Failed to update");
+    }
+  };
+
   const openPayslip = async (record) => {
     try {
       const data = await getPayslip(record.id);
@@ -193,6 +241,7 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const totalDeductions = payrollData.reduce((s, p) => s + (p.totalDeductions || 0), 0);
   const totalNet = payrollData.reduce((s, p) => s + (p.netSalary || 0), 0);
   const totalLOP = payrollData.reduce((s, p) => s + (p.lopDeduction || 0), 0);
+  const totalCTC = payrollData.reduce((s, p) => s + (p.ctc || p.grossSalary || 0), 0);
 
   const payrollColumns = [
     { title: "Emp ID", dataIndex: "employeeId", width: 100 },
@@ -201,10 +250,10 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
       title: "Category",
       dataIndex: "category",
       render: (v) => {
-        const map = { TEACHING_REGULAR: "T", TEACHING_TRAINEE: "T-Tr", NON_TEACHING_REGULAR: "NT", NON_TEACHING_TRAINEE: "NT-Tr" };
-        return map[v] || v || "-";
+        const short = { TEACHING_REGULAR: "T", TEACHING_TRAINEE: "T-Tr", TEACHING_PART_TIME: "T-PT", NON_TEACHING_REGULAR: "NT", NON_TEACHING_TRAINEE: "NT-Tr", NON_TEACHING_SECURITY: "Security", NON_TEACHING_SPORTS: "Sports" };
+        return short[v] || v || "-";
       },
-      width: 70,
+      width: 80,
     },
     {
       title: "Pay Mode",
@@ -212,20 +261,26 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
       render: (v) => v === "BANK_TRANSFER" ? "BT" : v === "CASH" ? "Cash" : "-",
       width: 70,
     },
-    { title: "Basic", dataIndex: "basicSalary", render: (v) => `₹${(v || 0).toLocaleString()}` },
+    {
+      title: "Basic (50%)",
+      dataIndex: "basicSalary",
+      render: (v) => `₹${(v || 0).toLocaleString()}`,
+    },
     { title: "Gross", dataIndex: "grossSalary", render: (v) => `₹${(v || 0).toLocaleString()}` },
     {
       title: "LOP Days",
       dataIndex: "lopDays",
-      render: (v) => v ? <Tag color="red">{v}</Tag> : <Tag color="green">0</Tag>,
+      render: (v, r) => r.lopCancelled
+        ? <Tag color="green">Cancelled</Tag>
+        : v ? <Tag color="red">{v}</Tag> : <Tag color="green">0</Tag>,
     },
     {
       title: "LOP Ded.",
       dataIndex: "lopDeduction",
       render: (v) => v ? <Tag color="red">₹{v.toLocaleString()}</Tag> : "₹0",
     },
-    { title: "PF", dataIndex: "pfDeduction", render: (v) => `₹${(v || 0).toLocaleString()}` },
-    { title: "ESI", dataIndex: "esiDeduction", render: (v) => `₹${(v || 0).toLocaleString()}` },
+    { title: "PF (Emp)", dataIndex: "pfDeduction", render: (v) => `₹${(v || 0).toLocaleString()}` },
+    { title: "ESI (Emp)", dataIndex: "esiDeduction", render: (v) => `₹${(v || 0).toLocaleString()}` },
     { title: "Fixed Adv.", dataIndex: "fixedAdvanceDeduction", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
     { title: "Sal. Adv.", dataIndex: "salaryAdvanceDeduction", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
     { title: "Other Adv.", dataIndex: "otherAdvanceDeduction", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
@@ -240,6 +295,16 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
       render: (v) => <Tag color="green">₹{(v || 0).toLocaleString()}</Tag>,
     },
     {
+      title: "Bonus",
+      dataIndex: "bonusIncentive",
+      render: (v) => v ? <Tag color="gold">₹{v.toLocaleString()}</Tag> : "-",
+    },
+    {
+      title: "CTC",
+      dataIndex: "ctc",
+      render: (v) => v ? `₹${v.toLocaleString()}` : "-",
+    },
+    {
       title: "Status",
       dataIndex: "status",
       render: (v) => <Tag color={PAY_STATUS_COLORS[v] || "default"}>{(v || "").toUpperCase()}</Tag>,
@@ -250,6 +315,14 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
       render: (_, record) => (
         <Space>
           <Button icon={<EyeOutlined />} size="small" onClick={() => openPayslip(record)} />
+          {canManagePayroll && !record.lopCancelled && (record.lopDays > 0 || record.permissionLopDays > 0) && (
+            <Popconfirm title="Cancel LOP and pay full salary?" onConfirm={() => handleCancelLOP(record)}>
+              <Button icon={<CloseCircleOutlined />} size="small" danger title="Cancel LOP" />
+            </Popconfirm>
+          )}
+          {canManagePayroll && (
+            <Button icon={<GiftOutlined />} size="small" onClick={() => openBonusModal(record)} title="Add Bonus/Incentive" />
+          )}
           {canApprovePayroll && record.status === "generated" && (
             <Popconfirm title="Approve this payroll?" onConfirm={() => handleApprove(record.id)}>
               <Button icon={<CheckOutlined />} size="small" type="primary" />
@@ -345,24 +418,29 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
       {/* Summary Cards */}
       {!isSelfOnly && (
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={6}>
+        <Col span={5}>
           <Card size="small">
             <Statistic title="Total Gross" prefix="₹" value={totalGross} valueStyle={{ color: "#1890ff" }} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={5}>
           <Card size="small">
             <Statistic title="Total Deductions" prefix="₹" value={totalDeductions} valueStyle={{ color: "#ff4d4f" }} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={5}>
           <Card size="small">
             <Statistic title="Net Payable" prefix="₹" value={totalNet} valueStyle={{ color: "#52c41a" }} />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Card size="small">
             <Statistic title="Total LOP" prefix="₹" value={totalLOP} valueStyle={{ color: "#fa8c16" }} />
+          </Card>
+        </Col>
+        <Col span={5}>
+          <Card size="small">
+            <Statistic title="Total CTC" prefix="₹" value={totalCTC} valueStyle={{ color: "#722ed1" }} />
           </Card>
         </Col>
       </Row>
@@ -426,14 +504,17 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
           message="Payroll Calculation Includes"
           description={
             <ul style={{ margin: 0, paddingLeft: 16 }}>
-              <li>Basic + Allowances = Gross Salary</li>
-              <li>LOP deduction based on absent days (per day = Gross / Working days)</li>
-              <li>Permission LOP: excess hours beyond {PERMISSION_HOURS_LIMIT}h/month converted to LOP</li>
-              <li>PF: {settings?.pf?.employeeRate || 12}% employee + {settings?.pf?.employerRate || 12}% employer</li>
-              <li>ESI: {settings?.esi?.employeeRate || 0.75}% employee + {settings?.esi?.employerRate || 3.25}% employer (if gross ≤ ₹{(settings?.esi?.wageLimit || 21000).toLocaleString()})</li>
-              <li>Professional Tax (if applicable)</li>
-              <li>Advance deductions: Fixed / Salary / Other (auto-deducted from active advances)</li>
-              <li>Net = Gross + Extra − LOP − PF − ESI − PT − Advances</li>
+              <li><strong>Gross = Basic (50%) + HRA (30%) + Travel + Other Allowances</strong></li>
+              <li>PF: {settings?.pfEmployeeRate || 12}% employee on <em>Basic (50% of Gross)</em> + {settings?.pfEmployerRate || 12}% employer</li>
+              <li>ESI: {settings?.esiEmployeeRate || 0.75}% employee on <em>Basic+HRA (80% of Gross)</em> — skipped if daily wage &lt; ₹{settings?.esiDailyWageThreshold || 176}</li>
+              <li>LOP deduction: absent days × (Gross ÷ working days) — <em>skipped for part-time teachers</em></li>
+              <li>Security staff: present days × daily rate (default ₹400)</li>
+              <li>Sports staff: present days × daily rate (default ₹1500)</li>
+              <li>Professional Tax (if enabled)</li>
+              <li>Advance deductions: Fixed / Salary / Other (auto-deducted)</li>
+              <li><strong>Net = Gross − LOP − Employee PF − Employee ESI − Advances</strong></li>
+              <li><strong>CTC = Gross + Employer PF + Employer ESI</strong></li>
+              <li>Bonus/Incentive added separately after Net (via the gift icon)</li>
             </ul>
           }
           type="info"
@@ -457,7 +538,7 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
       <Modal title="Payslip" open={payslipModal} onCancel={() => setPayslipModal(false)} footer={[
         <Button key="close" onClick={() => setPayslipModal(false)}>Close</Button>,
         <Button key="print" type="primary" icon={<DownloadOutlined />} onClick={() => window.print()}>Print</Button>,
-      ]} width={650}>
+      ]} width={680}>
         {selectedPayslip && (
           <div>
             <div style={{ textAlign: "center", marginBottom: 16 }}>
@@ -468,17 +549,23 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
               <Descriptions.Item label="Emp ID">{selectedPayslip.employeeId}</Descriptions.Item>
               <Descriptions.Item label="Department">{selectedPayslip.department || "-"}</Descriptions.Item>
               <Descriptions.Item label="Designation">{selectedPayslip.designation || "-"}</Descriptions.Item>
-              <Descriptions.Item label="Category">{({ TEACHING_REGULAR: "Teaching Regular", TEACHING_TRAINEE: "Teaching Trainee", NON_TEACHING_REGULAR: "Non-Teaching Regular", NON_TEACHING_TRAINEE: "Non-Teaching Trainee" })[selectedPayslip.category] || "-"}</Descriptions.Item>
+              <Descriptions.Item label="Category">{CATEGORY_LABELS[selectedPayslip.category] || selectedPayslip.category || "-"}</Descriptions.Item>
               <Descriptions.Item label="Pay Mode">{selectedPayslip.paymentMode === "BANK_TRANSFER" ? "Bank Transfer" : selectedPayslip.paymentMode === "CASH" ? "Cash" : "-"}</Descriptions.Item>
             </Descriptions>
 
             <Divider orientation="left">Earnings</Divider>
             <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="Basic Salary">₹{(selectedPayslip.basicSalary || 0).toLocaleString()}</Descriptions.Item>
-              <Descriptions.Item label="HRA">₹{(selectedPayslip.hra || 0).toLocaleString()}</Descriptions.Item>
-              <Descriptions.Item label="DA">₹{(selectedPayslip.da || 0).toLocaleString()}</Descriptions.Item>
-              <Descriptions.Item label="Others">₹{(selectedPayslip.otherAllowances || 0).toLocaleString()}</Descriptions.Item>
-              <Descriptions.Item label="Extra Allowance">₹{(selectedPayslip.extraAllowance || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="Basic Salary (50% of Gross)">₹{(selectedPayslip.basicSalary || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="HRA (30% of Gross)">₹{(selectedPayslip.hra || 0).toLocaleString()}</Descriptions.Item>
+              {(selectedPayslip.travelAllowance > 0) && (
+                <Descriptions.Item label="Travel Allowance">₹{(selectedPayslip.travelAllowance || 0).toLocaleString()}</Descriptions.Item>
+              )}
+              {(selectedPayslip.otherAllowances > 0) && (
+                <Descriptions.Item label="Other Allowances">₹{(selectedPayslip.otherAllowances || 0).toLocaleString()}</Descriptions.Item>
+              )}
+              {(selectedPayslip.extraAllowance > 0) && (
+                <Descriptions.Item label="Extra Allowance">₹{(selectedPayslip.extraAllowance || 0).toLocaleString()}</Descriptions.Item>
+              )}
               <Descriptions.Item label="Gross Salary" span={2}>
                 <Tag color="blue">₹{(selectedPayslip.grossSalary || 0).toLocaleString()}</Tag>
               </Descriptions.Item>
@@ -486,11 +573,19 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
 
             <Divider orientation="left">Deductions</Divider>
             <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="LOP Days">{selectedPayslip.lopDays || 0}</Descriptions.Item>
+              <Descriptions.Item label="LOP Days">
+                {selectedPayslip.lopCancelled
+                  ? <Tag color="green">Cancelled (Full Salary)</Tag>
+                  : (selectedPayslip.lopDays || 0)}
+              </Descriptions.Item>
               <Descriptions.Item label="LOP Deduction">₹{(selectedPayslip.lopDeduction || 0).toLocaleString()}</Descriptions.Item>
-              <Descriptions.Item label="Permission Excess">₹{(selectedPayslip.permissionLopDeduction || 0).toLocaleString()}</Descriptions.Item>
-              <Descriptions.Item label="PF (Employee)">₹{(selectedPayslip.pfDeduction || 0).toLocaleString()}</Descriptions.Item>
-              <Descriptions.Item label="ESI (Employee)">₹{(selectedPayslip.esiDeduction || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="Permission Excess LOP">₹{(selectedPayslip.permissionLopDeduction || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label={`PF Employee (on Basic ₹${(selectedPayslip.pfBase || selectedPayslip.basicSalary || 0).toLocaleString()})`}>
+                ₹{(selectedPayslip.pfDeduction || 0).toLocaleString()}
+              </Descriptions.Item>
+              <Descriptions.Item label={`ESI Employee (on ₹${(selectedPayslip.esiBase || 0).toLocaleString()}, daily ₹${selectedPayslip.esiBase ? Math.round(selectedPayslip.esiBase / 30) : 0})`}>
+                ₹{(selectedPayslip.esiDeduction || 0).toLocaleString()}
+              </Descriptions.Item>
               <Descriptions.Item label="Professional Tax">₹{(selectedPayslip.ptDeduction || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="Fixed Advance">₹{(selectedPayslip.fixedAdvanceDeduction || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="Salary Advance">₹{(selectedPayslip.salaryAdvanceDeduction || 0).toLocaleString()}</Descriptions.Item>
@@ -501,11 +596,49 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
             </Descriptions>
 
             <Divider />
-            <div style={{ textAlign: "right", fontSize: 18, fontWeight: 700 }}>
-              Net Salary: <Tag color="green" style={{ fontSize: 16 }}>₹{(selectedPayslip.netSalary || 0).toLocaleString()}</Tag>
+            <div style={{ textAlign: "right", fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+              Net / Take-Home: <Tag color="green" style={{ fontSize: 16 }}>₹{(selectedPayslip.netSalary || 0).toLocaleString()}</Tag>
             </div>
+
+            {(selectedPayslip.bonusIncentive > 0) && (
+              <div style={{ textAlign: "right", fontSize: 15, color: "#fa8c16", marginBottom: 8 }}>
+                Bonus / Incentive: <strong>₹{(selectedPayslip.bonusIncentive || 0).toLocaleString()}</strong>
+              </div>
+            )}
+
+            <Divider orientation="left">Employer Contributions</Divider>
+            <Descriptions bordered size="small" column={2}>
+              <Descriptions.Item label="Employer PF">₹{(selectedPayslip.employerPfContribution || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="Employer ESI">₹{(selectedPayslip.employerEsiContribution || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="CTC (Gross + Employer PF + ESI)" span={2}>
+                <Tag color="purple">₹{(selectedPayslip.ctc || selectedPayslip.grossSalary || 0).toLocaleString()}</Tag>
+              </Descriptions.Item>
+            </Descriptions>
           </div>
         )}
+      </Modal>
+
+      {/* Bonus / Incentive Modal */}
+      <Modal
+        title="Add Bonus / Incentive"
+        open={bonusModal}
+        onCancel={() => setBonusModal(false)}
+        onOk={handleBonusSave}
+        okText="Save"
+      >
+        <Alert
+          message="Bonus/Incentive is added as a separate line item and does not affect Net Salary calculation. It is displayed on the payslip below the Net."
+          type="info"
+          style={{ marginBottom: 16 }}
+        />
+        <Form form={bonusForm} layout="vertical">
+          <Form.Item name="bonusIncentive" label="Bonus / Incentive Amount (₹)">
+            <InputNumber min={0} style={{ width: "100%" }} prefix="₹" />
+          </Form.Item>
+          <Form.Item name="extraAllowance" label="Extra Allowance (₹) — added to Gross">
+            <InputNumber min={0} style={{ width: "100%" }} prefix="₹" />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

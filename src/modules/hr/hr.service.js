@@ -325,21 +325,35 @@ export const getAllStaffPFESI = async (params) => {
 };
 
 export const calculatePFESI = async (data) => {
-  const basic = Number(data?.basicSalary || 0);
-  const gross = Number(data?.grossSalary || basic);
+  const gross = Number(data?.grossSalary || data?.basicSalary || 0);
+  const basicRate = Number(data?.basicRate ?? 50);
+  const hraRate = Number(data?.hraRate ?? 30);
   const pfEmployeeRate = Number(data?.pfEmployeeRate ?? 12);
   const pfEmployerRate = Number(data?.pfEmployerRate ?? 12);
   const esiEmployeeRate = Number(data?.esiEmployeeRate ?? 0.75);
   const esiEmployerRate = Number(data?.esiEmployerRate ?? 3.25);
   const esiWageLimit = Number(data?.esiWageLimit ?? 21000);
+  const esiDailyWageThreshold = Number(data?.esiDailyWageThreshold ?? 176);
+  const pfWageLimit = Number(data?.pfWageLimit ?? 15000);
 
-  const pfEmployee = Math.round((basic * pfEmployeeRate) / 100);
-  const pfEmployer = Math.round((basic * pfEmployerRate) / 100);
-  const esiApplicable = gross <= esiWageLimit;
-  const esiEmployee = esiApplicable ? Math.round((gross * esiEmployeeRate) / 100) : 0;
-  const esiEmployer = esiApplicable ? Math.round((gross * esiEmployerRate) / 100) : 0;
+  // PF is on basic = 50% of gross
+  const pfBase = Math.round(gross * basicRate / 100);
+  const pfWage = Math.min(pfBase, pfWageLimit);
+  const pfEmployee = Math.round((pfWage * pfEmployeeRate) / 100);
+  const pfEmployer = Math.round((pfWage * pfEmployerRate) / 100);
+
+  // ESI is on basic + HRA = (basicRate + hraRate)% of gross ≈ 80%
+  const esiBase = Math.round(gross * (basicRate + hraRate) / 100);
+  const dailyEsiWage = esiBase / 30;
+  const esiApplicable = dailyEsiWage >= esiDailyWageThreshold && esiBase <= esiWageLimit;
+  const esiEmployee = esiApplicable ? Math.round((esiBase * esiEmployeeRate) / 100) : 0;
+  const esiEmployer = esiApplicable ? Math.round((esiBase * esiEmployerRate) / 100) : 0;
 
   return {
+    pfBase,
+    esiBase,
+    dailyEsiWage: Math.round(dailyEsiWage),
+    esiApplicable,
     pfEmployee,
     pfEmployer,
     esiEmployee,
@@ -356,12 +370,13 @@ export const generatePFReport = async (params) => {
     staffName: row.staff?.name,
     uanNumber: row.staff?.staffStatutory?.uanNumber || '-',
     pfNumber: row.staff?.staffStatutory?.pfNumber || '-',
-    basicSalary: row.grossSalary || 0,
+    pfBase: row.pfBase || row.basicSalary || 0,
+    grossSalary: row.grossSalary || 0,
     employeePF: row.pfDeduction || 0,
-    employerPF: 0,
+    employerPF: row.employerPfContribution || 0,
     adminCharges: 0,
     edliCharges: 0,
-    totalPF: row.pfDeduction || 0,
+    totalPF: (row.pfDeduction || 0) + (row.employerPfContribution || 0),
   }));
 };
 
@@ -373,10 +388,12 @@ export const generateESIReport = async (params) => {
     employeeId: row.staff?.employeeId,
     staffName: row.staff?.name,
     esiNumber: row.staff?.staffStatutory?.esiNumber || '-',
+    esiBase: row.esiBase || 0,
     grossSalary: row.grossSalary || 0,
+    dailyEsiWage: row.esiBase ? Math.round(row.esiBase / 30) : 0,
     employeeESI: row.esiDeduction || 0,
-    employerESI: 0,
-    totalESI: row.esiDeduction || 0,
+    employerESI: row.employerEsiContribution || 0,
+    totalESI: (row.esiDeduction || 0) + (row.employerEsiContribution || 0),
   }));
 };
 
@@ -426,6 +443,16 @@ export const getLOPReport = async (params) => {
       perDaySalary: totalLopDays > 0 ? Math.round(totalLopDeduction / totalLopDays) : 0,
     };
   });
+};
+
+export const cancelPayrollLOP = async (id) => {
+  const res = await axios.put(`/hr/payroll/${id}/cancel-lop`);
+  return res.data;
+};
+
+export const updatePayrollManual = async (id, data) => {
+  const res = await axios.put(`/hr/payroll/${id}/update`, data);
+  return res.data;
 };
 
 // ─── HR DASHBOARD ───────────────────────────

@@ -858,8 +858,10 @@ const StaffManagementPage = () => {
                     <Option value="Clerk">Clerk</Option>
                     <Option value="Lab Assistant">Lab Assistant</Option>
                     <Option value="Librarian">Librarian</Option>
+                    <Option value="Driver">Driver</Option>
+                    <Option value="Conductor">Conductor</Option>
+                    <Option value="Acting Driver">Acting Driver</Option>
                     <Option value="Peon">Peon</Option>
-                    <Option value="Other">Acting-drivers</Option>
                     <Option value="Other">Other</Option>
                   </Select>
                 </Form.Item>
@@ -882,6 +884,7 @@ const StaffManagementPage = () => {
                     <Option value="TEACHING_TRAINEE">Academic Faculty (Trainee)</Option>
                     <Option value="NON_TEACHING_REGULAR">Operations (Regular)</Option>
                     <Option value="NON_TEACHING_TRAINEE">Operations (Trainee)</Option>
+                    <Option value="NON_TEACHING_ACTING_DRIVER">Operations (Acting Driver - Day Based)</Option>
                   </Select>
                 </Form.Item>
                 <Form.Item name="salary" label={<span style={{ fontWeight: 700, fontSize: 12 }}>EMOLUMENTS (MONTHLY)</span>}>

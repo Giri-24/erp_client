@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   Card,
   Table,
@@ -58,11 +58,19 @@ const DEFAULT_SETTINGS = {
     employeeRate: 0.75, // %
     employerRate: 3.25,  // %
     wageLimit: 21000,    // ESI applicable if gross <= 21000
+    dailyWageThreshold: 176,
   },
   pt: {
     enabled: false, // Professional Tax
     amount: 200,
   },
+  salaryStructure: {
+    basicRate: 50,
+    hraRate: 30,
+    travelAllowanceRate: 0,
+    otherAllowanceRate: 0,
+  },
+  clLapseMonths: 3,
 };
 
 const PFESIPage = () => {
@@ -103,11 +111,25 @@ const PFESIPage = () => {
             employeeRate: data.esi?.employeeRate ?? data.esiEmployeeRate ?? DEFAULT_SETTINGS.esi.employeeRate,
             employerRate: data.esi?.employerRate ?? data.esiEmployerRate ?? DEFAULT_SETTINGS.esi.employerRate,
             wageLimit: data.esi?.wageLimit ?? data.esiWageLimit ?? DEFAULT_SETTINGS.esi.wageLimit,
+            dailyWageThreshold: data.esi?.dailyWageThreshold
+              ?? data.esiDailyWageThreshold
+              ?? DEFAULT_SETTINGS.esi.dailyWageThreshold,
           },
           pt: {
             enabled: data.pt?.enabled ?? data.ptEnabled ?? DEFAULT_SETTINGS.pt.enabled,
             amount: data.pt?.amount ?? data.ptAmount ?? DEFAULT_SETTINGS.pt.amount,
           },
+          salaryStructure: {
+            basicRate: data.salaryStructure?.basicRate ?? data.basicRate ?? DEFAULT_SETTINGS.salaryStructure.basicRate,
+            hraRate: data.salaryStructure?.hraRate ?? data.hraRate ?? DEFAULT_SETTINGS.salaryStructure.hraRate,
+            travelAllowanceRate: data.salaryStructure?.travelAllowanceRate
+              ?? data.travelAllowanceRate
+              ?? DEFAULT_SETTINGS.salaryStructure.travelAllowanceRate,
+            otherAllowanceRate: data.salaryStructure?.otherAllowanceRate
+              ?? data.otherAllowanceRate
+              ?? DEFAULT_SETTINGS.salaryStructure.otherAllowanceRate,
+          },
+          clLapseMonths: data.clLapseMonths ?? DEFAULT_SETTINGS.clLapseMonths,
         });
       }
     } catch {
@@ -179,7 +201,6 @@ const PFESIPage = () => {
   const handleSettingsSave = async () => {
     try {
       const values = await settingsForm.validateFields();
-      // Send flat structure matching backend StatutorySettings model
       await updatePFESISettings({
         pfEnabled: values.pfEnabled,
         pfEmployeeRate: values.pfEmployeeRate,
@@ -191,10 +212,15 @@ const PFESIPage = () => {
         esiEmployeeRate: values.esiEmployeeRate,
         esiEmployerRate: values.esiEmployerRate,
         esiWageLimit: values.esiWageLimit,
+        esiDailyWageThreshold: values.esiDailyWageThreshold,
         ptEnabled: values.ptEnabled,
         ptAmount: values.ptAmount,
+        basicRate: values.basicRate,
+        hraRate: values.hraRate,
+        travelAllowanceRate: values.travelAllowanceRate,
+        otherAllowanceRate: values.otherAllowanceRate,
+        clLapseMonths: values.clLapseMonths,
       });
-      // Update local nested state
       setSettings({
         pf: {
           enabled: values.pfEnabled,
@@ -209,11 +235,19 @@ const PFESIPage = () => {
           employeeRate: values.esiEmployeeRate,
           employerRate: values.esiEmployerRate,
           wageLimit: values.esiWageLimit,
+          dailyWageThreshold: values.esiDailyWageThreshold,
         },
         pt: {
           enabled: values.ptEnabled,
           amount: values.ptAmount,
         },
+        salaryStructure: {
+          basicRate: values.basicRate,
+          hraRate: values.hraRate,
+          travelAllowanceRate: values.travelAllowanceRate,
+          otherAllowanceRate: values.otherAllowanceRate,
+        },
+        clLapseMonths: values.clLapseMonths,
       });
       message.success("Settings updated");
       setSettingsModal(false);
@@ -234,8 +268,14 @@ const PFESIPage = () => {
       esiEmployeeRate: settings.esi.employeeRate,
       esiEmployerRate: settings.esi.employerRate,
       esiWageLimit: settings.esi.wageLimit,
+      esiDailyWageThreshold: settings.esi.dailyWageThreshold ?? 176,
       ptEnabled: settings.pt?.enabled,
       ptAmount: settings.pt?.amount,
+      basicRate: settings.salaryStructure?.basicRate ?? 50,
+      hraRate: settings.salaryStructure?.hraRate ?? 30,
+      travelAllowanceRate: settings.salaryStructure?.travelAllowanceRate ?? 0,
+      otherAllowanceRate: settings.salaryStructure?.otherAllowanceRate ?? 0,
+      clLapseMonths: settings.clLapseMonths ?? 3,
     });
     setSettingsModal(true);
   };
@@ -250,6 +290,8 @@ const PFESIPage = () => {
       esiEnabled: record.esiEnabled !== false,
       basicSalary: record.basicSalary,
       grossSalary: record.grossSalary,
+      isStipend: record.isStipend || false,
+      dailyRate: record.dailyRate,
     });
     setEditModal(true);
   };
@@ -266,47 +308,73 @@ const PFESIPage = () => {
     }
   };
 
-  // Client-side PF/ESI calculation helper
-  const calcPF = (basic) => {
-    if (!settings.pf.enabled || !basic) return { employee: 0, employer: 0, total: 0 };
-    const employee = Math.round((basic * settings.pf.employeeRate) / 100);
-    const employer = Math.round((basic * settings.pf.employerRate) / 100);
-    return { employee, employer, total: employee + employer };
+  // Client-side PF/ESI calculation helpers using new rules
+  const basicRate = settings.salaryStructure?.basicRate ?? 50;
+  const hraRate = settings.salaryStructure?.hraRate ?? 30;
+  const esiDailyThreshold = settings.esi?.dailyWageThreshold ?? 176;
+
+  const calcPF = (gross, isStipend = false) => {
+    if (!settings.pf.enabled || !gross || isStipend) return { employee: 0, employer: 0, total: 0, base: 0 };
+    const base = Math.round(gross * basicRate / 100); // 50% of gross
+    const wage = Math.min(base, settings.pf.wageLimit);
+    const employee = Math.round((wage * settings.pf.employeeRate) / 100);
+    const employer = Math.round((wage * settings.pf.employerRate) / 100);
+    return { employee, employer, total: employee + employer, base };
   };
 
   const calcESI = (gross) => {
-    if (!settings.esi.enabled || !gross || gross > settings.esi.wageLimit) return { employee: 0, employer: 0, total: 0 };
-    const employee = Math.round((gross * settings.esi.employeeRate) / 100);
-    const employer = Math.round((gross * settings.esi.employerRate) / 100);
-    return { employee, employer, total: employee + employer };
+    if (!settings.esi.enabled || !gross) return { employee: 0, employer: 0, total: 0, base: 0, dailyWage: 0, applicable: false };
+    const base = Math.round(gross * (basicRate + hraRate) / 100); // ~80% of gross
+    const dailyWage = Math.round(base / 30);
+    if (dailyWage < esiDailyThreshold || base > settings.esi.wageLimit) {
+      return { employee: 0, employer: 0, total: 0, base, dailyWage, applicable: false };
+    }
+    const employee = Math.round((base * settings.esi.employeeRate) / 100);
+    const employer = Math.round((base * settings.esi.employerRate) / 100);
+    return { employee, employer, total: employee + employer, base, dailyWage, applicable: true };
   };
 
   const staffColumns = [
     { title: "Emp ID", dataIndex: "employeeId", width: 100 },
     { title: "Name", dataIndex: "staffName", sorter: (a, b) => (a.staffName || "").localeCompare(b.staffName || "") },
-    { title: "Basic", dataIndex: "basicSalary", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
     { title: "Gross", dataIndex: "grossSalary", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
+    {
+      title: "Basic (50%)",
+      dataIndex: "grossSalary",
+      key: "basicCalc",
+      render: (v) => v ? `₹${Math.round(v * basicRate / 100).toLocaleString()}` : "-",
+    },
     { title: "PF No", dataIndex: "pfNumber", render: (v) => v || "-" },
     { title: "UAN", dataIndex: "uanNumber", render: (v) => v || "-" },
     { title: "ESI No", dataIndex: "esiNumber", render: (v) => v || "-" },
     {
-      title: "PF",
+      title: "Type",
+      key: "type",
+      render: (_, r) => r.isStipend ? <Tag color="orange">Stipend</Tag> : <Tag color="blue">Regular</Tag>,
+    },
+    {
+      title: "PF (Emp + Employer)",
       key: "pfCalc",
       render: (_, r) => {
-        if (!r.pfEnabled) return <Tag color="default">Disabled</Tag>;
-        const pf = calcPF(r.basicSalary);
-        return <Tag color="blue">₹{pf.employee} + ₹{pf.employer}</Tag>;
+        if (r.isStipend || !r.pfEnabled) return <Tag color="default">N/A (Stipend/Disabled)</Tag>;
+        const pf = calcPF(r.grossSalary, r.isStipend);
+        return <Tag color="blue">₹{pf.employee} + ₹{pf.employer}<br/><small>on Basic ₹{pf.base?.toLocaleString()}</small></Tag>;
       },
     },
     {
-      title: "ESI",
+      title: "ESI (Emp + Employer)",
       key: "esiCalc",
       render: (_, r) => {
         if (!r.esiEnabled) return <Tag color="default">N/A</Tag>;
         const esi = calcESI(r.grossSalary);
-        if (esi.total === 0) return <Tag color="default">Above limit</Tag>;
-        return <Tag color="cyan">₹{esi.employee} + ₹{esi.employer}</Tag>;
+        if (!esi.applicable) return <Tag color="red">Below threshold (daily ₹{esi.dailyWage} &lt; ₹{esiDailyThreshold})</Tag>;
+        return <Tag color="cyan">₹{esi.employee} + ₹{esi.employer}<br/><small>on ₹{esi.base?.toLocaleString()} (daily ₹{esi.dailyWage})</small></Tag>;
       },
+    },
+    {
+      title: "Daily Rate",
+      key: "dailyRate",
+      render: (_, r) => r.dailyRate ? <Tag color="purple">₹{r.dailyRate}/day</Tag> : "-",
     },
     {
       title: "Actions",
@@ -328,6 +396,7 @@ const PFESIPage = () => {
     { title: "UAN", dataIndex: "uanNumber" },
     { title: "PF No", dataIndex: "pfNumber" },
     { title: "Basic", dataIndex: "basicSalary", render: (v) => `₹${(v || 0).toLocaleString()}` },
+    { title: "PF Base (50%)", dataIndex: "pfBase", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
     { title: "Employee PF", dataIndex: "employeePF", render: (v) => `₹${(v || 0).toLocaleString()}` },
     { title: "Employer PF", dataIndex: "employerPF", render: (v) => `₹${(v || 0).toLocaleString()}` },
     { title: "Admin", dataIndex: "adminCharges", render: (v) => `₹${(v || 0).toLocaleString()}` },
@@ -340,6 +409,14 @@ const PFESIPage = () => {
     { title: "Name", dataIndex: "staffName" },
     { title: "ESI No", dataIndex: "esiNumber" },
     { title: "Gross", dataIndex: "grossSalary", render: (v) => `₹${(v || 0).toLocaleString()}` },
+    { title: "ESI Base (80%)", dataIndex: "esiBase", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
+    {
+      title: "Daily Wage",
+      dataIndex: "dailyEsiWage",
+      render: (v) => v ? (v < (settings.esi?.dailyWageThreshold ?? 176)
+        ? <Tag color="red">₹{v} (below ₹{settings.esi?.dailyWageThreshold ?? 176})</Tag>
+        : <Tag color="green">₹{v}</Tag>) : "-",
+    },
     { title: "Employee ESI", dataIndex: "employeeESI", render: (v) => `₹${(v || 0).toLocaleString()}` },
     { title: "Employer ESI", dataIndex: "employerESI", render: (v) => `₹${(v || 0).toLocaleString()}` },
     { title: "Total", dataIndex: "totalESI", render: (v) => <Tag color="cyan">₹{(v || 0).toLocaleString()}</Tag> },
@@ -398,6 +475,21 @@ const PFESIPage = () => {
         <Col span={4}>
           <Card size="small">
             <Statistic title="ESI Wage Limit" prefix="₹" value={settings.esi.wageLimit} />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card size="small">
+            <Statistic title="Basic Rate" value={settings.salaryStructure?.basicRate ?? 50} suffix="%" valueStyle={{ color: "#722ed1" }} />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card size="small">
+            <Statistic title="HRA Rate" value={settings.salaryStructure?.hraRate ?? 30} suffix="%" valueStyle={{ color: "#eb2f96" }} />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card size="small">
+            <Statistic title="ESI Daily Threshold" prefix="₹" value={settings.esi?.dailyWageThreshold ?? 176} />
           </Card>
         </Col>
       </Row>
@@ -468,6 +560,9 @@ const PFESIPage = () => {
             <Form.Item name="esiWageLimit" label="Wage Limit (₹)">
               <InputNumber min={0} step={1000} />
             </Form.Item>
+            <Form.Item name="esiDailyWageThreshold" label="Daily Wage Threshold (₹)">
+              <InputNumber min={0} step={1} />
+            </Form.Item>
           </Space>
 
           <Divider orientation="left">Professional Tax</Divider>
@@ -476,6 +571,33 @@ const PFESIPage = () => {
           </Form.Item>
           <Form.Item name="ptAmount" label="PT Amount (₹/month)">
             <InputNumber min={0} />
+          </Form.Item>
+
+          <Divider orientation="left">Salary Structure</Divider>
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Gross = Basic + HRA + Travel + Other. PF on Basic, ESI on Basic + HRA."
+          />
+          <Space size="large" wrap>
+            <Form.Item name="basicRate" label="Basic Rate (%)" rules={[{ required: true }]}>
+              <InputNumber min={0} max={100} step={0.5} />
+            </Form.Item>
+            <Form.Item name="hraRate" label="HRA Rate (%)" rules={[{ required: true }]}>
+              <InputNumber min={0} max={100} step={0.5} />
+            </Form.Item>
+            <Form.Item name="travelAllowanceRate" label="Travel Allowance Rate (%)">
+              <InputNumber min={0} max={100} step={0.5} />
+            </Form.Item>
+            <Form.Item name="otherAllowanceRate" label="Other Allowance Rate (%)">
+              <InputNumber min={0} max={100} step={0.5} />
+            </Form.Item>
+          </Space>
+
+          <Divider orientation="left">Casual Leave (CL) Settings</Divider>
+          <Form.Item name="clLapseMonths" label="CL Lapse Months">
+            <InputNumber min={0} step={1} style={{ width: 200 }} />
           </Form.Item>
         </Form>
       </Modal>
@@ -505,6 +627,12 @@ const PFESIPage = () => {
             <Form.Item name="esiEnabled" label="ESI Applicable" valuePropName="checked">
               <Switch />
             </Form.Item>
+            <Form.Item name="isStipend" label="Stipend (No PF)" valuePropName="checked">
+              <Switch />
+            </Form.Item>
+            <Form.Item name="dailyRate" label="Daily Rate (₹) - Security/Sports">
+              <InputNumber min={0} style={{ width: 180 }} />
+            </Form.Item>
           </Space>
         </Form>
       </Modal>
@@ -512,12 +640,14 @@ const PFESIPage = () => {
       {/* Detail Modal */}
       <Modal title="PF & ESI Details" open={detailModal} onCancel={() => setDetailModal(false)} footer={null} width={550}>
         {selectedRecord && (() => {
-          const pf = calcPF(selectedRecord.basicSalary);
+          const pf = calcPF(selectedRecord.grossSalary, selectedRecord.isStipend);
           const esi = calcESI(selectedRecord.grossSalary);
           return (
             <Descriptions bordered size="small" column={2}>
               <Descriptions.Item label="Name">{selectedRecord.staffName}</Descriptions.Item>
               <Descriptions.Item label="Emp ID">{selectedRecord.employeeId}</Descriptions.Item>
+              <Descriptions.Item label="Type">{selectedRecord.isStipend ? <Tag color="orange">Stipend</Tag> : <Tag color="blue">Regular</Tag>}</Descriptions.Item>
+              <Descriptions.Item label="Daily Rate">{selectedRecord.dailyRate ? `₹${selectedRecord.dailyRate}/day` : "-"}</Descriptions.Item>
               <Descriptions.Item label="Basic Salary">₹{(selectedRecord.basicSalary || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="Gross Salary">₹{(selectedRecord.grossSalary || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="PF Number">{selectedRecord.pfNumber || "-"}</Descriptions.Item>
@@ -530,6 +660,8 @@ const PFESIPage = () => {
               <Descriptions.Item label="PF (Employer)">₹{pf.employer.toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="ESI (Employee)">₹{esi.employee.toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="ESI (Employer)">₹{esi.employer.toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="PF Base">₹{(pf.base || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="ESI Daily Wage">₹{(esi.dailyWage || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="Total Deductions" span={2}>
                 <Tag color="red">₹{(pf.employee + esi.employee + (settings.pt?.enabled ? settings.pt.amount : 0)).toLocaleString()}</Tag>
               </Descriptions.Item>

@@ -300,3 +300,13 @@ export const getTransportExpenses = async () => {
   const res = await axios.get('/transport-expense');
   return res.data;
 };
+
+export const getTransportSalaryReport = async (month) => {
+  const res = await axios.get('/transport-expense/salary-report', { params: month ? { month } : undefined });
+  return res.data;
+};
+
+export const getTransportFinanceReport = async (month) => {
+  const res = await axios.get('/transport-expense/finance-report', { params: month ? { month } : undefined });
+  return res.data;
+};
