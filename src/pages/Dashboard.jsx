@@ -36,6 +36,7 @@ import BusReportPage from "../modules/transport/pages/BusReportPage";
 import AllBusReportsPage from "../modules/transport/pages/AllBusReportsPage";
 import DriverListingPage from "../modules/transport/pages/DriverListingPage";
 import TransportExpensePage from "../modules/transport/pages/TransportExpensePage";
+import TransportExpenseDashboardPage from "../modules/transport/pages/TransportExpenseDashboardPage";
 
 import StaffManagementPage from "../modules/staff/pages/StaffManagementPage";
 import ApprovalsView from "./ApprovalsView";
@@ -87,6 +88,8 @@ const TRANSPORT_MANAGER_KEYS = new Set([
   "transport-all-reports",
   "transport-drivers",
   "transport-buses",
+  "transport-expense",
+  "transport-expense-dashboard",
   "pos-transactions",
 ]);
 
@@ -240,7 +243,8 @@ const Dashboard = () => {
         { key: "transport-all-reports", label: "All Bus Reports", icon: "summarize", permission: canLocationRead },
         { key: "transport-drivers", label: "Drivers", icon: "person", permission: canTransportRouteAccess },
         { key: "transport-buses", label: "Buses", icon: "directions_bus_filled", permission: canTransportRouteAccess },
-        { key: "transport-expense", label: "Transport Expense", icon: "payments", permission: canTransportRouteAccess },
+        { key: "transport-expense", label: "Add Expense", icon: "payments", permission: canTransportRouteAccess },
+        { key: "transport-expense-dashboard", label: "Expense Dashboard", icon: "analytics", permission: canTransportRouteAccess },
       ],
     },
     { key: "staff-management", label: "Staff", icon: "badge", permission: canStaffAccess },
@@ -372,6 +376,7 @@ case "fees-collect":
       case "transport-drivers":   return <DriverListingPage />;
       case "transport-buses":     return <BussesPage />;
       case "transport-expense": return <TransportExpensePage />;
+      case "transport-expense-dashboard": return <TransportExpenseDashboardPage />;
       case "staff-management":    return <StaffManagementPage />;
       case "hr-dashboard":        return <HRDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
       case "hr-attendance":       return <AttendancePage selfOnly={isTeacherOrStaffSelf} />;
