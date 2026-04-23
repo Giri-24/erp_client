@@ -1,25 +1,100 @@
-import { useState, useEffect } from "react";
-import { createTransportExpense, getAllBuses } from "../transport.service";
+import { useState, useEffect, useMemo } from "react";
+import {
+  createTransportExpense,
+  getAllBuses,
+} from "../transport.service";
 import toast from "react-hot-toast";
 
+const EXPENSE_TYPES = [
+  { key: "FUEL", label: "Fuel" },
+  { key: "MAINTENANCE", label: "Maintenance" },
+  { key: "PARTS", label: "Parts" },
+  { key: "TAX", label: "Tax" },
+];
+
+const MULTI_BUS_TYPES = new Set(["MAINTENANCE", "PARTS", "TAX"]);
+
+const INITIAL_FORM = {
+  busNo: "",
+  busIds: [],
+  date: "",
+  fuelStation: "",
+  paymentMode: "CASH",
+  cardName: "",
+  litres: "",
+  pricePerLitre: "",
+  amount: "",
+  workshop: "",
+  description: "",
+  partName: "",
+  quantity: "",
+  unitCost: "",
+  isShared: false,
+  taxType: "ROAD TAX",
+  referenceNo: "",
+};
+
+const distributeAmounts = (totalAmount, count, splitEqually) => {
+  const normalizedTotal = Number(totalAmount || 0);
+  if (!splitEqually || count <= 1) {
+    return Array.from({ length: count }, () => normalizedTotal);
+  }
+
+  const totalPaise = Math.round(normalizedTotal * 100);
+  const basePaise = Math.floor(totalPaise / count);
+  let remainder = totalPaise - (basePaise * count);
+
+  return Array.from({ length: count }, () => {
+    const currentPaise = basePaise + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) {
+      remainder -= 1;
+    }
+    return Number((currentPaise / 100).toFixed(2));
+  });
+};
 
 export default function TransportExpensePage() {
-
   const [type, setType] = useState("FUEL");
   const [buses, setBuses] = useState([]);
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState({
-    busNo: "",
-    date: "",
-    fuelStation: "",
-    paymentMode: "CASH",
-    cardName: "",
-    litres: "",
-    pricePerLitre: "",
-    amount: "",
-    workshop: "",
-    description: "",
-  });
+  const getBusLabel = (bus) => {
+    return (
+      bus?.number ||
+      bus?.busNo ||
+      bus?.busNumber ||
+      bus?.vanNo ||
+      bus?.vehicleNo ||
+      bus?.vehicleNumber ||
+      bus?.plateNo ||
+      bus?.registrationNo ||
+      bus?.regNo ||
+      bus?.name ||
+      "Unnamed Bus"
+    );
+  };
+
+  const getBusId = (bus) => bus?.id || bus?._id || bus?.busId || "";
+  const isMultiBusType = MULTI_BUS_TYPES.has(type);
+
+  const fuelAmount = useMemo(() => {
+    const litres = Number(form.litres);
+    const pricePerLitre = Number(form.pricePerLitre);
+    if (litres > 0 && pricePerLitre > 0) {
+      return (litres * pricePerLitre).toFixed(2);
+    }
+    return "";
+  }, [form.litres, form.pricePerLitre]);
+
+  const partsAmount = useMemo(() => {
+    const quantity = Number(form.quantity);
+    const unitCost = Number(form.unitCost);
+    if (quantity > 0 && unitCost > 0) {
+      return (quantity * unitCost).toFixed(2);
+    }
+    return "";
+  }, [form.quantity, form.unitCost]);
 
   // ✅ LOAD BUSES FROM DB
   useEffect(() => {
@@ -36,127 +111,268 @@ export default function TransportExpensePage() {
 
   // 🔁 handle input change
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type: inputType, checked } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: inputType === "checkbox" ? checked : value,
+    }));
   };
 
-  // 🔥 AUTO CALCULATION
-  useEffect(() => {
-    if (type === "FUEL") {
-      const l = Number(form.litres);
-      const p = Number(form.pricePerLitre);
-
-      if (l > 0 && p > 0) {
-        setForm((prev) => ({
-          ...prev,
-          amount: (l * p).toFixed(2),
-        }));
+  const handleBusCheckboxChange = (busId, checked) => {
+    setForm((prev) => {
+      const selected = new Set(prev.busIds);
+      if (checked) {
+        selected.add(busId);
+      } else {
+        selected.delete(busId);
       }
+      return { ...prev, busIds: Array.from(selected) };
+    });
+  };
+
+  const handleSelectAllBuses = () => {
+    setForm((prev) => ({
+      ...prev,
+      busIds: buses.map(getBusId).filter(Boolean),
+    }));
+  };
+
+  const handleClearBusSelection = () => {
+    setForm((prev) => ({ ...prev, busIds: [] }));
+  };
+
+  const resetForm = () => {
+    setForm(INITIAL_FORM);
+  };
+
+  const getSelectedBusIds = () => {
+    if (isMultiBusType) {
+      return form.busIds;
     }
-  }, [form.litres, form.pricePerLitre, type]);
+    return form.busNo ? [form.busNo] : [];
+  };
+
+  const getValidationMessage = (selectedBusIds) => {
+    if (selectedBusIds.length === 0) {
+      return isMultiBusType ? "Please select at least one bus" : "Please select a bus";
+    }
+    if (!form.date) {
+      return "Please select a date";
+    }
+
+    switch (type) {
+      case "FUEL":
+        if (!form.fuelStation || !form.litres || !form.pricePerLitre || !fuelAmount) {
+          return "Please fill all fuel details";
+        }
+        if (form.paymentMode === "CARD" && !form.cardName) {
+          return "Please enter card details";
+        }
+        return "";
+      case "MAINTENANCE":
+        if (!form.workshop || !form.amount) {
+          return "Please fill workshop and amount";
+        }
+        return "";
+      case "PARTS":
+        if (!form.partName || !form.quantity || !form.unitCost || !partsAmount) {
+          return "Please fill all parts details";
+        }
+        return "";
+      case "TAX":
+        if (!form.taxType || !form.amount) {
+          return "Please fill tax details";
+        }
+        return "";
+      default:
+        return "";
+    }
+  };
+
+  const buildEntries = (selectedBusIds) => {
+    switch (type) {
+      case "FUEL":
+        return [
+          {
+            busId: selectedBusIds[0],
+            date: form.date,
+            category: "FUEL",
+            fuelStation: form.fuelStation,
+            paymentMode: form.paymentMode,
+            description: form.paymentMode === "CARD" && form.cardName
+              ? `Card: ${form.cardName}`
+              : "",
+            litres: Number(form.litres || 0),
+            pricePerLitre: Number(form.pricePerLitre || 0),
+            amount: Number(fuelAmount || 0),
+          },
+        ];
+      case "MAINTENANCE":
+        return selectedBusIds.map((busId, index) => ({
+          busId,
+          date: form.date,
+          category: "MAINTENANCE",
+          workshop: form.workshop,
+          description: form.isShared
+            ? `${form.description ? `${form.description} ` : ""}(Shared split equally)`.trim()
+            : form.description,
+          amount: distributeAmounts(Number(form.amount || 0), selectedBusIds.length, Boolean(form.isShared))[index],
+        }));
+      case "PARTS":
+        return selectedBusIds.map((busId, index) => ({
+          busId,
+          date: form.date,
+          category: "PARTS",
+          partName: form.partName,
+          description: `${form.partName} x ${Number(form.quantity || 0)} @ ${Number(form.unitCost || 0)}`,
+          amount: distributeAmounts(Number(partsAmount || 0), selectedBusIds.length, Boolean(form.isShared))[index],
+          isShared: Boolean(form.isShared),
+        }));
+      case "TAX":
+        return selectedBusIds.map((busId) => ({
+          busId,
+          date: form.date,
+          category: "TAX",
+          taxType: form.taxType,
+          description: form.referenceNo ? `Ref No: ${form.referenceNo}` : "",
+          amount: Number(form.amount || 0),
+        }));
+      default:
+        return [];
+    }
+  };
 
   // ✅ SAVE FUNCTION
   const handleSave = async () => {
-    if (!form.busNo || !form.date) {
-      toast.error("Please fill required fields");
+    const selectedBusIds = getSelectedBusIds();
+    const validationMessage = getValidationMessage(selectedBusIds);
+
+    if (validationMessage) {
+      toast.error(validationMessage);
       return;
     }
 
     try {
-      const payload = {
-        busId: form.busNo, // ✅ REAL DB ID
-        date: form.date,
-        category: type,
-        amount: Number(form.amount || 0),
-
-        ...(type === "FUEL" && {
-          fuelStation: form.fuelStation,
-          paymentMode: form.paymentMode,
-          litres: Number(form.litres || 0),
-          pricePerLitre: Number(form.pricePerLitre || 0),
-        }),
-
-        ...(type === "MAINTENANCE" && {
-          workshop: form.workshop,
-          description: form.description,
-        }),
-      };
-
-      console.log("Payload:", payload);
-
-      await createTransportExpense(payload);
-
-toast.success("Expense saved successfully!");
-      setForm({
-        busNo: "",
-        date: "",
-        fuelStation: "",
-        paymentMode: "CASH",
-        cardName: "",
-        litres: "",
-        pricePerLitre: "",
-        amount: "",
-        workshop: "",
-        description: "",
-      });
-
+      setSaving(true);
+      const entries = buildEntries(selectedBusIds);
+      await Promise.all(entries.map((entry) => createTransportExpense(entry)));
+      toast.success(
+        entries.length > 1
+          ? `${entries.length} expenses saved successfully!`
+          : "Expense saved successfully!"
+      );
+      resetForm();
     } catch (err) {
       console.error(err);
-toast.error("Failed to save expense. Please try again.");
+      const backendMessage = err?.response?.data?.message;
+      const message = Array.isArray(backendMessage)
+        ? backendMessage.join(", ")
+        : backendMessage;
+      toast.error(message || "Failed to save expense. Please try again.");
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-<div className="w-full min-h-screen bg-gray-100 p-6"> 
-  
+<div className="w-full min-h-screen bg-gray-100 p-6">
      <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-lg p-8">
 
       {/* HEADER */}
-      <h2 className="text-xl font-bold text-gray-800 mb-6">
-        Transport Expense
-      </h2>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-gray-800">
+          Transport Expense
+        </h2>
+      </div>
 
       {/* TABS */}
-      <div className="flex gap-3 mb-8">
-        <button
-          onClick={() => setType("FUEL")}
-          className={`px-6 py-2 rounded-lg font-medium transition ${
-            type === "FUEL"
-  ? "bg-[#00152a] text-white shadow"
-  : "bg-gray-200 hover:bg-gray-300"
-          }`}
-        >
-           Fuel
-        </button>
-
-        <button
-          onClick={() => setType("MAINTENANCE")}
-          className={`px-6 py-2 rounded-lg font-medium transition ${
-          type === "MAINTENANCE"
-  ? "bg-[#00152a] text-white shadow"
-  : "bg-gray-200 hover:bg-gray-300"
-          }`}
-        >
-           Maintenance
-        </button>
+      <div className="flex flex-wrap gap-3 mb-8">
+        {EXPENSE_TYPES.map((expenseType) => (
+          <button
+            key={expenseType.key}
+            type="button"
+            onClick={() => setType(expenseType.key)}
+            className={`px-6 py-2 rounded-lg font-medium transition ${
+              type === expenseType.key
+                ? "bg-[#00152a] text-white shadow"
+                : "bg-gray-200 hover:bg-gray-300"
+            }`}
+          >
+            {expenseType.label}
+          </button>
+        ))}
       </div>
 
       {/* COMMON FIELDS */}
       <div className="grid md:grid-cols-2 gap-5">
         <div>
-          <label className="text-sm font-medium text-gray-700">Bus</label>
-          <select
-            name="busNo"
-            value={form.busNo}
-            onChange={handleChange}
-className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a] transition"          >
-            <option value="">Select Bus</option>
-            {buses.map((bus) => (
-              <option key={bus.id} value={bus.id}>
-                {bus.busNo || bus.name}
-              </option>
-            ))}
-          </select>
+          <label className="text-sm font-medium text-gray-700">
+            {isMultiBusType ? "Buses" : "Bus"}
+          </label>
+          {isMultiBusType ? (
+            <>
+              <div className="mt-1 border border-gray-300 rounded-xl px-3 py-2 bg-white">
+                <div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-2 mb-2">
+                  <p className="text-xs text-gray-500">Select one or more buses</p>
+                  <div className="flex items-center gap-3 text-xs font-medium">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllBuses}
+                      className="text-[#00152a] hover:underline"
+                    >
+                      Select all
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearBusSelection}
+                      className="text-gray-500 hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-40 overflow-y-auto">
+                {buses.map((bus) => {
+                  const busId = getBusId(bus);
+                  const busLabel = getBusLabel(bus);
+                  const isChecked = form.busIds.includes(busId);
+
+                  if (!busId) return null;
+
+                  return (
+                    <label key={busId} className="flex items-center gap-3 py-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => handleBusCheckboxChange(busId, e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-[#00152a] focus:ring-[#00152a]"
+                      />
+                      <span className="text-sm text-gray-800">{busLabel}</span>
+                    </label>
+                  );
+                })}
+                {buses.length === 0 && (
+                  <p className="text-sm text-gray-500 py-1">No buses available</p>
+                )}
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">Selected: {form.busIds.length}</p>
+            </>
+          ) : (
+            <select
+              name="busNo"
+              value={form.busNo}
+              onChange={handleChange}
+              className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a] transition"
+            >
+              <option value="">Select Bus</option>
+              {buses.map((bus) => (
+                <option key={getBusId(bus)} value={getBusId(bus)}>
+                  {getBusLabel(bus)}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         <div>
@@ -166,7 +382,8 @@ className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline
             name="date"
             value={form.date}
             onChange={handleChange}
-className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a] transition"          />
+            className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a] transition"
+          />
         </div>
       </div>
 
@@ -219,6 +436,7 @@ className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline
               <label className="text-sm font-medium">Litres</label>
               <input
                 name="litres"
+                type="number"
                 value={form.litres}
                 onChange={handleChange}
                 className="w-full mt-1 border rounded-xl px-3 py-2"
@@ -229,6 +447,7 @@ className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline
               <label className="text-sm font-medium">Price / Litre</label>
               <input
                 name="pricePerLitre"
+                type="number"
                 value={form.pricePerLitre}
                 onChange={handleChange}
                 className="w-full mt-1 border rounded-xl px-3 py-2"
@@ -238,7 +457,7 @@ className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline
             <div>
               <label className="text-sm font-medium">Total Amount</label>
               <input
-                value={form.amount}
+                value={fuelAmount}
                 readOnly
                 className="w-full mt-1 border rounded-xl px-3 py-2 bg-blue-50 font-semibold text-blue-900"
               />
@@ -265,6 +484,7 @@ className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline
               <label className="text-sm font-medium">Amount</label>
               <input
                 name="amount"
+                type="number"
                 value={form.amount}
                 onChange={handleChange}
                 className="w-full mt-1 border rounded-xl px-3 py-2"
@@ -275,8 +495,122 @@ className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline
           <div className="mt-5">
             <label className="text-sm font-medium">Description</label>
             <textarea
-              name="description"colour
+              name="description"
               value={form.description}
+              onChange={handleChange}
+              className="w-full mt-1 border rounded-xl px-3 py-2"
+            />
+          </div>
+
+          <label className="mt-5 inline-flex items-center gap-3 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              name="isShared"
+              checked={form.isShared}
+              onChange={handleChange}
+              className="h-4 w-4 rounded border-gray-300 text-[#00152a] focus:ring-[#00152a]"
+            />
+            Shared Expense (Split equally)
+          </label>
+        </>
+      )}
+
+      {/* ================= PARTS ================= */}
+      {type === "PARTS" && (
+        <>
+          <div className="grid md:grid-cols-2 gap-5 mt-5">
+            <div>
+              <label className="text-sm font-medium">Part Name</label>
+              <input
+                name="partName"
+                value={form.partName}
+                onChange={handleChange}
+                className="w-full mt-1 border rounded-xl px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Quantity</label>
+              <input
+                name="quantity"
+                type="number"
+                value={form.quantity}
+                onChange={handleChange}
+                className="w-full mt-1 border rounded-xl px-3 py-2"
+              />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5 mt-5">
+            <div>
+              <label className="text-sm font-medium">Unit Cost</label>
+              <input
+                name="unitCost"
+                type="number"
+                value={form.unitCost}
+                onChange={handleChange}
+                className="w-full mt-1 border rounded-xl px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Amount</label>
+              <input
+                value={partsAmount}
+                readOnly
+                className="w-full mt-1 border rounded-xl px-3 py-2 bg-blue-50 font-semibold text-blue-900"
+              />
+            </div>
+          </div>
+
+          <label className="mt-5 inline-flex items-center gap-3 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              name="isShared"
+              checked={form.isShared}
+              onChange={handleChange}
+              className="h-4 w-4 rounded border-gray-300 text-[#00152a] focus:ring-[#00152a]"
+            />
+            Shared Expense (Split equally)
+          </label>
+        </>
+      )}
+
+      {/* ================= TAX ================= */}
+      {type === "TAX" && (
+        <>
+          <div className="grid md:grid-cols-2 gap-5 mt-5">
+            <div>
+              <label className="text-sm font-medium">Tax Type</label>
+              <select
+                name="taxType"
+                value={form.taxType}
+                onChange={handleChange}
+                className="w-full mt-1 border rounded-xl px-3 py-2"
+              >
+                <option value="ROAD TAX">Road Tax</option>
+                <option value="PERMIT">Permit</option>
+                <option value="INSURANCE">Insurance</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Amount</label>
+              <input
+                name="amount"
+                type="number"
+                value={form.amount}
+                onChange={handleChange}
+                className="w-full mt-1 border rounded-xl px-3 py-2"
+              />
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <label className="text-sm font-medium">Reference No</label>
+            <input
+              name="referenceNo"
+              value={form.referenceNo}
               onChange={handleChange}
               className="w-full mt-1 border rounded-xl px-3 py-2"
             />
@@ -286,11 +620,13 @@ className="w-full mt-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline
 
       {/* SAVE BUTTON */}
      <button
-  onClick={handleSave}
-  className="mt-8 w-full bg-[#00152a] hover:bg-[#002a4d] text-white py-3 rounded-xl font-semibold shadow-md transition"
->
-  Save Expense
-</button>
+      type="button"
+      onClick={handleSave}
+      disabled={saving}
+      className="mt-8 w-full bg-[#00152a] hover:bg-[#002a4d] text-white py-3 rounded-xl font-semibold shadow-md transition disabled:opacity-60"
+    >
+      {saving ? "Saving..." : "Save Expense"}
+    </button>
 
     </div>
   </div>

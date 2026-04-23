@@ -1,4 +1,5 @@
 import axios from '../../utils/axios';
+import * as XLSX from 'xlsx';
 
 const triggerBrowserDownload = (blob, filename) => {
   const url = window.URL.createObjectURL(blob);
@@ -296,7 +297,158 @@ export const createTransportExpense = async (data) => {
   return res.data;
 };
 
-export const getTransportExpenses = async () => {
-  const res = await axios.get('/transport-expense');
+export const getTransportExpenses = async (filters = {}) => {
+  const params = Object.fromEntries(
+    Object.entries(filters || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  );
+  const res = await axios.get('/transport-expense', { params });
   return res.data;
+};
+
+export const exportTransportExpenses = async (type = 'all', filters = {}) => {
+  const normalizedType = String(type || 'all').toUpperCase();
+  const expenses = await getTransportExpenses({
+    ...(normalizedType !== 'ALL' ? { category: normalizedType } : {}),
+    ...filters,
+  });
+  const toDateKey = (value) => {
+    if (!value) return '';
+    try {
+      return new Date(value).toISOString().slice(0, 10);
+    } catch {
+      return String(value).slice(0, 10);
+    }
+  };
+  const toMonthKey = (value) => toDateKey(value).slice(0, 7);
+
+  const normalizedDate = filters?.date || '';
+  const normalizedMonth = filters?.month || '';
+  const filteredExpenses = (Array.isArray(expenses) ? expenses : []).filter((expense) => (
+    (normalizedType === 'ALL' ? true : expense?.category === normalizedType) &&
+    (normalizedDate ? toDateKey(expense?.date) === normalizedDate : true) &&
+    (normalizedMonth ? toMonthKey(expense?.date) === normalizedMonth : true)
+  ));
+
+  const formatDate = (value) => {
+    if (!value) return '';
+    try {
+      return new Date(value).toISOString().split('T')[0];
+    } catch {
+      return String(value);
+    }
+  };
+
+  const getBusLabel = (expense) => {
+    const bus = expense?.bus;
+    return (
+      bus?.number ||
+      bus?.busNo ||
+      bus?.busNumber ||
+      bus?.plateNo ||
+      bus?.vehicleNo ||
+      expense?.busNo ||
+      expense?.plateNo ||
+      expense?.vehicleNo ||
+      expense?.busId ||
+      'Unassigned'
+    );
+  };
+
+  const rows = filteredExpenses
+    .slice()
+    .sort((left, right) => new Date(left?.date || 0) - new Date(right?.date || 0))
+    .map((expense) => {
+      const partDescription = String(expense?.description || '');
+      const partMatch = partDescription.match(/^(.*?)\s+x\s+([\d.]+)\s+@\s+([\d.]+)/i);
+      const referenceNo = String(expense?.description || '').replace(/^Ref No:\s*/i, '');
+
+      if (normalizedType === 'FUEL') {
+        const desc = String(expense?.description || '');
+        const cardFromDescription = desc.startsWith('Card:') ? desc.replace(/^Card:\s*/i, '') : '';
+        return {
+          Bus: getBusLabel(expense),
+          Date: formatDate(expense?.date),
+          'Fuel Station': expense?.fuelStation || '',
+          Litres: Number(expense?.litres || 0),
+          'Price / Litre': Number(expense?.pricePerLitre || 0),
+          'Payment Mode': expense?.paymentMode || '',
+          'Card Number': expense?.paymentMode === 'CARD' ? (expense?.cardName || cardFromDescription) : '',
+          'Total Price': Number(expense?.amount || 0),
+        };
+      }
+
+      if (normalizedType === 'MAINTENANCE') {
+        return {
+          Bus: getBusLabel(expense),
+          Date: formatDate(expense?.date),
+          Workshop: expense?.workshop || '',
+          Description: expense?.description || '',
+          'Total Price': Number(expense?.amount || 0),
+        };
+      }
+
+      if (normalizedType === 'PARTS') {
+        return {
+          Bus: getBusLabel(expense),
+          Date: formatDate(expense?.date),
+          'Part Name': expense?.partName || partMatch?.[1] || '',
+          Quantity: expense?.quantity ? Number(expense.quantity) : (partMatch?.[2] || ''),
+          'Unit Cost': expense?.unitCost ? Number(expense.unitCost) : (partMatch?.[3] || ''),
+          Shared: expense?.isShared ? 'Yes' : 'No',
+          'Total Price': Number(expense?.amount || 0),
+        };
+      }
+
+      if (normalizedType === 'TAX') {
+        return {
+          Bus: getBusLabel(expense),
+          Date: formatDate(expense?.date),
+          'Tax Type': expense?.taxType || '',
+          'Reference No': expense?.referenceNo || (referenceNo === partDescription ? '' : referenceNo),
+          'Total Price': Number(expense?.amount || 0),
+        };
+      }
+
+      return {
+        Bus: getBusLabel(expense),
+        Date: formatDate(expense?.date),
+        Category: expense?.category || '',
+        Details: expense?.fuelStation || expense?.workshop || expense?.partName || expense?.taxType || expense?.description || '',
+        'Total Price': Number(expense?.amount || 0),
+      };
+    });
+
+  const total = rows.reduce((sum, row) => sum + Number(row['Total Price'] || 0), 0);
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  const columnWidths = {
+    FUEL: [18, 14, 20, 10, 14, 14, 18, 14],
+    MAINTENANCE: [18, 14, 24, 28, 14],
+    PARTS: [18, 14, 22, 10, 12, 10, 14],
+    TAX: [18, 14, 18, 18, 14],
+    ALL: [18, 14, 14, 28, 14],
+  };
+  worksheet['!cols'] = (columnWidths[normalizedType] || columnWidths.ALL).map((wch) => ({ wch }));
+  const footerLength = Object.keys(rows[0] || { 'Total Price': 0 }).length;
+  const footerRow = Array.from({ length: footerLength }, () => '');
+  footerRow[0] = 'Grand Total';
+  footerRow[footerLength - 1] = total;
+  XLSX.utils.sheet_add_aoa(
+    worksheet,
+    [footerRow],
+    { origin: -1 }
+  );
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Expenses');
+  const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob(
+    [buffer],
+    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+  );
+  const suffix = [
+    normalizedType !== 'ALL' ? String(type).toLowerCase() : '',
+    normalizedMonth || '',
+    normalizedDate || '',
+  ].filter(Boolean).join('-');
+  triggerBrowserDownload(blob, `transport-expenses${suffix ? `-${suffix}` : ''}.xlsx`);
 };

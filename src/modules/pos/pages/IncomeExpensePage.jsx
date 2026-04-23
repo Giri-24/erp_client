@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { message } from "antd";
 import { createPosTransaction, getAllPosTransactions } from "../pos.service";
+import { getAcademicYears, getPaymentStatusReport } from "../../fees/fees.service";
 import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
 import { exportToCSV } from "../exportCsv";
 
@@ -11,6 +12,7 @@ const CATEGORIES = ["SALE", "PURCHASE", "MAINTENANCE","TRANSPORT","OTHER"];
 
 const IncomeExpensePage = () => {
   const [transactions, setTransactions] = useState([]);
+  const [transportPayments, setTransportPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("list"); // list | add
 
@@ -27,16 +29,65 @@ const IncomeExpensePage = () => {
 
   const canManage = hasPermission(PERMISSIONS.POS_MANAGE);
 
-  useEffect(() => { loadData(); }, []);
+  const getTransportCollectedAmount = (payment) => {
+    const paidComponents = payment?.paidComponents;
+    if (paidComponents && typeof paidComponents === "object") {
+      const transportComponent = Number(
+        paidComponents.transport ??
+        paidComponents.transportFee ??
+        paidComponents.transportAmount ??
+        0
+      );
+      if (transportComponent > 0) {
+        return transportComponent;
+      }
+    }
 
-  const loadData = async () => {
+    const directAmount = Number(
+      payment?.transportAmount ??
+      payment?.transportFee ??
+      0
+    );
+    if (directAmount > 0) {
+      return directAmount;
+    }
+
+    const receiptComponents = Array.isArray(payment?.receiptComponents)
+      ? payment.receiptComponents
+      : [];
+    if (receiptComponents.includes("transportFee")) {
+      return Number(payment?.amount || 0);
+    }
+
+    return 0;
+  };
+
+  const loadTransportIncome = async () => {
+    try {
+      const years = await getAcademicYears();
+      const reports = await Promise.all(
+        (years || []).map((academicYear) => getPaymentStatusReport(academicYear))
+      );
+      setTransportPayments(reports.flat().filter(Boolean));
+    } catch {
+      message.error("Failed to load transport fee collections");
+      setTransportPayments([]);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+    loadTransportIncome();
+  }, []);
+
+  async function loadData() {
     setLoading(true);
     try {
       const data = await getAllPosTransactions({ type: filterType || undefined, from: filterFrom || undefined, to: filterTo || undefined });
       setTransactions(data || []);
     } catch { message.error("Failed to load transactions"); }
     setLoading(false);
-  };
+  }
 
   useEffect(() => { if (tab === "list") loadData(); }, [filterType, filterFrom, filterTo]);
 
@@ -77,6 +128,17 @@ const IncomeExpensePage = () => {
 
   const totalIncome = displayedTransactions.filter((t) => t.type === "INCOME").reduce((s, t) => s + (t.amount || 0), 0);
   const totalExpense = displayedTransactions.filter((t) => t.type === "EXPENSE").reduce((s, t) => s + (t.amount || 0), 0);
+  const transportIncome = transportPayments
+    .filter((payment) => {
+      const status = String(payment?.status || "SUCCESS").toUpperCase();
+      if (status !== "SUCCESS") return false;
+      const collectedDate = payment?.paymentDate || payment?.date;
+      const dateKey = collectedDate ? new Date(collectedDate).toISOString().slice(0, 10) : "";
+      if (filterFrom && dateKey < filterFrom) return false;
+      if (filterTo && dateKey > filterTo) return false;
+      return getTransportCollectedAmount(payment) > 0;
+    })
+    .reduce((sum, payment) => sum + getTransportCollectedAmount(payment), 0);
   const netBalance = totalIncome - totalExpense;
 
   if (loading && tab === "list") {
@@ -95,10 +157,11 @@ const IncomeExpensePage = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
         {[
           { label: "Total Income", value: totalIncome, icon: "trending_up", color: "text-[#44ddc1]", bg: "bg-[#44ddc1]/10" },
           { label: "Total Expense", value: totalExpense, icon: "trending_down", color: "text-error", bg: "bg-error-container/30" },
+          { label: "Transport Fee Income", value: transportIncome, icon: "directions_bus", color: "text-primary", bg: "bg-primary-container/30" },
           { label: "Net Balance", value: netBalance, icon: "account_balance", color: netBalance >= 0 ? "text-primary" : "text-error", bg: "bg-primary-container/30" },
         ].map((card) => (
           <div key={card.label} className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)] flex items-center gap-4">
