@@ -305,6 +305,31 @@ export const getTransportExpenses = async (filters = {}) => {
   return res.data;
 };
 
+export const getActingDriverDailyRates = async () => {
+  const res = await axios.get('/transport-expense/acting-drivers/daily-rate');
+  return res.data;
+};
+
+export const updateActingDriverDailyRate = async (staffId, dailyRate) => {
+  const res = await axios.put(`/transport-expense/acting-drivers/${staffId}/daily-rate`, { dailyRate });
+  return res.data;
+};
+
+export const getActingDriverManualDays = async (month) => {
+  const res = await axios.get('/transport-expense/acting-drivers/manual-days', {
+    params: month ? { month } : undefined,
+  });
+  return res.data;
+};
+
+export const updateActingDriverManualDays = async (staffId, month, days) => {
+  const res = await axios.put(`/transport-expense/acting-drivers/${staffId}/manual-days`, {
+    month,
+    days,
+  });
+  return res.data;
+};
+
 export const exportTransportExpenses = async (type = 'all', filters = {}) => {
   const normalizedType = String(type || 'all').toUpperCase();
   const expenses = await getTransportExpenses({

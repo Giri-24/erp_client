@@ -181,6 +181,7 @@ const TransportManagerDashboard = ({ onNavigate }) => {
           { key: "transport-view", icon: "manage_search", label: "View Transport", color: "bg-amber-50 text-amber-700" },
           { key: "transport-report", icon: "analytics", label: "Fuel & Mileage", color: "bg-blue-50 text-blue-700" },
           { key: "transport-drivers", icon: "person", label: "Drivers", color: "bg-primary-fixed text-primary" },
+          { key: "transport-acting-driver-salary", icon: "request_quote", label: "Acting Driver Salary", color: "bg-[#f5fbf7] text-[#2e7d32]" },
           { key: "pos-transactions", icon: "receipt_long", label: "POS Transactions", color: "bg-secondary-fixed text-on-secondary-fixed-variant" },
           { key: "transport-buses", icon: "directions_bus_filled", label: "Buses", color: "bg-surface-container-high text-on-surface-variant" },
         ].map((action) => (

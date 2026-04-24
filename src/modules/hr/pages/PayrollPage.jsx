@@ -67,7 +67,10 @@ const CATEGORY_LABELS = {
   NON_TEACHING_TRAINEE: "Non-Teaching Trainee",
   NON_TEACHING_SECURITY: "Security (Daily Rate)",
   NON_TEACHING_SPORTS: "Sports Staff (Daily Rate)",
+  NON_TEACHING_ACTING_DRIVER: "Acting Driver (Daily Rate)",
 };
+
+const isActingDriverCategory = (category) => category === "NON_TEACHING_ACTING_DRIVER";
 
 const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [payrollData, setPayrollData] = useState([]);
@@ -250,7 +253,16 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
       title: "Category",
       dataIndex: "category",
       render: (v) => {
-        const short = { TEACHING_REGULAR: "T", TEACHING_TRAINEE: "T-Tr", TEACHING_PART_TIME: "T-PT", NON_TEACHING_REGULAR: "NT", NON_TEACHING_TRAINEE: "NT-Tr", NON_TEACHING_SECURITY: "Security", NON_TEACHING_SPORTS: "Sports" };
+        const short = {
+          TEACHING_REGULAR: "T",
+          TEACHING_TRAINEE: "T-Tr",
+          TEACHING_PART_TIME: "T-PT",
+          NON_TEACHING_REGULAR: "NT",
+          NON_TEACHING_TRAINEE: "NT-Tr",
+          NON_TEACHING_SECURITY: "Security",
+          NON_TEACHING_SPORTS: "Sports",
+          NON_TEACHING_ACTING_DRIVER: "ActDrv",
+        };
         return short[v] || v || "-";
       },
       width: 80,
@@ -279,11 +291,31 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
       dataIndex: "lopDeduction",
       render: (v) => v ? <Tag color="red">₹{v.toLocaleString()}</Tag> : "₹0",
     },
-    { title: "PF (Emp)", dataIndex: "pfDeduction", render: (v) => `₹${(v || 0).toLocaleString()}` },
-    { title: "ESI (Emp)", dataIndex: "esiDeduction", render: (v) => `₹${(v || 0).toLocaleString()}` },
-    { title: "Fixed Adv.", dataIndex: "fixedAdvanceDeduction", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
-    { title: "Sal. Adv.", dataIndex: "salaryAdvanceDeduction", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
-    { title: "Other Adv.", dataIndex: "otherAdvanceDeduction", render: (v) => v ? `₹${v.toLocaleString()}` : "-" },
+    {
+      title: "PF (Emp)",
+      dataIndex: "pfDeduction",
+      render: (v, r) => isActingDriverCategory(r.category) ? <Tag color="geekblue">N/A</Tag> : `₹${(v || 0).toLocaleString()}`,
+    },
+    {
+      title: "ESI (Emp)",
+      dataIndex: "esiDeduction",
+      render: (v, r) => isActingDriverCategory(r.category) ? <Tag color="geekblue">N/A</Tag> : `₹${(v || 0).toLocaleString()}`,
+    },
+    {
+      title: "Fixed Adv.",
+      dataIndex: "fixedAdvanceDeduction",
+      render: (v, r) => isActingDriverCategory(r.category) ? <Tag color="geekblue">N/A</Tag> : (v ? `₹${v.toLocaleString()}` : "-"),
+    },
+    {
+      title: "Sal. Adv.",
+      dataIndex: "salaryAdvanceDeduction",
+      render: (v, r) => isActingDriverCategory(r.category) ? <Tag color="geekblue">N/A</Tag> : (v ? `₹${v.toLocaleString()}` : "-"),
+    },
+    {
+      title: "Other Adv.",
+      dataIndex: "otherAdvanceDeduction",
+      render: (v, r) => isActingDriverCategory(r.category) ? <Tag color="geekblue">N/A</Tag> : (v ? `₹${v.toLocaleString()}` : "-"),
+    },
     {
       title: "Total Ded.",
       dataIndex: "totalDeductions",
@@ -510,6 +542,7 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
               <li>LOP deduction: absent days × (Gross ÷ working days) — <em>skipped for part-time teachers</em></li>
               <li>Security staff: present days × daily rate (default ₹400)</li>
               <li>Sports staff: present days × daily rate (default ₹1500)</li>
+              <li>Acting driver: present days × per-day salary, no PF/ESI/PT/advance deductions</li>
               <li>Professional Tax (if enabled)</li>
               <li>Advance deductions: Fixed / Salary / Other (auto-deducted)</li>
               <li><strong>Net = Gross − LOP − Employee PF − Employee ESI − Advances</strong></li>
@@ -553,6 +586,15 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
               <Descriptions.Item label="Pay Mode">{selectedPayslip.paymentMode === "BANK_TRANSFER" ? "Bank Transfer" : selectedPayslip.paymentMode === "CASH" ? "Cash" : "-"}</Descriptions.Item>
             </Descriptions>
 
+            {isActingDriverCategory(selectedPayslip.category) && (
+              <Alert
+                message="Acting Driver Rule"
+                description="For acting drivers, salary is calculated as present days × per-day salary. PF, ESI, PT, and advance deductions are not applied."
+                type="info"
+                style={{ marginTop: 12 }}
+              />
+            )}
+
             <Divider orientation="left">Earnings</Divider>
             <Descriptions bordered size="small" column={2}>
               <Descriptions.Item label="Basic Salary (50% of Gross)">₹{(selectedPayslip.basicSalary || 0).toLocaleString()}</Descriptions.Item>
@@ -581,15 +623,35 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
               <Descriptions.Item label="LOP Deduction">₹{(selectedPayslip.lopDeduction || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label="Permission Excess LOP">₹{(selectedPayslip.permissionLopDeduction || 0).toLocaleString()}</Descriptions.Item>
               <Descriptions.Item label={`PF Employee (on Basic ₹${(selectedPayslip.pfBase || selectedPayslip.basicSalary || 0).toLocaleString()})`}>
-                ₹{(selectedPayslip.pfDeduction || 0).toLocaleString()}
+                {isActingDriverCategory(selectedPayslip.category)
+                  ? <Tag color="geekblue">N/A</Tag>
+                  : `₹${(selectedPayslip.pfDeduction || 0).toLocaleString()}`}
               </Descriptions.Item>
               <Descriptions.Item label={`ESI Employee (on ₹${(selectedPayslip.esiBase || 0).toLocaleString()}, daily ₹${selectedPayslip.esiBase ? Math.round(selectedPayslip.esiBase / 30) : 0})`}>
-                ₹{(selectedPayslip.esiDeduction || 0).toLocaleString()}
+                {isActingDriverCategory(selectedPayslip.category)
+                  ? <Tag color="geekblue">N/A</Tag>
+                  : `₹${(selectedPayslip.esiDeduction || 0).toLocaleString()}`}
               </Descriptions.Item>
-              <Descriptions.Item label="Professional Tax">₹{(selectedPayslip.ptDeduction || 0).toLocaleString()}</Descriptions.Item>
-              <Descriptions.Item label="Fixed Advance">₹{(selectedPayslip.fixedAdvanceDeduction || 0).toLocaleString()}</Descriptions.Item>
-              <Descriptions.Item label="Salary Advance">₹{(selectedPayslip.salaryAdvanceDeduction || 0).toLocaleString()}</Descriptions.Item>
-              <Descriptions.Item label="Other Advance">₹{(selectedPayslip.otherAdvanceDeduction || 0).toLocaleString()}</Descriptions.Item>
+              <Descriptions.Item label="Professional Tax">
+                {isActingDriverCategory(selectedPayslip.category)
+                  ? <Tag color="geekblue">N/A</Tag>
+                  : `₹${(selectedPayslip.ptDeduction || 0).toLocaleString()}`}
+              </Descriptions.Item>
+              <Descriptions.Item label="Fixed Advance">
+                {isActingDriverCategory(selectedPayslip.category)
+                  ? <Tag color="geekblue">N/A</Tag>
+                  : `₹${(selectedPayslip.fixedAdvanceDeduction || 0).toLocaleString()}`}
+              </Descriptions.Item>
+              <Descriptions.Item label="Salary Advance">
+                {isActingDriverCategory(selectedPayslip.category)
+                  ? <Tag color="geekblue">N/A</Tag>
+                  : `₹${(selectedPayslip.salaryAdvanceDeduction || 0).toLocaleString()}`}
+              </Descriptions.Item>
+              <Descriptions.Item label="Other Advance">
+                {isActingDriverCategory(selectedPayslip.category)
+                  ? <Tag color="geekblue">N/A</Tag>
+                  : `₹${(selectedPayslip.otherAdvanceDeduction || 0).toLocaleString()}`}
+              </Descriptions.Item>
               <Descriptions.Item label="Total Deductions" span={2}>
                 <Tag color="red">₹{(selectedPayslip.totalDeductions || 0).toLocaleString()}</Tag>
               </Descriptions.Item>

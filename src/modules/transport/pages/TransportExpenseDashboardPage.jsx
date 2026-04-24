@@ -78,6 +78,14 @@ const getDetails = (expense) => {
   }
 };
 
+const escapeCsv = (value) => {
+  const text = String(value ?? "");
+  if (/[",\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+};
+
 const getTransportCollectedAmount = (payment) => {
   const paidComponents = payment?.paidComponents;
   if (paidComponents && typeof paidComponents === "object") {
@@ -135,6 +143,8 @@ export default function TransportExpenseDashboardPage() {
   const [showPastHistory, setShowPastHistory] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey());
+  const [busFilter, setBusFilter] = useState("ALL");
+  const [keywordFilter, setKeywordFilter] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -334,7 +344,7 @@ export default function TransportExpenseDashboardPage() {
     return dateKey.startsWith(selectedMonth);
   }, [showPastHistory, currentMonthLabel, selectedDate, selectedMonth]);
 
-  const filteredEntries = useMemo(() => {
+  const scopedEntries = useMemo(() => {
     return monthlyExpenses.filter((expense) => {
       if (expense?.category !== activeCategory) {
         return false;
@@ -351,6 +361,33 @@ export default function TransportExpenseDashboardPage() {
       return toMonthKey(expense?.date) === selectedMonth;
     });
   }, [monthlyExpenses, activeCategory, showPastHistory, selectedDate, selectedMonth, currentMonthLabel]);
+
+  const busFilterOptions = useMemo(() => {
+    const options = new Set();
+    scopedEntries.forEach((expense) => {
+      options.add(getBusLabel(expense));
+    });
+    return Array.from(options).sort((left, right) => left.localeCompare(right));
+  }, [scopedEntries]);
+
+  const filteredEntries = useMemo(() => {
+    const keyword = keywordFilter.trim().toLowerCase();
+
+    return scopedEntries.filter((expense) => {
+      const busLabel = getBusLabel(expense);
+      if (busFilter !== "ALL" && busLabel !== busFilter) {
+        return false;
+      }
+
+      if (!keyword) {
+        return true;
+      }
+
+      const details = getDetails(expense);
+      const category = String(expense?.category || "");
+      return `${busLabel} ${details} ${category}`.toLowerCase().includes(keyword);
+    });
+  }, [scopedEntries, busFilter, keywordFilter]);
 
   const groupedByDate = useMemo(() => {
     const map = new Map();
@@ -371,6 +408,41 @@ export default function TransportExpenseDashboardPage() {
 
     return Array.from(map.values()).sort((left, right) => new Date(right.date) - new Date(left.date));
   }, [filteredEntries]);
+
+  const handleExportCsv = () => {
+    if (!filteredEntries.length) {
+      toast.error("No records found to export");
+      return;
+    }
+
+    const headers = ["Date", "Bus", "Category", "Details", "Amount"];
+    const rows = filteredEntries
+      .slice()
+      .sort((left, right) => new Date(right?.date || 0) - new Date(left?.date || 0))
+      .map((expense) => [
+        toDateKey(expense?.date),
+        getBusLabel(expense),
+        expense?.category || "",
+        getDetails(expense),
+        Number(expense?.amount || 0).toFixed(2),
+      ]);
+
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map(escapeCsv).join(","))
+      .join("\n");
+
+    const dateSuffix = selectedDate || selectedMonth || currentMonthKey();
+    const keywordSuffix = keywordFilter.trim() ? `-${keywordFilter.trim().replace(/\s+/g, "-").slice(0, 20)}` : "";
+    const filename = `transport-expense-${activeCategory.toLowerCase()}-${dateSuffix}${keywordSuffix}.csv`;
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   const profitSummary = useMemo(() => {
     const income = transportPayments
@@ -563,6 +635,56 @@ export default function TransportExpenseDashboardPage() {
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Expense History</h3>
             <p className="text-sm text-gray-500">{historyLabel}</p>
+          </div>
+
+          <div className="mb-4 grid gap-3 md:grid-cols-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bus Filter</label>
+              <select
+                value={busFilter}
+                onChange={(e) => setBusFilter(e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a]"
+              >
+                <option value="ALL">All Buses</option>
+                {busFilterOptions.map((label) => (
+                  <option key={label} value={label}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+              <input
+                type="text"
+                value={keywordFilter}
+                onChange={(e) => setKeywordFilter(e.target.value)}
+                placeholder="Bus / category / details"
+                className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a]"
+              />
+            </div>
+
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setBusFilter("ALL");
+                  setKeywordFilter("");
+                }}
+                className="w-full px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Clear Filters
+              </button>
+            </div>
+
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                className="w-full px-4 py-2 rounded-xl bg-[#00152a] text-white hover:bg-[#002a4d]"
+              >
+                Export CSV
+              </button>
+            </div>
           </div>
 
           {loading ? (

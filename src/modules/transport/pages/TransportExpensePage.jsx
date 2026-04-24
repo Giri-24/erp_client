@@ -111,18 +111,6 @@ export default function TransportExpensePage() {
     loadBuses();
   }, []);
 
-  useEffect(() => {
-    const loadFinanceReport = async () => {
-      try {
-        const data = await getTransportFinanceReport(reportMonth);
-        setFinanceReport(data);
-      } catch (err) {
-        console.error("Finance report load failed", err);
-      }
-    };
-    loadFinanceReport();
-  }, [reportMonth]);
-
   // 🔁 handle input change
   const handleChange = (e) => {
     const { name, value, type: inputType, checked } = e.target;
