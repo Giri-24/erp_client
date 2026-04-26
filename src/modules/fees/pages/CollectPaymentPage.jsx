@@ -26,9 +26,6 @@ const PAYMENT_MODES = [
   { value: "BANK", label: "Bank Transfer", icon: "receipt_long" },
   { value: "CHEQUE", label: "Cheque", icon: "description" },
 ];
-  
-
-
 
 const RECEIPT_COMPONENT_LABELS = {
   transportFee: "Transport Fee",
@@ -36,6 +33,21 @@ const RECEIPT_COMPONENT_LABELS = {
   hostelFee: "Hostel Fee",
   otherFee: "Other Fee",
   customItems: "Custom Items",
+};
+
+const formatPaidComponentLabel = (key) => {
+  const k = String(key || "").trim();
+  const map = {
+    tuition: "Tuition Fee",
+    transport: "Transport Fee",
+    book: "Book Fee",
+    hostel: "Hostel Fee",
+    other: "Other Fee",
+  };
+  if (map[k]) return map[k];
+  return k
+    .replace(/[_-]/g, " ")
+    .replace(/\b\w/g, (m) => m.toUpperCase());
 };
 
 const formatStandardLabel = (value) => {
@@ -70,7 +82,6 @@ const COMPONENT_FEE_FIELDS = {
   otherFee: "otherFee",
 };
 
-// Compute per-term component split (only tuition + transport are term-wise)
 const computeTermComponents = (fee) => {
   if (!fee?.terms?.length) return fee?.terms || [];
   const nTerms = fee.terms.length;
@@ -80,12 +91,10 @@ const computeTermComponents = (fee) => {
       i === n - 1 ? Math.round((val - perTerm * (n - 1)) * 100) / 100 : perTerm
     );
   };
-  // Check if component amounts are already populated
   const hasComponents = fee.terms.some(
     (t) => (t.tuitionAmount || 0) > 0 || (t.transportAmount || 0) > 0
   );
   if (hasComponents) return fee.terms;
-  // Fallback: only split tuition + transport; book/hostel/other are non-term
   const tuition = splitEvenly(Number(fee.tuitionFee || 0), nTerms);
   const transport = splitEvenly(Number(fee.transportFee || 0), nTerms);
   return fee.terms.map((t, i) => ({
@@ -129,6 +138,18 @@ const buildReceiptFeeRows = (payment) => {
   return rows;
 };
 
+const formatAllocationSummary = (splitPayments = []) => {
+  if (!Array.isArray(splitPayments) || splitPayments.length === 0) return "";
+  return splitPayments
+    .map((p) => {
+      const compText = p?.paidComponents && typeof p.paidComponents === "object"
+        ? ` (${Object.entries(p.paidComponents).map(([k, v]) => `${formatPaidComponentLabel(k)}: ${fmt(v)}`).join(", ")})`
+        : "";
+      return `${p.termNumber ? `Term ${p.termNumber}` : "Other Fees"}: ${fmt(p.amount)}${compText}`;
+    })
+    .join(" | ");
+};
+
 const statusBadge = (status) => {
   const s = (status || "SUCCESS").toUpperCase();
   if (s === "REFUNDED")
@@ -138,6 +159,14 @@ const statusBadge = (status) => {
   return <span className="px-3 py-1 bg-[#44ddc1]/20 text-[#00201a] rounded-full text-xs font-bold uppercase">Success</span>;
 };
 
+// ── Tab definitions ─────────────────────────────────────────────────────────
+const TABS = [
+  { key: "collect",  label: "Collect Payment", icon: "point_of_sale" },
+  { key: "history",  label: "Payment History",  icon: "receipt_long"  },
+  { key: "summary",  label: "Fee Summary",      icon: "bar_chart"     },
+  { key: "siblings", label: "Sibling Fees",     icon: "group"         },
+];
+
 // ── component ─────────────────────────────────────────────────────────────
 const CollectPaymentPage = ({ studentId }) => {
   const [form] = Form.useForm();
@@ -145,6 +174,8 @@ const CollectPaymentPage = ({ studentId }) => {
   const [linkForm] = Form.useForm();
   const printRef = useRef(null);
   const paymentFormRef = useRef(null);
+
+  const [activeTab, setActiveTab] = useState("collect");
 
   const [studentFees, setStudentFees] = useState([]);
   const [selectedFee, setSelectedFee] = useState(null);
@@ -161,16 +192,23 @@ const CollectPaymentPage = ({ studentId }) => {
   const [paymentMode, setPaymentMode] = useState("CASH");
   const [receiptNo, setReceiptNo] = useState("");
   const [amount, setAmount] = useState("");
+  const [amountInputKey, setAmountInputKey] = useState(0);
   const [remarks, setRemarks] = useState("");
   const [termNumber, setTermNumber] = useState(null);
   const [receiptComponents, setReceiptComponents] = useState([]);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [splitMode, setSplitMode] = useState(false);
   const [splitPayments, setSplitPayments] = useState([]);
-  const [payComponents, setPayComponents] = useState([]);  // which components to pay: ["tuition", "transport", ...] or [] = full term
-  const [payingNonTerm, setPayingNonTerm] = useState(false);  // paying non-term fees (book, hostel, other, custom)
+  const [payComponents, setPayComponents] = useState([]);
+  const [payingNonTerm, setPayingNonTerm] = useState(false);
+  const [extraTermNumbers, setExtraTermNumbers] = useState([]);
   const [admissionNoSearch, setAdmissionNoSearch] = useState("");
-  const [siblingData, setSiblingData] = useState([]);  // sibling fees from API (cross-year)
+  const [siblingData, setSiblingData] = useState([]);
+
+  const setAmountFromSystem = (next) => {
+    setAmount(String(next ?? ""));
+    setAmountInputKey((k) => k + 1);
+  };
 
   const { hasPermission } = usePermissionHelpers();
   const canCollectFee = hasPermission(PERMISSIONS.FEES_COLLECT);
@@ -181,14 +219,14 @@ const CollectPaymentPage = ({ studentId }) => {
       const years = await getAcademicYears();
       setAcademicYearOptions(years || []);
       if (years?.length > 0) setAcademicYear((prev) => prev || years[0]);
-    } catch { /* silent */ }
+    } catch { }
   };
 
   const fetchReceiptNo = async () => {
     try {
       const data = await getNextReceiptNo();
       setReceiptNo(data.nextReceiptNo || "");
-    } catch { /* silent */ }
+    } catch { }
   };
 
   const fetchFees = async (yr) => {
@@ -207,14 +245,12 @@ const CollectPaymentPage = ({ studentId }) => {
     if (academicYear) fetchFees(academicYear);
   }, [academicYear]);
 
-  // Keep selectedFee in sync when studentFees refreshes
-  // Helper: enrich fee with virtual terms if none exist in DB
   const enrichWithVirtualTerm = (fee) => {
     if (!fee || (fee.terms && fee.terms.length > 0)) return fee;
     const nTerms = Number(fee.numberOfTerms || 1);
     const tuition = Number(fee.tuitionFee || 0);
     const transport = Number(fee.transportFee || 0);
-    const termBase = tuition + transport; // only tuition+transport are term-distributed
+    const termBase = tuition + transport;
     const splitEvenly = (total, n) => {
       const per = Math.round((total / n) * 100) / 100;
       return Array.from({ length: n }, (_, i) =>
@@ -224,7 +260,6 @@ const CollectPaymentPage = ({ studentId }) => {
     const tuitionSplit = splitEvenly(tuition, nTerms);
     const transportSplit = splitEvenly(transport, nTerms);
     const termAmounts = splitEvenly(termBase, nTerms);
-    // Calculate paid per term from existing payments
     const paidPerTerm = {};
     (fee.payments || payments || []).forEach((p) => {
       if (p.status === "SUCCESS" && p.termNumber) {
@@ -256,7 +291,6 @@ const CollectPaymentPage = ({ studentId }) => {
       if (updated) {
         setSelectedFee(enrichWithVirtualTerm(updated));
       } else {
-        // Fee no longer exists in new data (e.g. academic year changed)
         setSelectedFee(null);
         setPayments([]);
       }
@@ -264,18 +298,12 @@ const CollectPaymentPage = ({ studentId }) => {
   }, [studentFees]);
 
   useEffect(() => {
-  if (studentId && studentFees.length > 0) {
-    const fee = studentFees.find(f => f.student?.id === studentId);
-
-    if (fee) {
-      onSelectFee(fee.id); // 🔥 auto select
+    if (studentId && studentFees.length > 0) {
+      const fee = studentFees.find(f => f.student?.id === studentId);
+      if (fee) onSelectFee(fee.id);
     }
-  }
-}, [studentId, studentFees]);
+  }, [studentId, studentFees]);
 
-  // siblingData is fetched from API in onSelectFee (cross-year support)
-
-  // Fetch sibling fees from API (cross-year)
   const fetchSiblingFees = async (studentId) => {
     if (!studentId) { setSiblingData([]); return; }
     try {
@@ -286,7 +314,6 @@ const CollectPaymentPage = ({ studentId }) => {
     }
   };
 
-  // Search by admission number
   const handleAdmissionNoSearch = () => {
     if (!admissionNoSearch.trim()) return;
     const fee = studentFees.find(
@@ -304,21 +331,18 @@ const CollectPaymentPage = ({ studentId }) => {
     let fee = studentFees.find((f) => f.id === feeId);
     fee = enrichWithVirtualTerm(fee);
     setSelectedFee(fee);
-    setAmount("");
+    setAmountFromSystem("");
     setTermNumber(null);
     setPayingNonTerm(false);
     setPayComponents([]);
+    setExtraTermNumbers([]);
     setReceiptComponents(getAvailableReceiptComponentOptions(fee));
     setLinkResult(null);
-
-    // Fetch sibling data
     fetchSiblingFees(fee?.student?.id);
-
     try {
       const list = await getPaymentsByStudentFee(feeId);
       setPayments(list || []);
     } catch { setPayments([]); }
-
     try {
       const links = await getPaymentLinks(feeId);
       const pending = (links || []).filter((l) => l.status === "PENDING");
@@ -332,7 +356,6 @@ const CollectPaymentPage = ({ studentId }) => {
     } catch { setPaymentLinks([]); }
   };
 
-  // When a fee is selected, pre-fill splitPayments with pending terms
   useEffect(() => {
     if (splitMode && selectedFee?.terms?.length > 0) {
       setSplitPayments(
@@ -351,51 +374,52 @@ const CollectPaymentPage = ({ studentId }) => {
   const handleCollect = async () => {
     if (!canCollectFee) { message.error("You are not authorized to collect payments"); return; }
     if (!selectedFee) { message.error("Please select a student"); return; }
-    
     if (!splitMode) {
       if (!amount || Number(amount) <= 0) { message.error("Please enter an amount"); return; }
       if (selectedFee.terms?.length > 0 && !termNumber && !payingNonTerm) { message.error("Please select a term or Non-Term Fees"); return; }
     }
-
     setLoading(true);
     try {
       let payload;
       if (splitMode) {
-        const paymentsArr = splitPayments
-          .filter((p) => Number(p.amount) > 0)
-          .map((p) => ({ termNumber: p.termNumber, amount: Number(p.amount) }));
-        const total = paymentsArr.reduce((s, p) => s + p.amount, 0);
-        
-        if (!paymentsArr.length) { 
-          message.error("Enter at least one term payment"); 
-          setLoading(false);
-          return; 
-        }
-        if (total <= 0) { 
-          message.error("Total amount must be positive"); 
-          setLoading(false);
-          return; 
-        }
-        
+        const paymentsArr = splitPayments.filter((p) => Number(p.amount) > 0);
+        if (paymentsArr.length === 0) { message.error("Enter at least one term amount"); setLoading(false); return; }
+        const totalSplitAmount = paymentsArr.reduce((sum, p) => sum + Math.round(Number(p.amount)), 0);
         payload = {
           studentFeeId: selectedFee.id,
-          amount: total,
+          amount: totalSplitAmount,
           paymentMode,
           receiptNo,
           remarks,
-          payments: paymentsArr,
-          receiptComponents,
+          splitPayments: paymentsArr.map((p) => ({ termNumber: p.termNumber, amount: Math.round(Number(p.amount)) })),
         };
       } else {
-        // Build paidComponents from chip selection — use actual payment amount, not full fee value
-        let paidComps;
-        const actualAmount = Math.round(Number(amount));
+        const actualAmount = Number(amount);
+        let paidComps = null;
         if (payComponents.length > 0 && termNumber) {
           const enriched = computeTermComponents(selectedFee);
           const selTerm = enriched.find((t) => t.termNumber === termNumber);
           if (selTerm) {
-            const keyMap = { tuition: "tuitionAmount", transport: "transportAmount", book: "bookAmount", hostel: "hostelAmount", other: "otherAmount" };
-            const selectedVals = payComponents.map((k) => ({ key: k, val: Math.round(selTerm[keyMap[k]] || 0) }));
+            const termPayments = payments?.filter((p) => p.termNumber === termNumber && p.status === "SUCCESS") || [];
+            const componentPaid = {};
+            termPayments.forEach((p) => {
+              if (p.paidComponents && typeof p.paidComponents === "object") {
+                Object.entries(p.paidComponents).forEach(([k, v]) => {
+                  componentPaid[k] = (componentPaid[k] || 0) + Number(v);
+                });
+              }
+            });
+            const components = [
+              { key: "tuition", val: selTerm.tuitionAmount || 0 },
+              { key: "transport", val: selTerm.transportAmount || 0 },
+              { key: "book", val: selTerm.bookAmount || 0 },
+              { key: "hostel", val: selTerm.hostelAmount || 0 },
+              { key: "other", val: selTerm.otherAmount || 0 },
+            ].map((c) => ({ ...c, paidAmount: componentPaid[c.key] || 0 }));
+            const selectedVals = payComponents
+              .map((k) => components.find((c) => c.key === k))
+              .filter(Boolean)
+              .map((c) => ({ key: c.key, val: Math.round(c.val - c.paidAmount) }));
             const totalSelected = selectedVals.reduce((s, it) => s + it.val, 0);
             paidComps = {};
             if (selectedVals.length === 1) {
@@ -408,45 +432,22 @@ const CollectPaymentPage = ({ studentId }) => {
               });
             }
           }
-        } else if (payComponents.length > 0 && payingNonTerm) {
-          // Non-term component selection — distribute actual amount across selected components
-          const feeMap = { book: Number(selectedFee.bookFee || 0), hostel: Number(selectedFee.hostelFee || 0), other: Number(selectedFee.otherFee || 0) };
-          const selectedItems = [];
-          payComponents.forEach((k) => {
-            if (feeMap[k] !== undefined) {
-              selectedItems.push({ key: k, val: feeMap[k] });
-            } else {
-              const ci = (selectedFee.customItems || []).find((c) => `custom-${c.id || c.name}` === k);
-              if (ci) selectedItems.push({ key: ci.name, val: Number(ci.amount || 0) });
-            }
-          });
-          const totalSelected = selectedItems.reduce((s, it) => s + it.val, 0);
-          paidComps = {};
-          if (selectedItems.length === 1) {
-            paidComps[selectedItems[0].key] = actualAmount;
-          } else if (totalSelected > 0) {
-            let rem = actualAmount;
-            selectedItems.forEach((it, i) => {
-              if (i === selectedItems.length - 1) { paidComps[it.key] = rem; }
-              else { const share = Math.round((it.val / totalSelected) * actualAmount); paidComps[it.key] = share; rem -= share; }
-            });
-          }
-        } else if (payingNonTerm && payComponents.length === 0) {
-          // "Pay All" non-term — distribute actual amount proportionally so per-component tracking works
-          const feeMap = { book: Number(selectedFee.bookFee || 0), hostel: Number(selectedFee.hostelFee || 0), other: Number(selectedFee.otherFee || 0) };
-          const allItems = [];
-          Object.entries(feeMap).forEach(([k, v]) => { if (v > 0) allItems.push({ key: k, val: v }); });
-          (selectedFee.customItems || []).forEach((ci) => { allItems.push({ key: ci.name, val: Number(ci.amount || 0) }); });
-          const totalAll = allItems.reduce((s, it) => s + it.val, 0);
-          if (totalAll > 0 && allItems.length > 0) {
-            paidComps = {};
-            let rem = actualAmount;
-            allItems.forEach((it, i) => {
-              if (i === allItems.length - 1) { paidComps[it.key] = rem; }
-              else { const share = Math.round((it.val / totalAll) * actualAmount); paidComps[it.key] = share; rem -= share; }
-            });
-          }
         }
+
+        const extraTerms = (() => {
+          if (!Array.isArray(extraTermNumbers) || extraTermNumbers.length === 0 || !selectedFee?.terms?.length) return [];
+          return extraTermNumbers
+            .map((tn) => {
+              const t = selectedFee.terms.find((x) => x.termNumber === tn);
+              if (!t) return null;
+              const paid = payments?.filter((p) => p.termNumber === tn && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+              const bal = Math.max(0, Math.round(t.amount - paid));
+              if (bal <= 0) return null;
+              return { termNumber: tn, amount: bal };
+            })
+            .filter(Boolean);
+        })();
+
         payload = {
           studentFeeId: selectedFee.id,
           amount: Math.round(Number(amount)),
@@ -460,9 +461,11 @@ const CollectPaymentPage = ({ studentId }) => {
       }
 
       const result = await collectPayment(payload);
-      message.success("Payment collected successfully!");
-
-      // show print receipt
+      if (Array.isArray(result?.splitPayments) && result.splitPayments.length > 0) {
+        message.success(`Payment auto-allocated: ${formatAllocationSummary(result.splitPayments)}`);
+      } else {
+        message.success("Payment collected successfully!");
+      }
       setPrintPayment({
         ...result,
         studentName: selectedFee?.student?.name,
@@ -478,24 +481,21 @@ const CollectPaymentPage = ({ studentId }) => {
         discounts: selectedFee?.discounts,
         receiptComponents,
         paidComponents: result?.paidComponents || payload.paidComponents,
+        splitPayments: result?.splitPayments || undefined,
+        totalCollected: result?.totalCollected || result?.amount,
         status: result?.status || "SUCCESS",
       });
-
-      // show toast
       setShowSuccessToast(true);
       setTimeout(() => setShowSuccessToast(false), 4000);
-
-      // reset form
-      setAmount("");
+      setAmountFromSystem("");
       setRemarks("");
       setTermNumber(null);
       setPayComponents([]);
       setPayingNonTerm(false);
       setSplitMode(false);
       setSplitPayments([]);
+      setExtraTermNumbers([]);
       await fetchReceiptNo();
-
-      // refresh
       await fetchFees(academicYear);
       const paymentList = await getPaymentsByStudentFee(selectedFee.id);
       setPayments(paymentList || []);
@@ -624,809 +624,660 @@ const CollectPaymentPage = ({ studentId }) => {
     return "receipt_long";
   };
 
-  // ── render ───────────────────────────────────────────────────────────────
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <nav className="flex items-center gap-1.5 text-xs text-on-surface-variant mb-2 font-medium">
-          <span>Finance</span>
-          <span className="material-symbols-outlined text-[10px]">chevron_right</span>
-          <span className="text-primary font-bold">Collect Fees</span>
-        </nav>
-        <h2 className="font-headline font-extrabold text-3xl text-primary tracking-tight">
-          Collect Student Fees
-        </h2>
-      </div>
-
-      {/* ── 12-col bento grid ── */}
-      <div className="grid grid-cols-12 gap-5">
-
-        {/* ── LEFT: form (8 cols) ── */}
-        <div className="col-span-12 lg:col-span-8 space-y-5">
-
-          {/* Section 1: Select recipient */}
-          <section className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.06)] relative overflow-hidden">
-            {/* decorative corner */}
-            <div className="absolute top-0 right-0 w-28 h-28 bg-primary/5 rounded-bl-full -mr-8 -mt-8 pointer-events-none" />
-
-            <div className="flex items-center gap-4 mb-7">
-              <div className="w-12 h-12 bg-secondary-container rounded-xl flex items-center justify-center text-primary flex-shrink-0">
-                <span className="material-symbols-outlined"
-                  style={{ fontVariationSettings: "'FILL' 1" }}>person_search</span>
-              </div>
-              <div>
-                <h3 className="font-headline font-bold text-lg text-primary">Select Recipient</h3>
-                <p className="text-sm text-on-surface-variant">Identify the student and academic session</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-5">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
-                  Academic Year
-                </label>
-                <div className="relative">
-                  <select
-                    value={academicYear}
-                    onChange={(e) => setAcademicYear(e.target.value)}
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
-                  >
-                    {academicYearOptions.map((y) => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                  <span className="material-symbols-outlined absolute right-3 top-3 text-on-surface-variant pointer-events-none text-base">expand_more</span>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
-                  Admission No
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={admissionNoSearch}
-                    onChange={(e) => setAdmissionNoSearch(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAdmissionNoSearch()}
-                    placeholder="e.g. ADM-001"
-                    className="flex-1 bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAdmissionNoSearch}
-                    className="px-3 rounded-xl bg-primary text-white flex items-center justify-center hover:opacity-90 transition-opacity"
-                  >
-                    <span className="material-symbols-outlined text-sm">search</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
-                  Search Student
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedFee?.id || ""}
-                    onChange={(e) => e.target.value && onSelectFee(e.target.value)}
-                    className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
-                  >
-                    <option value="">Select student...</option>
-                    {studentFees.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.student?.admission?.admissionNo ? `[${f.student.admission.admissionNo}] ` : ""}{f.student?.name} — {formatStandardLabel(f.student?.standard)} — Pending: {fmt(f.pending)}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="material-symbols-outlined absolute right-3 top-3 text-primary/40 pointer-events-none text-base">expand_more</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Section 2: Payment transaction */}
-          <section ref={paymentFormRef} className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
-            <div className="flex items-center gap-4 mb-7">
-              <div className="w-12 h-12 bg-tertiary-fixed rounded-xl flex items-center justify-center text-tertiary flex-shrink-0">
-                <span className="material-symbols-outlined"
-                  style={{ fontVariationSettings: "'FILL' 1" }}>payments</span>
-              </div>
-              <div>
-                <h3 className="font-headline font-bold text-lg text-primary">Payment Transaction</h3>
-                <p className="text-sm text-on-surface-variant">Enter receipt details and payment mode</p>
-              </div>
-            </div>
-
-            {/* Term selection moved from Section 1 for better flow */}
-            {selectedFee?.terms?.length > 0 && (
-              <div className="mb-8 p-6 bg-surface-container-low rounded-2xl border border-outline-variant/30">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm text-primary">account_tree</span>
-                    <label className="text-[11px] font-extrabold text-primary uppercase tracking-widest">Term Distribution</label>
-                  </div>
-                  <Checkbox 
-                    checked={splitMode} 
-                    onChange={e => {
-                      setSplitMode(e.target.checked);
-                      if (e.target.checked) setTermNumber(null);
-                    }}
-                    className="text-primary font-bold text-xs"
-                  >
-                    Split Payment Across Terms
-                  </Checkbox>
-                </div>
-
-                {!splitMode ? (
-                  <>
-                    <div className="flex gap-2 flex-wrap">
-                      {selectedFee.terms.map((t) => {
-                        const paid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
-                        const balance = Math.round(t.amount - paid);
-                        const isPaid = t.status === "PAID" || balance <= 0;
-                        
-                        return (
-                          <button
-                            key={t.termNumber}
-                            type="button"
-                            onClick={() => {
-                              setTermNumber(t.termNumber);
-                              setPayingNonTerm(false);
-                              setPayComponents([]);  // reset component selection
-                              setAmount(balance.toString());
-                            }}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${
-                              termNumber === t.termNumber && !payingNonTerm
-                                ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-[1.02]"
-                                : isPaid
-                                ? "bg-green-50 text-green-700 border-green-100 cursor-not-allowed opacity-60"
-                                : "bg-white text-on-surface-variant border-surface-container-highest hover:border-primary/30 hover:bg-surface-bright"
-                            }`}
-                            disabled={isPaid}
-                          >
-                            <div className="flex flex-col items-start gap-0.5">
-                              <span>{t.termName}</span>
-                              {t.dueDate && (
-                                <span className={`text-[10px] opacity-60 ${termNumber === t.termNumber && !payingNonTerm ? "text-white/70" : ""}`}>
-                                  Due: {new Date(t.dueDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
-                                </span>
-                              )}
-                              <span className={`text-[10px] opacity-70 ${termNumber === t.termNumber && !payingNonTerm ? "text-white/80" : ""}`}>
-                                {isPaid ? "Paid" : `Bal: ${fmt(balance)}`}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-
-                      {/* Non-Term Fees button (Book, Hostel, Other, Custom) */}
-                      {(() => {
-                        const nonTermTotal = Number(selectedFee.bookFee || 0) + Number(selectedFee.hostelFee || 0) + Number(selectedFee.otherFee || 0) +
-                          (selectedFee.customItems || []).reduce((s, ci) => s + Number(ci.amount || 0), 0);
-                        if (nonTermTotal <= 0) return null;
-                        const nonTermPaid = payments?.filter((p) => !p.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
-                        const nonTermBal = Math.round(nonTermTotal - nonTermPaid);
-                        const isNonTermPaid = nonTermBal <= 0;
-                        return (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setTermNumber(null);
-                              setPayingNonTerm(true);
-                              setPayComponents([]);
-                              setAmount(nonTermBal.toString());
-                            }}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border-2 ${
-                              payingNonTerm
-                                ? "bg-tertiary text-white border-tertiary shadow-lg shadow-tertiary/20 scale-[1.02]"
-                                : isNonTermPaid
-                                ? "bg-green-50 text-green-700 border-green-100 cursor-not-allowed opacity-60"
-                                : "bg-white text-tertiary border-tertiary/30 hover:border-tertiary/60 hover:bg-tertiary-fixed/10"
-                            }`}
-                            disabled={isNonTermPaid}
-                          >
-                            <div className="flex flex-col items-start gap-0.5">
-                              <span className="flex items-center gap-1">
-                                <span className="material-symbols-outlined text-sm">shopping_bag</span>
-                                Other Fees
-                              </span>
-                              <span className={`text-[10px] opacity-70 ${payingNonTerm ? "text-white/80" : ""}`}>
-                                {isNonTermPaid ? "Paid" : `Bal: ${fmt(nonTermBal)}`}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })()}
-                    </div>
-
-                    {/* Non-Term Fees — interactive component selection */}
-                    {payingNonTerm && (() => {
-                      // Aggregate per-component paid from prior non-term payments
-                      const nonTermPayments = payments?.filter((p) => !p.termNumber && p.status === "SUCCESS") || [];
-                      const componentPaid = {};
-                      let totalAttributed = 0;
-                      let totalNonTermPaid = 0;
-                      nonTermPayments.forEach((p) => {
-                        totalNonTermPaid += Number(p.amount || 0);
-                        if (p.paidComponents && typeof p.paidComponents === "object") {
-                          Object.entries(p.paidComponents).forEach(([k, v]) => {
-                            const val = Number(v);
-                            componentPaid[k] = (componentPaid[k] || 0) + val;
-                            totalAttributed += val;
-                          });
-                        }
-                      });
-
-                      const items = [
-                        ...(Number(selectedFee.bookFee || 0) > 0 ? [{ key: "book", label: "Book Fee", val: Number(selectedFee.bookFee), icon: "menu_book" }] : []),
-                        ...(Number(selectedFee.hostelFee || 0) > 0 ? [{ key: "hostel", label: "Hostel Fee", val: Number(selectedFee.hostelFee), icon: "hotel" }] : []),
-                        ...(Number(selectedFee.otherFee || 0) > 0 ? [{ key: "other", label: "Other Fee", val: Number(selectedFee.otherFee), icon: "more_horiz" }] : []),
-                        ...((selectedFee.customItems || []).map((ci) => ({ key: `custom-${ci.id || ci.name}`, label: ci.name, val: Number(ci.amount || 0), icon: "label" }))),
-                      ];
-
-                      // Distribute unattributed non-term payments proportionally (handles old "Pay All" payments without paidComponents)
-                      const unattributed = Math.round(totalNonTermPaid - totalAttributed);
-                      if (unattributed > 0) {
-                        const totalFeeVal = items.reduce((s, c) => s + c.val, 0);
-                        if (totalFeeVal > 0) {
-                          let rem = unattributed;
-                          items.forEach((c, i) => {
-                            if (i === items.length - 1) { componentPaid[c.key] = (componentPaid[c.key] || 0) + rem; }
-                            else { const share = Math.round((c.val / totalFeeVal) * unattributed); componentPaid[c.key] = (componentPaid[c.key] || 0) + share; rem -= share; }
-                          });
-                        }
-                      }
-
-                      const enrichedItems = items.map((c) => ({
-                        ...c,
-                        paidAmount: Math.min(componentPaid[c.key] || 0, c.val),
-                        isFullyPaid: (componentPaid[c.key] || 0) >= c.val,
-                      }));
-
-                      const unpaidItems = enrichedItems.filter((c) => !c.isFullyPaid);
-                      const nonTermBal = Math.round(unpaidItems.reduce((s, c) => s + (c.val - c.paidAmount), 0));
-
-                      const toggleNonTermComp = (key) => {
-                        const comp = enrichedItems.find((c) => c.key === key);
-                        if (comp?.isFullyPaid) return;
-                        let next;
-                        if (payComponents.includes(key)) {
-                          next = payComponents.filter((k) => k !== key);
-                        } else {
-                          next = [...payComponents, key];
-                        }
-                        setPayComponents(next);
-                        if (next.length === 0 || next.length === unpaidItems.length) {
-                          setPayComponents([]);
-                          setAmount(nonTermBal.toString());
-                        } else {
-                          const sum = Math.min(
-                            enrichedItems.filter((c) => next.includes(c.key)).reduce((s, c) => s + Math.round(c.val - c.paidAmount), 0),
-                            nonTermBal
-                          );
-                          setAmount(Math.round(sum).toString());
-                        }
-                      };
-
-                      const allSelected = payComponents.length === 0;
-                      return (
-                        <div className="mt-3 p-4 bg-tertiary/5 rounded-xl border border-tertiary/10">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-[10px] font-bold text-tertiary uppercase tracking-wider">
-                              Non-Term Fees — Balance {fmt(nonTermBal)}
-                            </span>
-                            {nonTermBal > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => { setPayComponents([]); setAmount(nonTermBal.toString()); }}
-                                className={`text-[10px] px-2 py-1 rounded-md font-bold transition-colors ${
-                                  allSelected ? "bg-tertiary text-white" : "bg-white text-tertiary hover:bg-tertiary/10"
-                                }`}
-                              >
-                                Pay All
-                              </button>
-                            )}
-                          </div>
-                          {nonTermBal > 0 && (
-                            <p className="text-[10px] text-on-surface-variant mb-2">
-                              Select specific fees to pay (e.g., Book Fee only) or pay all:
-                            </p>
-                          )}
-                          <div className="flex flex-wrap gap-2">
-                            {enrichedItems.map((c) => {
-                              const isActive = payComponents.includes(c.key);
-                              if (c.isFullyPaid) {
-                                return (
-                                  <div
-                                    key={c.key}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold bg-[#e8f5e9] text-[#2e7d32] border border-[#4caf50]/20 cursor-default"
-                                  >
-                                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                                    {c.label}
-                                    <span className="text-[10px] text-[#2e7d32]/70">{fmt(c.val)} Paid</span>
-                                  </div>
-                                );
-                              }
-                              const remaining = Math.round(c.val - c.paidAmount);
-                              return (
-                                <button
-                                  key={c.key}
-                                  type="button"
-                                  onClick={() => toggleNonTermComp(c.key)}
-                                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border ${
-                                    isActive
-                                      ? "bg-tertiary text-white border-tertiary shadow-md"
-                                      : allSelected
-                                      ? "bg-tertiary-fixed/20 text-tertiary border-tertiary/20"
-                                      : "bg-white text-on-surface-variant border-outline-variant/30 opacity-60"
-                                  }`}
-                                >
-                                  <span className="material-symbols-outlined text-sm">{c.icon}</span>
-                                  {c.label}
-                                  <span className={`text-[10px] font-medium ${
-                                    isActive ? "text-white/80" : allSelected ? "text-tertiary" : "text-on-surface-variant"
-                                  }`}>
-                                    {c.paidAmount > 0 ? `${fmt(remaining)} left` : fmt(c.val)}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {payComponents.length > 0 && (
-                            <div className="mt-2 text-[10px] text-tertiary font-bold">
-                              Paying: {payComponents.map((k) => enrichedItems.find((c) => c.key === k)?.label).join(" + ")} = {fmt(amount)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Selected term — quick pay by component */}
-                    {termNumber && (() => {
-                      const enriched = computeTermComponents(selectedFee);
-                      const selTerm = enriched.find((t) => t.termNumber === termNumber);
-                      if (!selTerm) return null;
-                      const termPayments = payments?.filter((p) => p.termNumber === termNumber && p.status === "SUCCESS") || [];
-                      const paid = termPayments.reduce((s, p) => s + p.amount, 0);
-                      const bal = Math.round(selTerm.amount - paid);
-
-                      // Aggregate per-component paid amounts from past payments
-                      const componentPaid = {};
-                      termPayments.forEach((p) => {
-                        if (p.paidComponents && typeof p.paidComponents === "object") {
-                          Object.entries(p.paidComponents).forEach(([k, v]) => {
-                            componentPaid[k] = (componentPaid[k] || 0) + Number(v);
-                          });
-                        }
-                      });
-
-                      const components = [
-                        { key: "tuition", label: "Tuition", val: selTerm.tuitionAmount || 0, icon: "school" },
-                        ...(Number(selTerm.transportAmount || 0) > 0 ? [{ key: "transport", label: "Transport", val: selTerm.transportAmount, icon: "directions_bus", highlight: true }] : []),
-                        ...(Number(selTerm.bookAmount || 0) > 0 ? [{ key: "book", label: "Book", val: selTerm.bookAmount, icon: "menu_book" }] : []),
-                        ...(Number(selTerm.hostelAmount || 0) > 0 ? [{ key: "hostel", label: "Hostel", val: selTerm.hostelAmount, icon: "hotel" }] : []),
-                        ...(Number(selTerm.otherAmount || 0) > 0 ? [{ key: "other", label: "Other", val: selTerm.otherAmount, icon: "more_horiz" }] : []),
-                      ].map((c) => ({
-                        ...c,
-                        paidAmount: componentPaid[c.key] || 0,
-                        isFullyPaid: (componentPaid[c.key] || 0) >= c.val,
-                      }));
-
-                      const unpaidComponents = components.filter((c) => !c.isFullyPaid);
-
-                      const toggleComponent = (key) => {
-                        const comp = components.find((c) => c.key === key);
-                        if (comp?.isFullyPaid) return; // can't toggle paid components
-                        let next;
-                        if (payComponents.includes(key)) {
-                          next = payComponents.filter((k) => k !== key);
-                        } else {
-                          next = [...payComponents, key];
-                        }
-                        setPayComponents(next);
-                        if (next.length === 0 || next.length === unpaidComponents.length) {
-                          setPayComponents([]);
-                          setAmount(bal.toString());
-                        } else {
-                          const sum = Math.min(
-                            components.filter((c) => next.includes(c.key)).reduce((s, c) => s + Math.round(c.val - c.paidAmount), 0),
-                            bal
-                          );
-                          setAmount(Math.round(sum).toString());
-                        }
-                      };
-
-                      const allSelected = payComponents.length === 0;
-                      return (
-                        <div className="mt-3 p-4 bg-primary/5 rounded-xl border border-primary/10">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
-                              {selTerm.termName} — Balance {fmt(bal)}
-                            </span>
-                            {bal > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => { setPayComponents([]); setAmount(bal.toString()); }}
-                                className={`text-[10px] px-2 py-1 rounded-md font-bold transition-colors ${
-                                  allSelected ? "bg-primary text-white" : "bg-white text-primary hover:bg-primary/10"
-                                }`}
-                              >
-                                Pay Full Term
-                              </button>
-                            )}
-                          </div>
-                          {bal > 0 && (
-                            <p className="text-[10px] text-on-surface-variant mb-2">
-                              Select specific components to pay (e.g., Transport only) or pay full term:
-                            </p>
-                          )}
-                          <div className="flex flex-wrap gap-2">
-                            {components.map((c) => {
-                              const isActive = payComponents.includes(c.key);
-                              if (c.isFullyPaid) {
-                                return (
-                                  <div
-                                    key={c.key}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold bg-[#e8f5e9] text-[#2e7d32] border border-[#4caf50]/20 cursor-default"
-                                  >
-                                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                                    {c.label}
-                                    <span className="text-[10px] text-[#2e7d32]/70">{fmt(c.val)} Paid</span>
-                                  </div>
-                                );
-                              }
-                              const remaining = Math.round(c.val - c.paidAmount);
-                              return (
-                                <button
-                                  key={c.key}
-                                  type="button"
-                                  onClick={() => toggleComponent(c.key)}
-                                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border ${
-                                    isActive
-                                      ? c.highlight
-                                        ? "bg-tertiary text-white border-tertiary shadow-md"
-                                        : "bg-primary text-white border-primary shadow-md"
-                                      : allSelected
-                                      ? c.highlight
-                                        ? "bg-tertiary-fixed/20 text-tertiary border-tertiary/20"
-                                        : "bg-white text-on-surface-variant border-outline-variant/30"
-                                      : "bg-white text-on-surface-variant border-outline-variant/30 opacity-60"
-                                  }`}
-                                >
-                                  <span className="material-symbols-outlined text-sm">{c.icon}</span>
-                                  {c.label}
-                                  <span className={`text-[10px] font-medium ${
-                                    isActive ? "text-white/80" : allSelected && c.highlight ? "text-tertiary" : "text-on-surface-variant"
-                                  }`}>
-                                    {c.paidAmount > 0 ? `${fmt(remaining)} left` : fmt(c.val)}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {payComponents.length > 0 && (
-                            <div className="mt-2 text-[10px] text-primary font-bold">
-                              Paying: {payComponents.map((k) => components.find((c) => c.key === k)?.label).join(" + ")} = {fmt(amount)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Component-wise breakdown per term (only Tuition + Transport) */}
-                    {(() => {
-                      const enrichedTerms = computeTermComponents(selectedFee);
-                      const nonTermFees = [
-                        ...(Number(selectedFee.bookFee || 0) > 0 ? [{ label: "Book Fee", amount: Number(selectedFee.bookFee), icon: "menu_book" }] : []),
-                        ...(Number(selectedFee.hostelFee || 0) > 0 ? [{ label: "Hostel Fee", amount: Number(selectedFee.hostelFee), icon: "hotel" }] : []),
-                        ...(Number(selectedFee.otherFee || 0) > 0 ? [{ label: "Other Fee", amount: Number(selectedFee.otherFee), icon: "more_horiz" }] : []),
-                        ...((selectedFee.customItems || []).map((ci) => ({ label: ci.name, amount: Number(ci.amount || 0), icon: "label" }))),
-                      ];
-                      return (
-                        <>
-                        <div className="mt-4 overflow-x-auto">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-                                <th className="text-left py-2 px-3">Component</th>
-                                {enrichedTerms.map((t) => (
-                                  <th key={t.termNumber} className="text-right py-2 px-3">{t.termName}</th>
-                                ))}
-                                <th className="text-right py-2 px-3">Total</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {[
-                                { label: "Tuition", field: "tuitionAmount", total: selectedFee.tuitionFee },
-                                ...(Number(selectedFee.transportFee || 0) > 0
-                                  ? [{ label: "Transport", field: "transportAmount", total: selectedFee.transportFee, highlight: true }]
-                                  : []),
-                              ].map((row) => (
-                                <tr key={row.field} className={row.highlight ? "bg-tertiary-fixed/10" : ""}>
-                                  <td className={`py-2 px-3 font-bold ${row.highlight ? "text-tertiary" : "text-on-surface"}`}>
-                                    {row.label}
-                                  </td>
-                                  {enrichedTerms.map((t) => (
-                                    <td key={t.termNumber} className="text-right py-2 px-3 font-medium text-on-surface-variant">
-                                      {fmt(t[row.field] || 0)}
-                                    </td>
-                                  ))}
-                                  <td className="text-right py-2 px-3 font-bold text-on-surface">{fmt(row.total)}</td>
-                                </tr>
-                              ))}
-                              <tr className="border-t border-outline-variant/30">
-                                <td className="py-2 px-3 font-extrabold text-primary">Total</td>
-                                {enrichedTerms.map((t) => (
-                                  <td key={t.termNumber} className="text-right py-2 px-3 font-extrabold text-primary">
-                                    {fmt(t.amount)}
-                                  </td>
-                                ))}
-                                <td className="text-right py-2 px-3 font-extrabold text-primary">
-                                  {fmt(Number(selectedFee.tuitionFee || 0) + Number(selectedFee.transportFee || 0))}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                        {/* Non-term fees (Book, Hostel, Other, Custom — paid as lump sum) */}
-                        {nonTermFees.length > 0 && (
-                          <div className="mt-3 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
-                            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">
-                              Non-Term Fees (paid separately)
-                            </p>
-                            <div className="flex flex-wrap gap-3">
-                              {nonTermFees.map((nf, idx) => (
-                                <div key={idx} className="flex items-center gap-1.5 px-3 py-2 bg-white rounded-lg border border-outline-variant/20 text-xs font-bold text-on-surface">
-                                  <span className="material-symbols-outlined text-sm text-on-surface-variant">{nf.icon}</span>
-                                  {nf.label}: {fmt(nf.amount)}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        </>
-                      );
-                    })()}
-                  </>
-                ) : (
-                  <div className="bg-white rounded-xl border border-outline-variant/50 overflow-hidden shadow-sm">
-                    <Table
-                      dataSource={splitPayments.map((sp) => {
-                        const enriched = computeTermComponents(selectedFee);
-                        const t = enriched.find((tt) => tt.termNumber === sp.termNumber);
-                        return { ...sp, term: t };
-                      })}
-                      columns={[
-                        { 
-                          title: "Term", 
-                          dataIndex: "termName",
-                          render: (v) => <span className="font-bold text-primary text-xs">{v}</span>
-                        },
-                        {
-                          title: "Breakdown",
-                          dataIndex: "term",
-                          render: (t) => t ? (
-                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-on-surface-variant">
-                              <span>Tuition: {fmt(t.tuitionAmount || 0)}</span>
-                              {Number(t.transportAmount || 0) > 0 && (
-                                <span className="text-tertiary font-bold">Transport: {fmt(t.transportAmount)}</span>
-                              )}
-                              {Number(t.bookAmount || 0) > 0 && <span>Book: {fmt(t.bookAmount)}</span>}
-                              {Number(t.otherAmount || 0) > 0 && <span>Other: {fmt(t.otherAmount)}</span>}
-                            </div>
-                          ) : null,
-                        },
-                        { 
-                          title: "Pending", 
-                          dataIndex: "pending", 
-                          render: v => <span className="text-xs font-medium text-on-surface-variant">{fmt(v)}</span> 
-                        },
-                        {
-                          title: "Amount",
-                          dataIndex: "amount",
-                          width: 140,
-                          render: (v, row, idx) => (
-                            <InputNumber
-                              min={0}
-                              max={row.pending}
-                              value={v}
-                              placeholder="0.00"
-                              variant="filled"
-                              style={{ width: '100%' }}
-                              className="text-xs font-bold"
-                              onChange={val => {
-                                const next = [...splitPayments];
-                                next[idx].amount = val;
-                                setSplitPayments(next);
-                              }}
-                            />
-                          ),
-                        },
-                      ]}
-                      pagination={false}
-                      rowKey="termNumber"
-                      size="small"
-                      className="split-payment-table"
-                    />
-                    <div className="p-3 bg-surface-container-highest/30 flex justify-between items-center border-t border-outline-variant/50">
-                      <span className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">Distributed Total</span>
-                      <p className="text-sm font-black text-primary">
-                        {fmt(splitPayments.reduce((s, p) => s + Number(p.amount || 0), 0))}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-5 mb-6">
-              {/* Amount */}
-              {!splitMode && (() => {
-                const selTerm = termNumber ? selectedFee?.terms?.find((t) => t.termNumber === termNumber) : null;
-                const maxBal = selTerm
-                  ? Math.round(selTerm.amount - (payments?.filter((p) => p.termNumber === termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0))
-                  : undefined;
-                return (
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
-                      Amount to Collect (₹)
-                      {maxBal !== undefined && <span className="text-on-surface-variant font-medium ml-2">Max: {fmt(maxBal)}</span>}
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={maxBal || undefined}
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-xl font-headline font-bold text-primary focus:bg-surface-container-highest transition-colors outline-none"
-                    />
-                    {maxBal !== undefined && Number(amount) > maxBal && (
-                      <p className="text-xs text-error font-medium ml-1 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-xs">warning</span>
-                        Amount exceeds term balance ({fmt(maxBal)}). Transport & other fees are already included in the term amount.
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Payment mode */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
-                  Payment Mode
-                </label>
-                <div className="flex gap-2">
-                  {PAYMENT_MODES.map((m) => (
-                    <button
-                      key={m.value}
-                      type="button"
-                      onClick={() => setPaymentMode(m.value)}
-                      className={`flex-1 py-3 px-2 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all ${
-                        paymentMode === m.value
-                          ? "bg-primary text-white"
-                          : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-sm">{m.icon}</span>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Receipt no */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
-                  Receipt Number
-                </label>
-                <input
-                  type="text"
-                  disabled
-                  value={receiptNo}
-                  onChange={(e) => setReceiptNo(e.target.value)}
-                  placeholder="REC-2024-001"
-                  className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
-                />
-              </div>
-
-              {/* Remarks */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">
-                  Remarks
-                </label>
-                <input
-                  type="text"
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Add a note..."
-                  className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Receipt components with amounts */}
-            {selectedFee && getAvailableReceiptComponentOptions(selectedFee).length > 0 && (
-              <div className="mb-6 p-4 bg-surface rounded-xl">
-                <p className="text-[10px] text-on-surface-variant mb-3 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[10px]">info</span>
-                  These components are already included in the term amounts above. Checking/unchecking controls what appears on the printed receipt.
-                </p>
-                <div className="flex flex-wrap gap-4">
-                {getAvailableReceiptComponentOptions(selectedFee).map((key) => {
-                  const feeAmount = Number(selectedFee[COMPONENT_FEE_FIELDS[key]] || 0);
-                  const perTerm = selectedFee.terms?.length
-                    ? Math.round((feeAmount / selectedFee.terms.length) * 100) / 100
-                    : feeAmount;
-                  return (
-                    <label key={key} className={`flex items-center gap-3 cursor-pointer group px-3 py-2 rounded-lg transition-colors ${
-                      receiptComponents.includes(key) ? "bg-primary-fixed/30" : "hover:bg-surface-container-low"
-                    }`}>
-                      <input
-                        type="checkbox"
-                        checked={receiptComponents.includes(key)}
-                        onChange={(e) => {
-                          setReceiptComponents((prev) =>
-                            e.target.checked ? [...prev, key] : prev.filter((k) => k !== key)
-                          );
-                        }}
-                        className="w-4 h-4 rounded border-outline accent-primary"
-                      />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-on-surface-variant group-hover:text-primary transition-colors">
-                          Include {RECEIPT_COMPONENT_LABELS[key]}
-                        </span>
-                        <span className="text-[10px] text-on-surface-variant/70">
-                          {key === "customItems"
-                            ? fmt((selectedFee.customItems || []).reduce((s, ci) => s + Number(ci.amount || 0), 0)) + " total"
-                            : `${fmt(feeAmount)} total` + (selectedFee.terms?.length > 1 ? ` · ${fmt(perTerm)}/term` : "")}
-                        </span>
-                      </div>
-                    </label>
-                  );
-                })}
-                </div>
-              </div>
-            )}
-
-            {/* Collect button */}
-            <button
-              type="button"
-              disabled={loading || !canCollectFee || !selectedFee || Number(selectedFee?.pending || 0) <= 0}
-              onClick={handleCollect}
-                  style={{
-  background: 'linear-gradient(to right, #00152a, #102a43)'
-}}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-primary to-primary-container text-white font-headline font-bold text-lg shadow-[0_10px_20px_rgba(0,21,42,0.2)] hover:shadow-[0_15px_30px_rgba(0,21,42,0.3)] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
+  // ── Student selector (shared across tabs) ───────────────────────────────
+  const StudentSelector = () => (
+    <div className="bg-white rounded-2xl px-7 py-5 shadow-[0_4px_20px_rgba(1,29,53,0.06)] border border-outline-variant/20">
+      <div className="flex flex-wrap items-end gap-4">
+        {/* Academic Year */}
+        <div className="space-y-1 min-w-[140px]">
+          <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Academic Year</label>
+          <div className="relative">
+            <select
+              value={academicYear}
+              onChange={(e) => setAcademicYear(e.target.value)}
+              className="w-full bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
             >
-              {loading ? (
-                <><span className="material-symbols-outlined text-base animate-spin">refresh</span>Processing...</>
-              ) : (
-                <><span className="material-symbols-outlined">point_of_sale</span>Collect Payment</>
-              )}
-            </button>
-
-            {/* Send payment link */}
-            {canCollectFee && selectedFee && (selectedFee.pending || 0) > 0 && (
-              <button
-                type="button"
-                onClick={openLinkModal}
-                className="w-full mt-3 py-3 rounded-xl border-2 border-outline-variant text-primary font-bold text-sm flex items-center justify-center gap-2 hover:bg-surface-container-low transition-colors"
-              >
-                <span className="material-symbols-outlined text-sm">link</span>
-                Send Payment Link (Digital)
-              </button>
-            )}
-          </section>
+              {academicYearOptions.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <span className="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant pointer-events-none text-base">expand_more</span>
+          </div>
         </div>
 
-        {/* ── RIGHT: summary + digital invoicing (4 cols) ── */}
-        <div className="col-span-12 lg:col-span-4 space-y-5">
+        {/* Admission No */}
+        <div className="space-y-1 min-w-[180px]">
+          <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Admission No</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={admissionNoSearch}
+              onChange={(e) => setAdmissionNoSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdmissionNoSearch()}
+              placeholder="e.g. ADM-001"
+              className="flex-1 bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+            />
+            <button
+              type="button"
+              onClick={handleAdmissionNoSearch}
+              className="px-3 rounded-xl bg-primary text-white flex items-center justify-center hover:opacity-90 transition-opacity"
+            >
+              <span className="material-symbols-outlined text-sm">search</span>
+            </button>
+          </div>
+        </div>
 
-          {/* Account summary card */}
-          <section className="bg-primary-container rounded-2xl p-7 text-white shadow-xl relative overflow-hidden">
+        {/* Student search */}
+        <div className="space-y-1 flex-1 min-w-[260px]">
+          <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Search Student</label>
+          <div className="relative">
+            <select
+              value={selectedFee?.id || ""}
+              onChange={(e) => e.target.value && onSelectFee(e.target.value)}
+              className="w-full bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
+            >
+              <option value="">Select student...</option>
+              {studentFees.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.student?.admission?.admissionNo ? `[${f.student.admission.admissionNo}] ` : ""}{f.student?.name} — {formatStandardLabel(f.student?.standard)} — Pending: {fmt(f.pending)}
+                </option>
+              ))}
+            </select>
+            <span className="material-symbols-outlined absolute right-3 top-2.5 text-primary/40 pointer-events-none text-base">expand_more</span>
+          </div>
+        </div>
+
+        {/* Selected student badge */}
+        {selectedFee && (
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/8 rounded-xl border border-primary/15">
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-black flex-shrink-0">
+              {(selectedFee.student?.name || "?")[0]}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-primary leading-none">{selectedFee.student?.name}</p>
+              <p className="text-[10px] text-on-surface-variant mt-0.5">
+                {formatStandardLabel(selectedFee.student?.standard)} · Pending: <span className={`font-bold ${Number(selectedFee.pending) > 0 ? "text-error" : "text-[#2e7d32]"}`}>{fmt(selectedFee.pending)}</span>
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── TAB: Collect Payment ─────────────────────────────────────────────────
+  const CollectTab = () => (
+    <div className="grid grid-cols-12 gap-5">
+      {/* Left: form */}
+      <div className="col-span-12 lg:col-span-8">
+        <section ref={paymentFormRef} className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
+          <div className="flex items-center gap-4 mb-7">
+            <div className="w-12 h-12 bg-tertiary-fixed rounded-xl flex items-center justify-center text-tertiary flex-shrink-0">
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>payments</span>
+            </div>
+            <div>
+              <h3 className="font-headline font-bold text-lg text-primary">Payment Transaction</h3>
+              <p className="text-sm text-on-surface-variant">Enter receipt details and payment mode</p>
+            </div>
+          </div>
+
+          {/* Term selection */}
+          {selectedFee?.terms?.length > 0 && (
+            <div className="mb-8 p-6 bg-surface-container-low rounded-2xl border border-outline-variant/30">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm text-primary">account_tree</span>
+                  <label className="text-[11px] font-extrabold text-primary uppercase tracking-widest">Term Distribution</label>
+                </div>
+                <Checkbox
+                  checked={splitMode}
+                  onChange={e => {
+                    setSplitMode(e.target.checked);
+                    if (e.target.checked) setTermNumber(null);
+                  }}
+                  className="text-primary font-bold text-xs"
+                >
+                  Split Payment Across Terms
+                </Checkbox>
+              </div>
+
+              {!splitMode ? (
+                <>
+                  <div className="flex gap-2 flex-wrap">
+                    {selectedFee.terms.map((t) => {
+                      const paid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                      const balance = Math.round(t.amount - paid);
+                      const isPaid = t.status === "PAID" || balance <= 0;
+                      return (
+                        <button
+                          key={t.termNumber}
+                          type="button"
+                          onClick={() => {
+                            if (isPaid) return;
+                            setTermNumber(t.termNumber);
+                            setPayingNonTerm(false);
+                            setPayComponents([]);
+                            setExtraTermNumbers([]);
+                            setAmountFromSystem(balance.toString());
+                          }}
+                          disabled={isPaid}
+                          className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 text-left transition-all ${termNumber === t.termNumber
+                            ? "border-primary bg-primary text-white shadow-lg"
+                            : isPaid
+                              ? "border-[#4caf50]/30 bg-[#e8f5e9]/60 text-[#2e7d32] cursor-not-allowed"
+                              : "border-outline-variant/30 bg-white text-on-surface hover:border-primary/40 hover:bg-primary/5"
+                            }`}
+                        >
+                          <span className="text-xs font-bold">{t.termName}</span>
+                          <span className={`text-[11px] mt-0.5 ${termNumber === t.termNumber ? "text-white/80" : isPaid ? "text-[#2e7d32]" : "text-on-surface-variant"}`}>
+                            {isPaid ? "✓ Paid" : `Balance: ${fmt(balance)}`}
+                          </span>
+                        </button>
+                      );
+                    })}
+
+                    {/* Non-term fees button */}
+                    {(() => {
+                      const nonTermTotal = Number(selectedFee.bookFee || 0) + Number(selectedFee.hostelFee || 0) + Number(selectedFee.otherFee || 0) +
+                        (selectedFee.customItems || []).reduce((s, ci) => s + Number(ci.amount || 0), 0);
+                      if (nonTermTotal <= 0) return null;
+                      const nonTermPaid = payments?.filter((p) => !p.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                      const nonTermBal = Math.round(nonTermTotal - nonTermPaid);
+                      const isNonTermPaid = nonTermBal <= 0;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isNonTermPaid) return;
+                            setPayingNonTerm(true);
+                            setTermNumber(null);
+                            setPayComponents([]);
+                            setExtraTermNumbers([]);
+                            setAmountFromSystem(nonTermBal.toString());
+                          }}
+                          disabled={isNonTermPaid}
+                          className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 text-left transition-all ${payingNonTerm
+                            ? "border-tertiary bg-tertiary text-white shadow-lg"
+                            : isNonTermPaid
+                              ? "border-[#4caf50]/30 bg-[#e8f5e9]/60 text-[#2e7d32] cursor-not-allowed"
+                              : "border-outline-variant/30 bg-white text-on-surface hover:border-tertiary/40 hover:bg-tertiary/5"
+                            }`}
+                        >
+                          <span className="text-xs font-bold">Other Fees</span>
+                          <span className={`text-[11px] mt-0.5 ${payingNonTerm ? "text-white/80" : isNonTermPaid ? "text-[#2e7d32]" : "text-tertiary"}`}>
+                            {isNonTermPaid ? "✓ Paid" : `Balance: ${fmt(nonTermBal)}`}
+                          </span>
+                        </button>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Component quick-pay (term) */}
+                  {termNumber && (() => {
+                    const enriched = computeTermComponents(selectedFee);
+                    const selTerm = enriched.find((t) => t.termNumber === termNumber);
+                    if (!selTerm) return null;
+                    const termPayments = payments?.filter((p) => p.termNumber === termNumber && p.status === "SUCCESS") || [];
+                    const paid = termPayments.reduce((s, p) => s + p.amount, 0);
+                    const bal = Math.round(selTerm.amount - paid);
+                    const componentPaid = {};
+                    termPayments.forEach((p) => {
+                      if (p.paidComponents && typeof p.paidComponents === "object") {
+                        Object.entries(p.paidComponents).forEach(([k, v]) => {
+                          componentPaid[k] = (componentPaid[k] || 0) + Number(v);
+                        });
+                      }
+                    });
+                    const components = [
+                      { key: "tuition", label: "Tuition", val: selTerm.tuitionAmount || 0, icon: "school" },
+                      ...(Number(selTerm.transportAmount || 0) > 0 ? [{ key: "transport", label: "Transport", val: selTerm.transportAmount, icon: "directions_bus", highlight: true }] : []),
+                      ...(Number(selTerm.bookAmount || 0) > 0 ? [{ key: "book", label: "Book", val: selTerm.bookAmount, icon: "menu_book" }] : []),
+                      ...(Number(selTerm.hostelAmount || 0) > 0 ? [{ key: "hostel", label: "Hostel", val: selTerm.hostelAmount, icon: "hotel" }] : []),
+                      ...(Number(selTerm.otherAmount || 0) > 0 ? [{ key: "other", label: "Other", val: selTerm.otherAmount, icon: "more_horiz" }] : []),
+                    ].map((c) => ({ ...c, paidAmount: componentPaid[c.key] || 0, isFullyPaid: (componentPaid[c.key] || 0) >= c.val }));
+                    const unpaidComponents = components.filter((c) => !c.isFullyPaid);
+                    const toggleComponent = (key) => {
+                      const comp = components.find((c) => c.key === key);
+                      if (comp?.isFullyPaid) return;
+                      let next = payComponents.includes(key) ? payComponents.filter((k) => k !== key) : [...payComponents, key];
+                      setPayComponents(next);
+                      if (next.length === 0 || next.length === unpaidComponents.length) {
+                        setPayComponents([]);
+                        setAmountFromSystem(bal.toString());
+                      } else {
+                        const sum = Math.min(
+                          components.filter((c) => next.includes(c.key)).reduce((s, c) => s + Math.round(c.val - c.paidAmount), 0),
+                          bal
+                        );
+                        setAmountFromSystem(Math.round(sum).toString());
+                      }
+                    };
+                    const allSelected = payComponents.length === 0;
+                    return (
+                      <div className="mt-3 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[10px] font-bold text-primary uppercase tracking-wider">{selTerm.termName} — Balance {fmt(bal)}</span>
+                          {bal > 0 && (
+                            <button type="button" onClick={() => { setPayComponents([]); setAmountFromSystem(bal.toString()); }}
+                              className={`text-[10px] px-2 py-1 rounded-md font-bold transition-colors ${allSelected ? "bg-primary text-white" : "bg-white text-primary hover:bg-primary/10"}`}>
+                              Pay Full Term
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {components.map((c) => {
+                            const isActive = payComponents.includes(c.key);
+                            if (c.isFullyPaid) {
+                              return (
+                                <div key={c.key} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold bg-[#e8f5e9] text-[#2e7d32] border border-[#4caf50]/20 cursor-default">
+                                  <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                                  {c.label} <span className="text-[10px] text-[#2e7d32]/70">{fmt(c.val)} Paid</span>
+                                </div>
+                              );
+                            }
+                            const remaining = Math.round(c.val - c.paidAmount);
+                            return (
+                              <button key={c.key} type="button" onClick={() => toggleComponent(c.key)}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all border ${isActive ? c.highlight ? "bg-tertiary text-white border-tertiary shadow-md" : "bg-primary text-white border-primary shadow-md" : allSelected ? c.highlight ? "bg-tertiary-fixed/20 text-tertiary border-tertiary/20" : "bg-white text-on-surface-variant border-outline-variant/30" : "bg-white text-on-surface-variant border-outline-variant/30 opacity-60"}`}>
+                                <span className="material-symbols-outlined text-sm">{c.icon}</span>
+                                {c.label}
+                                <span className={`text-[10px] font-medium ${isActive ? "text-white/80" : allSelected && c.highlight ? "text-tertiary" : "text-on-surface-variant"}`}>
+                                  {c.paidAmount > 0 ? `${fmt(remaining)} left` : fmt(c.val)}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {payComponents.length > 0 && (
+                          <div className="mt-2 text-[10px] text-primary font-bold">
+                            Paying: {payComponents.map((k) => components.find((c) => c.key === k)?.label).join(" + ")} = {fmt(amount)}
+                          </div>
+                        )}
+
+                        {/* one-shot extra term pick */}
+                        {selectedFee?.terms?.length > 1 && (
+                          <div className="mt-4 pt-3 border-t border-primary/10">
+                            <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2">
+                              Also include other term balances in this single shot
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedFee.terms
+                                .filter((t) => t.termNumber !== termNumber)
+                                .map((t) => {
+                                  const tPaid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                                  const tBal = Math.max(0, Math.round(t.amount - tPaid));
+                                  if (tBal <= 0) return null;
+                                  const active = extraTermNumbers.includes(t.termNumber);
+                                  return (
+                                    <button
+                                      key={`extra-${t.termNumber}`}
+                                      type="button"
+                                      onClick={() => {
+                                        setExtraTermNumbers((prev) => {
+                                          const next = prev.includes(t.termNumber)
+                                            ? prev.filter((n) => n !== t.termNumber)
+                                            : [...prev, t.termNumber];
+                                          const selectedCompSum = payComponents.length > 0
+                                            ? components
+                                              .filter((c) => payComponents.includes(c.key))
+                                              .reduce((s, c) => s + Math.round(c.val - c.paidAmount), 0)
+                                            : bal;
+                                          const extraSum = next.reduce((s, tn) => {
+                                            const trm = selectedFee.terms.find((x) => x.termNumber === tn);
+                                            if (!trm) return s;
+                                            const paidVal = payments?.filter((p) => p.termNumber === tn && p.status === "SUCCESS").reduce((ss, p) => ss + p.amount, 0) || 0;
+                                            return s + Math.max(0, Math.round(trm.amount - paidVal));
+                                          }, 0);
+                                          setAmountFromSystem(Math.max(0, Math.round(selectedCompSum + extraSum)).toString());
+                                          return next;
+                                        });
+                                      }}
+                                      className={`px-3 py-2 rounded-lg border text-[11px] font-bold transition-all ${active
+                                        ? "bg-primary text-white border-primary"
+                                        : "bg-white text-on-surface-variant border-outline-variant/40 hover:border-primary/40"
+                                        }`}
+                                    >
+                                      {t.termName} {fmt(tBal)}
+                                    </button>
+                                  );
+                                })}
+                            </div>
+                            {extraTermNumbers.length > 0 && (
+                              <div className="mt-2 text-[10px] text-primary font-bold">
+                                Total this shot (current selection + extra terms): {fmt(amount)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </>
+              ) : (
+                <div className="bg-white rounded-xl border border-outline-variant/50 overflow-hidden shadow-sm">
+                  <Table
+                    size="small"
+                    dataSource={splitPayments.map((sp) => {
+                      const enriched = computeTermComponents(selectedFee);
+                      const t = enriched.find((tt) => tt.termNumber === sp.termNumber);
+                      return { ...sp, term: t, key: sp.termNumber };
+                    })}
+                    columns={[
+                      { title: "Term", dataIndex: "termName", render: (v) => <span className="font-bold text-primary text-xs">{v}</span> },
+                      { title: "Pending", dataIndex: "pending", render: v => <span className="text-xs font-medium text-on-surface-variant">{fmt(v)}</span> },
+                      {
+                        title: "Amount to Pay", dataIndex: "termNumber",
+                        render: (termNum) => (
+                          <input
+                            type="number"
+                            min={0}
+                            max={splitPayments.find(s => s.termNumber === termNum)?.pending}
+                            value={splitPayments.find(s => s.termNumber === termNum)?.amount || ""}
+                            onChange={(e) => setSplitPayments(prev => prev.map(s => s.termNumber === termNum ? { ...s, amount: e.target.value } : s))}
+                            placeholder="0"
+                            className="w-28 bg-surface-container-high border-none rounded-lg py-1.5 px-3 text-sm font-medium outline-none focus:bg-surface-container-highest"
+                          />
+                        )
+                      },
+                    ]}
+                    pagination={false}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Receipt No + Amount */}
+          <div className="grid grid-cols-2 gap-5 mb-6">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Receipt No</label>
+              <input
+                type="text"
+                value={receiptNo}
+                onChange={(e) => setReceiptNo(e.target.value)}
+                className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+              />
+            </div>
+            {!splitMode && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Amount (₹)</label>
+                <input
+                  key={amountInputKey}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  defaultValue={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  onBlur={(e) => {
+                    const sanitized = (e.target.value || "").replace(/[^0-9]/g, "");
+                    e.target.value = sanitized;
+                    setAmount(sanitized);
+                  }}
+                  placeholder="Enter amount"
+                  className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Payment mode */}
+          <div className="mb-6">
+            <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1 mb-2 block">Payment Mode</label>
+            <div className="flex gap-2 flex-wrap">
+              {PAYMENT_MODES.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setPaymentMode(m.value)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-bold transition-all ${paymentMode === m.value
+                    ? "border-primary bg-primary text-white shadow-md"
+                    : "border-outline-variant/40 bg-white text-on-surface-variant hover:border-primary/40 hover:bg-primary/5"
+                    }`}
+                >
+                  <span className="material-symbols-outlined text-sm">{m.icon}</span>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Remarks */}
+          <div className="mb-6 space-y-1.5">
+            <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Remarks (optional)</label>
+            <textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="Add any notes..."
+              rows={2}
+              className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none resize-none"
+            />
+          </div>
+
+          {/* Receipt components */}
+          {selectedFee && getAvailableReceiptComponentOptions(selectedFee).length > 0 && (
+            <div className="mb-6 p-4 bg-surface-container-low rounded-xl border border-outline-variant/20">
+              <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider block mb-3">Receipt Components to Include</label>
+              <div className="flex flex-wrap gap-3">
+                {getAvailableReceiptComponentOptions(selectedFee).map((key) => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={receiptComponents.includes(key)}
+                      onChange={(e) => {
+                        setReceiptComponents(prev =>
+                          e.target.checked ? [...prev, key] : prev.filter((k) => k !== key)
+                        );
+                      }}
+                      className="w-4 h-4 rounded border-outline accent-primary"
+                    />
+                    <span className="text-sm font-medium text-on-surface-variant group-hover:text-primary transition-colors">
+                      {RECEIPT_COMPONENT_LABELS[key]}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Collect button */}
+          <button
+            type="button"
+            disabled={loading || !canCollectFee || !selectedFee || Number(selectedFee?.pending || 0) <= 0}
+            onClick={handleCollect}
+            style={{ background: 'linear-gradient(to right, #00152a, #102a43)' }}
+            className="w-full py-4 rounded-xl text-white font-headline font-bold text-lg shadow-[0_10px_20px_rgba(0,21,42,0.2)] hover:shadow-[0_15px_30px_rgba(0,21,42,0.3)] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
+          >
+            {loading ? (
+              <><span className="material-symbols-outlined text-base animate-spin">refresh</span>Processing...</>
+            ) : (
+              <><span className="material-symbols-outlined">point_of_sale</span>Collect Payment</>
+            )}
+          </button>
+
+          {canCollectFee && selectedFee && (selectedFee.pending || 0) > 0 && (
+            <button
+              type="button"
+              onClick={openLinkModal}
+              className="w-full mt-3 py-3 rounded-xl border-2 border-outline-variant text-primary font-bold text-sm flex items-center justify-center gap-2 hover:bg-surface-container-low transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">link</span>
+              Send Payment Link (Digital)
+            </button>
+          )}
+        </section>
+      </div>
+
+      {/* Right: account summary */}
+      <div className="col-span-12 lg:col-span-4 space-y-5">
+        <section className="bg-primary-container rounded-2xl p-7 text-white shadow-xl relative overflow-hidden">
+          <div className="absolute top-3 right-3 opacity-10">
+            <span className="material-symbols-outlined text-8xl">account_balance_wallet</span>
+          </div>
+          <h3 className="font-headline font-bold text-lg mb-5 flex items-center gap-2 text-on-primary-container">
+            <span className="material-symbols-outlined text-secondary-fixed-dim">bar_chart</span>
+            Account Summary
+          </h3>
+          {selectedFee ? (
+            <div className="space-y-3 text-white">
+              <div className="mb-4">
+                <p className="text-lg font-headline font-extrabold text-white">{selectedFee.student?.name || "—"}</p>
+                <p className="text-[11px] text-on-primary-container/70">
+                  {selectedFee.student?.admission?.admissionNo && <span className="font-bold">{selectedFee.student.admission.admissionNo} · </span>}
+                  {formatStandardLabel(selectedFee.student?.standard)}{selectedFee.student?.section ? ` - ${selectedFee.student.section}` : ""} · {selectedFee.academicYear || academicYear}
+                </p>
+              </div>
+              {[
+                { label: "Total Fee", val: selectedFee.totalFee },
+                { label: "Discount", val: selectedFee.discount, negative: true },
+                { label: "Net Fee", val: selectedFee.netFee, divider: true },
+                { label: "Amount Paid", val: selectedFee.totalPaid },
+              ].map(({ label, val, negative, divider }) => (
+                <React.Fragment key={label}>
+                  {divider && <div className="h-px bg-white/10 my-1" />}
+                  <div className="flex justify-between items-center text-on-primary-container/80">
+                    <span className="text-sm text-white-dim">{label}</span>
+                    <span className="font-bold text-white">{negative ? "− " : ""}{fmt(val)}</span>
+                  </div>
+                </React.Fragment>
+              ))}
+              <div className="mt-6 bg-white/10 rounded-2xl p-5 backdrop-blur-md border border-white/10 text-center">
+                <p className="text-[10px] uppercase tracking-widest text-secondary-fixed mb-1 font-bold">Pending Balance</p>
+                <p className={`text-4xl font-headline font-extrabold ${Number(selectedFee.pending || 0) > 0 ? "text-white" : "text-[#44ddc1]"}`}>
+                  {fmt(selectedFee.pending)}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-on-primary-container/60 text-sm text-center py-8">
+              <span className="material-symbols-outlined text-3xl block mb-2 opacity-40">person_search</span>
+              Select a student to view their account summary
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+
+  // ── TAB: Payment History ─────────────────────────────────────────────────
+  const HistoryTab = () => (
+    <section className="bg-white rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] overflow-hidden">
+      {/* Toolbar */}
+      <div className="px-7 py-5 border-b border-outline-variant/20 flex items-center justify-between flex-wrap gap-3">
+        <h3 className="font-headline font-bold text-lg text-primary flex items-center gap-2">
+          <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>receipt_long</span>
+          Payment History
+          {selectedFee && <span className="text-sm font-normal text-on-surface-variant">— {selectedFee.student?.name}</span>}
+        </h3>
+        <div className="flex gap-2">
+          {["ALL", "SUCCESS", "REFUNDED", "CANCELLED"].map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setPaymentStatusFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${paymentStatusFilter === f
+                ? "bg-primary text-white"
+                : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                }`}
+            >
+              {f === "ALL" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!selectedFee ? (
+        <div className="py-20 text-center text-on-surface-variant">
+          <span className="material-symbols-outlined text-4xl block mb-3 opacity-30">person_search</span>
+          <p className="text-sm">Select a student above to view payment history</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest bg-surface">
+                {["Date", "Receipt No", "Term", "Amount", "Mode", "Status", "Actions"].map((h, i) => (
+                  <th key={h} className={`px-5 py-3.5 ${i === 3 ? "text-right" : ""} ${i === 6 ? "text-center" : "text-left"}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredPayments.map((p, idx) => (
+                <tr key={p.id || idx} className="border-b border-surface-container-low hover:bg-surface-bright transition-colors">
+                  <td className="px-5 py-4 font-medium">
+                    {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                  </td>
+                  <td className="px-5 py-4 text-on-surface-variant">{p.receiptNo || "—"}</td>
+                  <td className="px-5 py-4 text-on-surface-variant">{p.termNumber ? `Term ${p.termNumber}` : "General"}</td>
+                  <td className="px-5 py-4 text-right">
+                    <div className="font-bold text-primary">{fmt(p.amount)}</div>
+                    {p.paidComponents && Object.keys(p.paidComponents).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1 justify-end">
+                        {Object.entries(p.paidComponents).map(([k, v]) => (
+                          <span key={k} className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${k === "transport" ? "bg-tertiary-fixed/20 text-tertiary" : "bg-surface-container-high text-on-surface-variant"}`}>
+                            {formatPaidComponentLabel(k)} {fmt(v)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className="flex items-center gap-2 text-on-surface-variant">
+                      <span className="material-symbols-outlined text-sm">{modeIcon(p.paymentMode)}</span>
+                      {p.paymentMode || "—"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">{statusBadge(p.status)}</td>
+                  <td className="px-5 py-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => handlePrintExistingPayment(p)} title="Print Receipt"
+                        className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all">
+                        <span className="material-symbols-outlined text-sm">print</span>
+                      </button>
+                      {canCollectFee && p.status !== "CANCELLED" && p.status !== "REFUNDED" && (
+                        <>
+                          <button onClick={() => openStatusModal("refund", p)} title="Refund"
+                            className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all">
+                            <span className="material-symbols-outlined text-sm">replay</span>
+                          </button>
+                          <button onClick={() => openStatusModal("cancel", p)} title="Cancel"
+                            className="w-8 h-8 rounded-full bg-error-container flex items-center justify-center text-error hover:bg-error hover:text-white transition-all">
+                            <span className="material-symbols-outlined text-sm">close</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredPayments.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-5 py-16 text-center text-on-surface-variant text-sm">
+                    <span className="material-symbols-outlined text-3xl block mb-2 opacity-30">receipt_long</span>
+                    No payments found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+
+  // ── TAB: Fee Summary ─────────────────────────────────────────────────────
+  const SummaryTab = () => {
+    if (!selectedFee) return (
+      <div className="bg-white rounded-2xl py-20 text-center text-on-surface-variant shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
+        <span className="material-symbols-outlined text-4xl block mb-3 opacity-30">bar_chart</span>
+        <p className="text-sm">Select a student above to view fee summary</p>
+      </div>
+    );
+
+    return (
+      <div className="grid grid-cols-12 gap-5">
+        {/* Account summary */}
+        <div className="col-span-12 lg:col-span-4">
+          <section className="bg-primary-container rounded-2xl p-7 shadow-xl relative overflow-hidden">
             <div className="absolute top-3 right-3 opacity-10">
               <span className="material-symbols-outlined text-8xl">account_balance_wallet</span>
             </div>
@@ -1434,47 +1285,41 @@ const CollectPaymentPage = ({ studentId }) => {
               <span className="material-symbols-outlined text-secondary-fixed-dim">bar_chart</span>
               Account Summary
             </h3>
-
-            {selectedFee ? (
-              <div className="space-y-3 text-white">
-                <div className="mb-4">
-                  <p className="text-lg font-headline font-extrabold text-white">{selectedFee.student?.name || "—"}</p>
-                  <p className="text-[11px] text-on-primary-container/70">
-                    {selectedFee.student?.admission?.admissionNo && <span className="font-bold">{selectedFee.student.admission.admissionNo} · </span>}
-                    {formatStandardLabel(selectedFee.student?.standard)}{selectedFee.student?.section ? ` - ${selectedFee.student.section}` : ""} · {selectedFee.academicYear || academicYear}
-                  </p>
-                </div>
-                {[
-                  { label: "Total Fee", val: selectedFee.totalFee },
-                  { label: "Discount", val: selectedFee.discount, negative: true },
-                  { label: "Net Fee", val: selectedFee.netFee, divider: true },
-                  { label: "Amount Paid", val: selectedFee.totalPaid },
-                ].map(({ label, val, negative, divider }) => (
-                  <React.Fragment key={label}>
-                    {divider && <div className="h-px bg-white/10 my-1" />}
-                    <div className="flex justify-between items-center text-on-primary-container/80">
-                      <span className="text-sm text-white-dim">{label}</span>
-                      <span className="font-bold text-white">{negative ? "− " : ""}{fmt(val)}</span>
-                    </div>
-                  </React.Fragment>
-                ))}
-                <div className="mt-6 bg-white/10 rounded-2xl p-5 backdrop-blur-md border border-white/10 text-center">
-                  <p className="text-[10px] uppercase tracking-widest text-secondary-fixed mb-1 font-bold">Pending Balance</p>
-                  <p className={`text-4xl font-headline font-extrabold ${Number(selectedFee.pending || 0) > 0 ? "text-white" : "text-[#44ddc1]"}`}>
-                    {fmt(selectedFee.pending)}
-                  </p>
-                </div>
+            <div className="space-y-3">
+              <div className="mb-4">
+                <p className="text-lg font-headline font-extrabold text-white">{selectedFee.student?.name}</p>
+                <p className="text-[11px] text-on-primary-container/70">
+                  {selectedFee.student?.admission?.admissionNo && <span className="font-bold">{selectedFee.student.admission.admissionNo} · </span>}
+                  {formatStandardLabel(selectedFee.student?.standard)} · {selectedFee.academicYear || academicYear}
+                </p>
               </div>
-            ) : (
-              <div className="text-on-primary-container/60 text-sm text-center py-8">
-                <span className="material-symbols-outlined text-3xl block mb-2 opacity-40">person_search</span>
-                Select a student to view their account summary
+              {[
+                { label: "Total Fee", val: selectedFee.totalFee },
+                { label: "Discount", val: selectedFee.discount, negative: true },
+                { label: "Net Fee", val: selectedFee.netFee, divider: true },
+                { label: "Amount Paid", val: selectedFee.totalPaid },
+              ].map(({ label, val, negative, divider }) => (
+                <React.Fragment key={label}>
+                  {divider && <div className="h-px bg-white/10 my-1" />}
+                  <div className="flex justify-between items-center text-on-primary-container/80">
+                    <span className="text-sm">{label}</span>
+                    <span className="font-bold text-white">{negative ? "− " : ""}{fmt(val)}</span>
+                  </div>
+                </React.Fragment>
+              ))}
+              <div className="mt-6 bg-white/10 rounded-2xl p-5 border border-white/10 text-center">
+                <p className="text-[10px] uppercase tracking-widest text-secondary-fixed mb-1 font-bold">Pending Balance</p>
+                <p className={`text-4xl font-headline font-extrabold ${Number(selectedFee.pending || 0) > 0 ? "text-white" : "text-[#44ddc1]"}`}>
+                  {fmt(selectedFee.pending)}
+                </p>
               </div>
-            )}
+            </div>
           </section>
+        </div>
 
-          {/* Term-Wise Summary */}
-          {selectedFee && selectedFee.terms?.length > 0 && (
+        {/* Term-wise status */}
+        {selectedFee.terms?.length > 0 && (
+          <div className="col-span-12 lg:col-span-8">
             <section className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
               <h3 className="font-headline font-bold text-primary mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
@@ -1489,19 +1334,13 @@ const CollectPaymentPage = ({ studentId }) => {
                   const isPartial = paid > 0 && !isPaid;
                   const pctPaid = termAmt > 0 ? Math.min(Math.round((paid / termAmt) * 100), 100) : 0;
                   return (
-                    <div key={t.termNumber} className={`p-3.5 rounded-xl border ${
-                      isPaid ? "bg-[#e8f5e9]/60 border-[#4caf50]/20" : isPartial ? "bg-amber-50/60 border-amber-200" : "bg-surface-container-low border-outline-variant/20"
-                    }`}>
+                    <div key={t.termNumber} className={`p-3.5 rounded-xl border ${isPaid ? "bg-[#e8f5e9]/60 border-[#4caf50]/20" : isPartial ? "bg-amber-50/60 border-amber-200" : "bg-surface-container-low border-outline-variant/20"}`}>
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${
-                            isPaid ? "bg-[#4caf50] text-white" : isPartial ? "bg-amber-400 text-white" : "bg-surface-container-highest text-on-surface-variant"
-                          }`}>{t.termNumber}</span>
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${isPaid ? "bg-[#4caf50] text-white" : isPartial ? "bg-amber-400 text-white" : "bg-surface-container-highest text-on-surface-variant"}`}>{t.termNumber}</span>
                           <span className="text-sm font-bold text-on-surface">{t.termName}</span>
                         </div>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                          isPaid ? "bg-[#4caf50]/20 text-[#2e7d32]" : isPartial ? "bg-amber-100 text-amber-700" : "bg-surface-container-highest text-on-surface-variant"
-                        }`}>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${isPaid ? "bg-[#4caf50]/20 text-[#2e7d32]" : isPartial ? "bg-amber-100 text-amber-700" : "bg-surface-container-highest text-on-surface-variant"}`}>
                           {isPaid ? "Paid" : isPartial ? "Partial" : "Unpaid"}
                         </span>
                       </div>
@@ -1522,79 +1361,106 @@ const CollectPaymentPage = ({ studentId }) => {
                         </div>
                       )}
                       <div className="w-full bg-surface-container-highest rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full transition-all ${isPaid ? "bg-[#4caf50]" : isPartial ? "bg-amber-400" : "bg-outline-variant/30"}`}
-                          style={{ width: `${pctPaid}%` }}
-                        />
+                        <div className={`h-1.5 rounded-full transition-all ${isPaid ? "bg-[#4caf50]" : isPartial ? "bg-amber-400" : "bg-outline-variant/30"}`}
+                          style={{ width: `${pctPaid}%` }} />
                       </div>
                     </div>
                   );
                 })}
-                {/* Non-term fees summary */}
-                {(() => {
-                  const nonTermTotal = Number(selectedFee.bookFee || 0) + Number(selectedFee.hostelFee || 0) + Number(selectedFee.otherFee || 0) +
-                    (selectedFee.customItems || []).reduce((s, ci) => s + Number(ci.amount || 0), 0);
-                  if (nonTermTotal <= 0) return null;
-                  const nonTermPaid = payments?.filter((p) => !p.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
-                  const nonTermBal = Math.round(nonTermTotal - nonTermPaid);
-                  return (
-                    <div className={`p-3.5 rounded-xl border ${
-                      nonTermBal <= 0 ? "bg-[#e8f5e9]/60 border-[#4caf50]/20" : "bg-tertiary-fixed/10 border-tertiary/10"
-                    }`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-bold text-tertiary flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">shopping_bag</span>Other Fees
-                        </span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                          nonTermBal <= 0 ? "bg-[#4caf50]/20 text-[#2e7d32]" : "bg-tertiary/10 text-tertiary"
-                        }`}>{nonTermBal <= 0 ? "Paid" : "Pending"}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-on-surface-variant">Total: <span className="font-bold">{fmt(nonTermTotal)}</span></span>
-                        <span className="text-on-surface-variant">Bal: <span className={`font-bold ${nonTermBal > 0 ? "text-error" : "text-[#2e7d32]"}`}>{fmt(nonTermBal)}</span></span>
-                      </div>
-                    </div>
-                  );
-                })()}
+              </div>
+
+              {/* Component breakdown table */}
+              <div className="mt-6">
+                <h4 className="font-headline font-bold text-sm text-primary mb-3">Component Breakdown</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+                        <th className="text-left py-2 px-3">Component</th>
+                        {computeTermComponents(selectedFee).map((t) => (
+                          <th key={t.termNumber} className="text-right py-2 px-3">{t.termName}</th>
+                        ))}
+                        <th className="text-right py-2 px-3">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { label: "Tuition", field: "tuitionAmount", total: selectedFee.tuitionFee },
+                        ...(Number(selectedFee.transportFee || 0) > 0 ? [{ label: "Transport", field: "transportAmount", total: selectedFee.transportFee, highlight: true }] : []),
+                      ].map((row) => (
+                        <tr key={row.field} className={row.highlight ? "bg-tertiary-fixed/10" : ""}>
+                          <td className={`py-2 px-3 font-bold ${row.highlight ? "text-tertiary" : "text-on-surface"}`}>{row.label}</td>
+                          {computeTermComponents(selectedFee).map((t) => (
+                            <td key={t.termNumber} className="text-right py-2 px-3 font-medium text-on-surface-variant">{fmt(t[row.field] || 0)}</td>
+                          ))}
+                          <td className="text-right py-2 px-3 font-bold text-on-surface">{fmt(row.total)}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t border-outline-variant/30">
+                        <td className="py-2 px-3 font-extrabold text-primary">Total</td>
+                        {computeTermComponents(selectedFee).map((t) => (
+                          <td key={t.termNumber} className="text-right py-2 px-3 font-extrabold text-primary">{fmt(t.amount)}</td>
+                        ))}
+                        <td className="text-right py-2 px-3 font-extrabold text-primary">
+                          {fmt(Number(selectedFee.tuitionFee || 0) + Number(selectedFee.transportFee || 0))}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </section>
-          )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
-          {/* Sibling Fee Summary */}
-          {selectedFee && (
-            <section className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
-              <h3 className="font-headline font-bold text-primary mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
-                Sibling Fees
-              </h3>
-              {!selectedFee.student?.siblingGroupId ? (
-                <p className="text-xs text-on-surface-variant text-center py-4">
-                  <span className="material-symbols-outlined text-2xl block mb-2 opacity-30">person</span>
-                  No sibling group assigned for this student.
-                </p>
-              ) : siblingData.length === 0 ? (
-                <p className="text-xs text-on-surface-variant text-center py-4">
-                  <span className="material-symbols-outlined text-2xl block mb-2 opacity-30">group_off</span>
-                  No siblings found in this group.
-                </p>
-              ) : (
-                <p className="text-xs text-on-surface-variant mb-4">
-                  {siblingData.length} sibling{siblingData.length > 1 ? "s" : ""} found — parents can pay for siblings here.
-                </p>
-              )}
-              {siblingData.length > 0 && (
-              <div className="space-y-3">
-                {siblingData.map((sib) => {
-                  const totalNet = sib.fees.reduce((s, f) => s + Number(f.netFee || 0), 0);
-                  const totalPaid = sib.fees.reduce((s, f) => s + Number(f.totalPaid || 0), 0);
-                  const totalPending = sib.fees.reduce((s, f) => s + Number(f.pending || 0), 0);
-                  const paidPercent = totalNet > 0 ? Math.round((totalPaid / totalNet) * 100) : 0;
-                  // Find a fee record in the current academic year for "Pay" button
-                  const currentYearFee = sib.fees.find((f) => f.academicYear === academicYear);
-                  const feeInStudentFees = currentYearFee ? studentFees.find((sf) => sf.id === currentYearFee.id) : null;
-                  return (
-                    <div key={sib.id} className="p-4 bg-surface-container-low rounded-xl border border-outline-variant/20 hover:border-primary/20 transition-colors">
-                      <div className="flex items-start justify-between mb-2">
+  // ── TAB: Siblings ────────────────────────────────────────────────────────
+  const SiblingsTab = () => {
+    if (!selectedFee) return (
+      <div className="bg-white rounded-2xl py-20 text-center text-on-surface-variant shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
+        <span className="material-symbols-outlined text-4xl block mb-3 opacity-30">group</span>
+        <p className="text-sm">Select a student above to view sibling fees</p>
+      </div>
+    );
+
+    return (
+      <section className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
+        <h3 className="font-headline font-bold text-primary mb-4 flex items-center gap-2">
+          <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>group</span>
+          Sibling Fees
+        </h3>
+
+        {!selectedFee.student?.siblingGroupId ? (
+          <div className="py-12 text-center text-on-surface-variant">
+            <span className="material-symbols-outlined text-3xl block mb-2 opacity-30">person</span>
+            <p className="text-sm">No sibling group assigned for this student.</p>
+          </div>
+        ) : siblingData.length === 0 ? (
+          <div className="py-12 text-center text-on-surface-variant">
+            <span className="material-symbols-outlined text-3xl block mb-2 opacity-30">group_off</span>
+            <p className="text-sm">No siblings found in this group.</p>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs text-on-surface-variant mb-4">
+              {siblingData.length} sibling{siblingData.length > 1 ? "s" : ""} found — parents can pay for siblings here.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {siblingData.map((sib) => {
+                const totalNet = sib.fees.reduce((s, f) => s + Number(f.netFee || 0), 0);
+                const totalPaid = sib.fees.reduce((s, f) => s + Number(f.totalPaid || 0), 0);
+                const totalPending = sib.fees.reduce((s, f) => s + Number(f.pending || 0), 0);
+                const paidPercent = totalNet > 0 ? Math.round((totalPaid / totalNet) * 100) : 0;
+                const pendingFee = sib.fees.find((f) => Number(f.pending) > 0);
+                return (
+                  <div key={sib.id} className="p-4 bg-surface-container-low rounded-xl border border-outline-variant/20 hover:border-primary/20 transition-colors">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-secondary-container flex items-center justify-center text-primary text-sm font-black flex-shrink-0">
+                          {(sib.name || "?")[0]}
+                        </div>
                         <div>
                           <p className="text-sm font-bold text-primary">{sib.name}</p>
                           <p className="text-[10px] text-on-surface-variant">
@@ -1602,263 +1468,123 @@ const CollectPaymentPage = ({ studentId }) => {
                             {formatStandardLabel(sib.standard)}{sib.section ? ` - ${sib.section}` : ""}
                           </p>
                         </div>
-                        {(() => {
-                          const pendingFee = sib.fees.find((f) => Number(f.pending) > 0);
-                          if (!pendingFee) return null;
-                          return (
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                const feeYear = pendingFee.academicYear;
-                                if (feeYear !== academicYear) {
-                                  setAcademicYear(feeYear);
-                                  // Wait for fees to load with new year, then select
-                                  try {
-                                    const freshFees = await getAllStudentFees(feeYear);
-                                    setStudentFees(freshFees || []);
-                                    const match = (freshFees || []).find((sf) => sf.id === pendingFee.id);
-                                    if (match) {
-                                      const enriched = enrichWithVirtualTerm(match);
-                                      setSelectedFee(enriched);
-                                      setAmount("");
-                                      setTermNumber(null);
-                                      setPayingNonTerm(false);
-                                      setPayComponents([]);
-                                      setReceiptComponents(getAvailableReceiptComponentOptions(enriched));
-                                      fetchSiblingFees(enriched?.student?.id);
-                                      const payList = await getPaymentsByStudentFee(pendingFee.id);
-                                      setPayments(payList || []);
-                                    }
-                                  } catch { message.error("Failed to load fees for that year"); }
-                                } else if (feeInStudentFees) {
-                                  onSelectFee(feeInStudentFees.id);
+                      </div>
+                      {pendingFee && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const feeYear = pendingFee.academicYear;
+                            if (feeYear !== academicYear) {
+                              setAcademicYear(feeYear);
+                              try {
+                                const freshFees = await getAllStudentFees(feeYear);
+                                setStudentFees(freshFees || []);
+                                const match = (freshFees || []).find((sf) => sf.id === pendingFee.id);
+                                if (match) {
+                                  const enriched = enrichWithVirtualTerm(match);
+                                  setSelectedFee(enriched);
+                                  const list = await getPaymentsByStudentFee(match.id);
+                                  setPayments(list || []);
                                 }
-                                setTimeout(() => {
-                                  paymentFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                                }, 200);
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-primary text-white text-[10px] font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
-                            >
-                              <span className="material-symbols-outlined text-xs">payments</span>
-                              Pay
-                            </button>
-                          );
-                        })()}
-                      </div>
-                      {/* Per-year fee breakdown */}
-                      {sib.fees.length > 0 ? sib.fees.map((f) => (
-                        <div key={f.id} className="flex items-center gap-3 text-[10px] mb-1">
-                          <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded font-bold">{f.academicYear}</span>
-                          <span className="text-on-surface-variant">Net: <span className="font-bold text-on-surface">{fmt(f.netFee)}</span></span>
-                          <span className="text-on-surface-variant">Paid: <span className="font-bold text-green-700">{fmt(f.totalPaid)}</span></span>
-                          <span className={`font-bold ${Number(f.pending) > 0 ? "text-error" : "text-green-700"}`}>
-                            {Number(f.pending) > 0 ? `Pending: ${fmt(f.pending)}` : "Paid"}
-                          </span>
-                        </div>
-                      )) : (
-                        <p className="text-[10px] text-on-surface-variant">No fees assigned</p>
+                              } catch { message.error("Failed to load sibling fees"); }
+                            } else {
+                              onSelectFee(pendingFee.id);
+                            }
+                            setActiveTab("collect");
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-primary text-white text-[11px] font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[11px]">point_of_sale</span>
+                          Pay
+                        </button>
                       )}
-                      <div className="w-full bg-surface-container-highest rounded-full h-1.5 mt-2">
-                        <div
-                          className={`h-1.5 rounded-full transition-all ${totalPending > 0 ? "bg-primary" : "bg-green-500"}`}
-                          style={{ width: `${Math.min(paidPercent, 100)}%` }}
-                        />
+                    </div>
+                    <div className="space-y-1.5 text-[11px]">
+                      {sib.fees.map((f) => (
+                        <div key={f.id} className="flex justify-between items-center py-1 border-b border-outline-variant/15 last:border-0">
+                          <span className="text-on-surface-variant">{f.academicYear}</span>
+                          <div className="flex gap-3">
+                            <span>Net: <span className="font-bold text-on-surface">{fmt(f.netFee)}</span></span>
+                            <span>Paid: <span className="font-bold text-[#2e7d32]">{fmt(f.totalPaid)}</span></span>
+                            <span>Pending: <span className={`font-bold ${Number(f.pending) > 0 ? "text-error" : "text-[#2e7d32]"}`}>{fmt(f.pending)}</span></span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Progress */}
+                    <div className="mt-3">
+                      <div className="flex justify-between text-[10px] mb-1">
+                        <span className="text-on-surface-variant">Overall progress</span>
+                        <span className="font-bold text-primary">{paidPercent}%</span>
                       </div>
-                    </div>
-                  );
-                })}
-
-                {/* Family total summary */}
-                {(() => {
-                  const familyTotal = siblingData.reduce((s, sib) => s + sib.fees.reduce((ss, f) => ss + Number(f.netFee || 0), 0), 0) + Number(selectedFee.netFee || 0);
-                  const familyPaid = siblingData.reduce((s, sib) => s + sib.fees.reduce((ss, f) => ss + Number(f.totalPaid || 0), 0), 0) + Number(selectedFee.totalPaid || 0);
-                  const familyPending = siblingData.reduce((s, sib) => s + sib.fees.reduce((ss, f) => ss + Number(f.pending || 0), 0), 0) + Number(selectedFee.pending || 0);
-                  return (
-                    <div className="mt-2 p-3 bg-primary/5 rounded-xl border border-primary/10">
-                      <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-2">Family Total (All Siblings)</p>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div>
-                          <p className="text-[10px] text-on-surface-variant">Total Fee</p>
-                          <p className="text-sm font-bold text-primary">{fmt(familyTotal)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-on-surface-variant">Paid</p>
-                          <p className="text-sm font-bold text-green-700">{fmt(familyPaid)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-on-surface-variant">Pending</p>
-                          <p className={`text-sm font-bold ${familyPending > 0 ? "text-error" : "text-green-700"}`}>{fmt(familyPending)}</p>
-                        </div>
+                      <div className="w-full bg-surface-container-highest rounded-full h-1.5">
+                        <div className="h-1.5 rounded-full bg-primary transition-all" style={{ width: `${paidPercent}%` }} />
                       </div>
-                    </div>
-                  );
-                })()}
-              </div>
-              )}
-            </section>
-          )}
-
-          {/* Payment links / digital invoicing */}
-          <section className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
-            <h3 className="font-headline font-bold text-primary mb-5 flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">send</span>
-              Digital Invoicing
-            </h3>
-            <div className="space-y-3">
-              {paymentLinks.slice(0, 3).map((link, i) => (
-                <div key={link.id || i} className="flex items-center justify-between p-3 bg-surface rounded-xl hover:bg-surface-container transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      link.channel === "WHATSAPP" ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"
-                    }`}>
-                      <span className="material-symbols-outlined text-base">
-                        {link.channel === "WHATSAPP" ? "chat" : "mail"}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-primary">
-                        {link.channel === "WHATSAPP" ? "WhatsApp Invoice" : "SMS Receipt"}
-                      </p>
-                      <p className="text-[10px] text-on-surface-variant">
-                        {link.createdAt ? new Date(link.createdAt).toLocaleString() : ""}
-                      </p>
                     </div>
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                    link.status === "SUCCESS"
-                      ? "bg-green-100 text-green-700"
-                      : link.status === "PENDING"
-                      ? "bg-surface-container-high text-on-surface-variant"
-                      : "bg-error-container text-error"
-                  }`}>
-                    {link.status === "SUCCESS" ? "Sent" : link.status === "PENDING" ? "Pending" : link.status}
-                  </span>
-                </div>
-              ))}
-              {paymentLinks.length === 0 && (
-                <p className="text-xs text-on-surface-variant text-center py-4">No payment links sent yet</p>
-              )}
+                );
+              })}
             </div>
-            <button
-              onClick={() => message.info("Filter by status from the history table below")}
-              className="w-full mt-5 py-2.5 text-sm font-bold text-primary border-2 border-primary-fixed rounded-xl hover:bg-primary-fixed transition-colors flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-sm">history</span>
-              View Log History
-            </button>
-          </section>
-        </div>
-
-        {/* ── BOTTOM: payment history table (full width) ── */}
-        {(filteredPayments.length > 0 || payments.length > 0) && (
-          <div className="col-span-12">
-            <section className="bg-white rounded-2xl p-7 shadow-[0_20px_40px_rgba(1,29,53,0.06)]">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="font-headline font-bold text-lg text-primary">Payment History</h3>
-                  <p className="text-sm text-on-surface-variant">
-                    {selectedFee ? `Recent fee transactions for ${selectedFee.student?.name}` : "All transactions"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <select
-                    value={paymentStatusFilter}
-                    onChange={(e) => setPaymentStatusFilter(e.target.value)}
-                    className="bg-surface-container-high border-none rounded-xl py-2 px-4 text-sm font-medium outline-none appearance-none"
-                  >
-                    <option value="ALL">All Status</option>
-                    <option value="SUCCESS">Success</option>
-                    <option value="CANCELLED">Cancelled</option>
-                    <option value="REFUNDED">Refunded</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest bg-surface">
-                      {["Date", "Receipt No", "Term", "Amount", "Mode", "Status", "Actions"].map((h, i) => (
-                        <th key={h} className={`px-5 py-3.5 ${i === 0 ? "rounded-tl-xl" : ""} ${i === 6 ? "rounded-tr-xl text-center" : ""} ${i === 3 ? "text-right" : ""}`}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    {filteredPayments.map((p, idx) => (
-                      <tr key={p.id || idx} className="border-b border-surface-container-low hover:bg-surface-bright transition-colors">
-                        <td className="px-5 py-4 font-medium">
-                          {p.paymentDate ? new Date(p.paymentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
-                        </td>
-                        <td className="px-5 py-4 text-on-surface-variant">{p.receiptNo || "—"}</td>
-                        <td className="px-5 py-4 text-on-surface-variant">{p.termNumber ? `Term ${p.termNumber}` : "General"}</td>
-                        <td className="px-5 py-4 text-right">
-                          <div className="font-bold text-primary">{fmt(p.amount)}</div>
-                          {p.paidComponents && Object.keys(p.paidComponents).length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1 justify-end">
-                              {Object.entries(p.paidComponents).map(([k, v]) => (
-                                <span key={k} className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
-                                  k === "transport" ? "bg-tertiary-fixed/20 text-tertiary" : "bg-surface-container-high text-on-surface-variant"
-                                }`}>
-                                  {k.startsWith("custom-") ? k.replace(/^custom-[\w-]+/, "Custom") : k.charAt(0).toUpperCase() + k.slice(1)} {fmt(v)}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="flex items-center gap-2 text-on-surface-variant">
-                            <span className="material-symbols-outlined text-sm">{modeIcon(p.paymentMode)}</span>
-                            {p.paymentMode || "—"}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4">{statusBadge(p.status)}</td>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => handlePrintExistingPayment(p)}
-                              title="Print Receipt"
-                              className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all"
-                            >
-                              <span className="material-symbols-outlined text-sm">print</span>
-                            </button>
-                            {canCollectFee && p.status !== "CANCELLED" && p.status !== "REFUNDED" && (
-                              <>
-                                <button
-                                  onClick={() => openStatusModal("refund", p)}
-                                  title="Refund"
-                                  className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all"
-                                >
-                                  <span className="material-symbols-outlined text-sm">replay</span>
-                                </button>
-                                <button
-                                  onClick={() => openStatusModal("cancel", p)}
-                                  title="Cancel"
-                                  className="w-8 h-8 rounded-full bg-error-container flex items-center justify-center text-error hover:bg-error hover:text-white transition-all"
-                                >
-                                  <span className="material-symbols-outlined text-sm">close</span>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredPayments.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="px-5 py-10 text-center text-on-surface-variant text-sm">
-                          <span className="material-symbols-outlined text-3xl block mb-2 opacity-30">receipt_long</span>
-                          No payments found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </div>
+          </>
         )}
+      </section>
+    );
+  };
+
+  // ── render ───────────────────────────────────────────────────────────────
+  return (
+    <div className="space-y-5">
+      {/* Page header */}
+      <div>
+        <nav className="flex items-center gap-1.5 text-xs text-on-surface-variant mb-2 font-medium">
+          <span>Finance</span>
+          <span className="material-symbols-outlined text-[10px]">chevron_right</span>
+          <span className="text-primary font-bold">Collect Fees</span>
+        </nav>
+        <h2 className="font-headline font-extrabold text-3xl text-primary tracking-tight">
+          Collect Student Fees
+        </h2>
+      </div>
+
+      {/* Shared student selector */}
+      <StudentSelector />
+
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 bg-surface-container-low rounded-2xl p-1.5 w-fit">
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.key;
+          // Badge counts
+          let badge = null;
+          if (tab.key === "history" && payments.length > 0) badge = payments.length;
+          if (tab.key === "siblings" && siblingData.length > 0) badge = siblingData.length;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${isActive
+                ? "bg-white text-primary shadow-[0_2px_8px_rgba(1,29,53,0.12)]"
+                : "text-on-surface-variant hover:text-primary hover:bg-white/50"
+                }`}
+            >
+              <span className="material-symbols-outlined text-base" style={isActive ? { fontVariationSettings: "'FILL' 1" } : {}}>{tab.icon}</span>
+              {tab.label}
+              {badge && (
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${isActive ? "bg-primary text-white" : "bg-surface-container-highest text-on-surface-variant"}`}>
+                  {badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab content */}
+      <div>
+        {activeTab === "collect"  && CollectTab()}
+        {activeTab === "history"  && HistoryTab()}
+        {activeTab === "summary"  && SummaryTab()}
+        {activeTab === "siblings" && SiblingsTab()}
       </div>
 
       {/* ── Print receipt modal ── */}
@@ -1868,9 +1594,7 @@ const CollectPaymentPage = ({ studentId }) => {
         onCancel={() => setPrintPayment(null)}
         width={700}
         footer={[
-          <button key="close" onClick={() => setPrintPayment(null)} className="px-6 py-2 rounded-xl border border-outline-variant font-bold text-sm mr-2 hover:bg-surface-container-low transition-colors">
-            Close
-          </button>,
+          <button key="close" onClick={() => setPrintPayment(null)} className="px-6 py-2 rounded-xl border border-outline-variant font-bold text-sm mr-2 hover:bg-surface-container-low transition-colors">Close</button>,
           <button key="print" onClick={handlePrint} className="px-6 py-2 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
             <span className="material-symbols-outlined text-sm">print</span>Print Receipt
           </button>,
@@ -1879,10 +1603,7 @@ const CollectPaymentPage = ({ studentId }) => {
         {printPayment && (
           <div ref={printRef}>
             <div className="receipt">
-              <div className="header">
-                <h2>School ERP</h2>
-                <p>Fee Payment Receipt</p>
-              </div>
+              <div className="header"><h2>School ERP</h2><p>Fee Payment Receipt</p></div>
               <div className="receipt-no">Receipt No: {printPayment.receiptNo || "N/A"}</div>
               <div className="receipt-no" style={{ marginTop: -4 }}>Status: {printPayment.status || "SUCCESS"}</div>
               <table>
@@ -1892,33 +1613,49 @@ const CollectPaymentPage = ({ studentId }) => {
                   <tr><th>Payment Date</th><td>{new Date(printPayment.paymentDate).toLocaleDateString()}</td></tr>
                   <tr><th>Payment Mode</th><td>{printPayment.paymentMode}</td></tr>
                   {printPayment.termNumber && <tr><th>Term</th><td>Term {printPayment.termNumber}</td></tr>}
-                  <tr><th>Amount Paid</th><td style={{ fontSize: "16px", fontWeight: "bold" }}>₹{printPayment.amount?.toLocaleString()}</td></tr>
+                  <tr><th>Amount Paid</th><td style={{ fontSize: "16px", fontWeight: "bold" }}>₹{Number(printPayment.totalCollected || printPayment.amount || 0).toLocaleString()}</td></tr>
                 </tbody>
               </table>
+              {Array.isArray(printPayment.splitPayments) && printPayment.splitPayments.length > 0 && (
+                <>
+                  <h4 style={{ marginTop: 16, marginBottom: 8 }}>Auto Allocation</h4>
+                  <table>
+                    <thead><tr><th>Allocated To</th><th>Amount</th><th>Components</th></tr></thead>
+                    <tbody>
+                      {printPayment.splitPayments.map((sp, idx) => (
+                        <tr key={`${sp.termNumber || "other"}-${idx}`}>
+                          <td>{sp.termNumber ? `Term ${sp.termNumber}` : "Other Fees"}</td>
+                          <td>₹{Number(sp.amount || 0).toLocaleString()}</td>
+                          <td>
+                            {sp?.paidComponents && typeof sp.paidComponents === "object"
+                              ? Object.entries(sp.paidComponents)
+                                .map(([k, v]) => `${formatPaidComponentLabel(k)}: ₹${Number(v || 0).toLocaleString()}`)
+                                .join(", ")
+                              : "-"}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="total-row"><td>Total Allocated</td><td>₹{Number(printPayment.totalCollected || printPayment.amount || 0).toLocaleString()}</td><td>-</td></tr>
+                    </tbody>
+                  </table>
+                </>
+              )}
               {printPayment.paidComponents && Object.keys(printPayment.paidComponents).length > 0 ? (
                 <>
                   <h4 style={{ marginTop: 16, marginBottom: 8 }}>Paid Components</h4>
-                  <table>
-                    <thead><tr><th>Component</th><th>Amount</th></tr></thead>
+                  <table><thead><tr><th>Component</th><th>Amount</th></tr></thead>
                     <tbody>
                       {Object.entries(printPayment.paidComponents).map(([k, v]) => (
-                        <tr key={k}>
-                          <td>{k.startsWith("custom-") ? k.replace(/^custom-[\w-]+/, "Custom") + " Fee" : k.charAt(0).toUpperCase() + k.slice(1) + " Fee"}</td>
-                          <td>₹{Number(v).toLocaleString()}</td>
-                        </tr>
+                        <tr key={k}><td>{formatPaidComponentLabel(k)}</td><td>₹{Number(v).toLocaleString()}</td></tr>
                       ))}
-                      <tr className="total-row">
-                        <td>Total Paid</td>
-                        <td>₹{printPayment.amount?.toLocaleString()}</td>
-                      </tr>
+                      <tr className="total-row"><td>Total Paid</td><td>₹{printPayment.amount?.toLocaleString()}</td></tr>
                     </tbody>
                   </table>
                 </>
               ) : (
                 <>
                   <h4 style={{ marginTop: 16, marginBottom: 8 }}>Receipt Fee Components</h4>
-                  <table>
-                    <thead><tr><th>Component</th><th>Amount</th></tr></thead>
+                  <table><thead><tr><th>Component</th><th>Amount</th></tr></thead>
                     <tbody>
                       {buildReceiptFeeRows(printPayment).map((row) => (
                         <tr key={row.key}><td>{row.label}</td><td>₹{row.amount?.toLocaleString()}</td></tr>
@@ -1930,12 +1667,10 @@ const CollectPaymentPage = ({ studentId }) => {
               {printPayment.totalFee && (
                 <>
                   <h4 style={{ marginTop: 16, marginBottom: 8 }}>Fee Summary</h4>
-                  <table>
-                    <tbody>
-                      <tr><th width="35%">Total Fee</th><td>₹{printPayment.totalFee?.toLocaleString()}</td></tr>
-                      <tr><th>Net Fee (after discount)</th><td>₹{printPayment.netFee?.toLocaleString()}</td></tr>
-                    </tbody>
-                  </table>
+                  <table><tbody>
+                    <tr><th width="35%">Total Fee</th><td>₹{printPayment.totalFee?.toLocaleString()}</td></tr>
+                    <tr><th>Net Fee (after discount)</th><td>₹{printPayment.netFee?.toLocaleString()}</td></tr>
+                  </tbody></table>
                 </>
               )}
               {printPayment.remarks && <p style={{ marginTop: 12 }}><strong>Remarks:</strong> {printPayment.remarks}</p>}
@@ -1960,12 +1695,7 @@ const CollectPaymentPage = ({ studentId }) => {
       >
         <Form form={statusActionForm} layout="vertical">
           {statusModal.action === "refund" && (
-            <Form.Item
-              name="refundAmount"
-              label="Refund Amount"
-              rules={[{ required: true, message: "Refund amount is required" }]}
-              initialValue={statusModal.payment?.amount}
-            >
+            <Form.Item name="refundAmount" label="Refund Amount" rules={[{ required: true, message: "Refund amount is required" }]} initialValue={statusModal.payment?.amount}>
               <InputNumber min={1} max={Number(statusModal.payment?.amount || 1)} style={{ width: "100%" }} prefix="₹" />
             </Form.Item>
           )}
@@ -1984,12 +1714,12 @@ const CollectPaymentPage = ({ studentId }) => {
           linkResult
             ? [<button key="close" onClick={() => { setLinkModal({ open: false, loading: false }); setLinkResult(null); }} className="px-6 py-2 rounded-xl border border-outline-variant font-bold text-sm hover:bg-surface-container-low transition-colors">Close</button>]
             : [
-                <button key="cancel" onClick={() => setLinkModal({ open: false, loading: false })} className="px-6 py-2 rounded-xl border border-outline-variant font-bold text-sm mr-2 hover:bg-surface-container-low transition-colors">Cancel</button>,
-                <button key="send" disabled={linkModal.loading} onClick={handleSendLink} className="px-6 py-2 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50">
-                  <span className="material-symbols-outlined text-sm">send</span>
-                  {linkModal.loading ? "Sending..." : "Generate & Send Link"}
-                </button>,
-              ]
+              <button key="cancel" onClick={() => setLinkModal({ open: false, loading: false })} className="px-6 py-2 rounded-xl border border-outline-variant font-bold text-sm mr-2 hover:bg-surface-container-low transition-colors">Cancel</button>,
+              <button key="send" disabled={linkModal.loading} onClick={handleSendLink} className="px-6 py-2 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50">
+                <span className="material-symbols-outlined text-sm">send</span>
+                {linkModal.loading ? "Sending..." : "Generate & Send Link"}
+              </button>,
+            ]
         }
         width={520}
       >
@@ -2005,21 +1735,14 @@ const CollectPaymentPage = ({ studentId }) => {
               />
             )}
             <div className="space-y-2 text-sm">
-              {[
-                { label: "Amount", val: fmt(linkResult.amount) },
-                { label: "Channel", val: linkResult.channel },
-                { label: "Phone", val: linkResult.phoneNumber },
-                { label: "Status", val: linkResult.status },
-              ].map(({ label, val }) => (
+              {[{ label: "Amount", val: fmt(linkResult.amount) }, { label: "Channel", val: linkResult.channel }, { label: "Phone", val: linkResult.phoneNumber }, { label: "Status", val: linkResult.status }].map(({ label, val }) => (
                 <div key={label} className="flex justify-between py-2 border-b border-outline-variant/20">
                   <span className="text-on-surface-variant">{label}</span>
                   <span className="font-bold">{val}</span>
                 </div>
               ))}
               {linkResult.phonePeUrl && (
-                <a href={linkResult.phonePeUrl} target="_blank" rel="noopener noreferrer" className="text-primary font-bold hover:underline block pt-2">
-                  Open Payment Link →
-                </a>
+                <a href={linkResult.phonePeUrl} target="_blank" rel="noopener noreferrer" className="text-primary font-bold hover:underline block pt-2">Open Payment Link →</a>
               )}
             </div>
           </div>
@@ -2043,11 +1766,7 @@ const CollectPaymentPage = ({ studentId }) => {
       </Modal>
 
       {/* ── Success toast ── */}
-      <div
-        className={`fixed bottom-8 right-8 flex items-center gap-4 bg-tertiary text-white px-6 py-4 rounded-2xl shadow-2xl transition-all duration-500 z-50 ${
-          showSuccessToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
-        }`}
-      >
+      <div className={`fixed bottom-8 right-8 flex items-center gap-4 bg-tertiary text-white px-6 py-4 rounded-2xl shadow-2xl transition-all duration-500 z-50 ${showSuccessToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}>
         <div className="w-8 h-8 rounded-full bg-[#44ddc1] text-[#001813] flex items-center justify-center flex-shrink-0">
           <span className="material-symbols-outlined text-sm font-bold">check</span>
         </div>

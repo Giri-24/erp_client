@@ -17,6 +17,7 @@ import DashboardSummary from "./DashboardSummary";
 import ProfilePage from "../modules/profile/pages/ProfilePage";
 
 import FeeStructurePage from "../modules/fees/pages/FeeStructurePage";
+import AcademicYearCreationPage from "../modules/fees/pages/AcademicYearCreationPage";
 import AssignFeePage from "../modules/fees/pages/AssignFeePage";
 import CollectPaymentPage from "../modules/fees/pages/CollectPaymentPage";
 import FeesDashboardPage from "../modules/fees/pages/FeesDashboardPage";
@@ -222,6 +223,7 @@ const Dashboard = () => {
       permission: canFeesDashboard,
       children: [
         { key: "fees-dashboard", label: "Dashboard", icon: "space_dashboard", permission: canFeesDashboard },
+        { key: "fees-academic-years", label: "Academic Years", icon: "calendar_month", permission: canFeesStructureAccess },
         { key: "fees-structure", label: "Fee Structure", icon: "list_alt", permission: canFeesStructureAccess },
         { key: "fees-assign", label: "Assign Fees", icon: "assignment", permission: canFeesAssign },
         { key: "fees-view", label: "All Fees", icon: "receipt_long", permission: canFeesRead },
@@ -363,10 +365,11 @@ const Dashboard = () => {
     //  case "approval":            return null; // <ApprovalsView />
       case "profile":             return <ProfilePage />;
       case "admin-settings":      return isTransportManager ? getRoleDashboard() : <AdminSettings />;
+      case "fees-academic-years": return <AcademicYearCreationPage />;
       case "fees-structure":      return <FeeStructurePage />;
       case "fees-assign":         return <AssignFeePage initialStudentId={feeStudentId} onMounted={() => setFeeStudentId(null)} />;
-case "fees-collect":
-  return <CollectPaymentPage studentId={feeStudentId} />;      case "fees-dashboard":      return <FeesDashboardPage />;
+      case "fees-collect":        return <CollectPaymentPage studentId={feeStudentId} />;
+      case "fees-dashboard":      return <FeesDashboardPage />;
       case "fees-view":           return <FeesViewPage />;
       case "fees-refund-report":  return <RefundCancellationReportPage />;
       case "fees-ledger":          return <StudentFeeLedgerPage />;

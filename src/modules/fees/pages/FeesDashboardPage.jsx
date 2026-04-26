@@ -29,12 +29,12 @@ const FeesDashboardPage = () => {
   const fetchAcademicYears = async () => {
     try {
       const years = await getAcademicYears();
-      setAcademicYearOptions(years);
-      if (years.length > 0 && !years.includes(academicYear)) {
+      setAcademicYearOptions(years || []);
+      if ((years || []).length > 0 && !(years || []).includes(academicYear)) {
         setAcademicYear(years[0]);
       }
     } catch {
-      // silent
+      message.error("Failed to load academic years");
     }
   };
 

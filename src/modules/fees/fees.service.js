@@ -1,5 +1,49 @@
 import axios from '../../utils/axios';
 
+const normalizeAcademicYearValue = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object') {
+    return String(
+      value.academicYear ?? value.year ?? value.name ?? value.label ?? value.value ?? ''
+    ).trim();
+  }
+  return String(value).trim();
+};
+
+const normalizeAcademicYearList = (...sources) => {
+  const years = sources
+    .flatMap((source) => {
+      if (Array.isArray(source)) return source;
+      if (Array.isArray(source?.items)) return source.items;
+      if (Array.isArray(source?.data)) return source.data;
+      if (Array.isArray(source?.rows)) return source.rows;
+      return [];
+    })
+    .map(normalizeAcademicYearValue)
+    .filter(Boolean);
+
+  return Array.from(new Set(years)).sort((left, right) => right.localeCompare(left));
+};
+
+const getAcademicYearsFromStudentFees = async () => {
+  const res = await axios.get('/fees/all');
+  return normalizeAcademicYearList(res.data?.map((fee) => fee?.academicYear));
+};
+
+// ─── ACADEMIC YEAR CREATION ───────────────
+export const createAcademicYear = async (academicYear) => {
+  const res = await axios.post('/fees/academic-years', { academicYear });
+  return res.data;
+};
+
+export const updateAcademicYear = async (academicYearId, academicYear) => {
+  const res = await axios.put(`/fees/academic-years/${encodeURIComponent(academicYearId)}`, {
+    academicYear,
+  });
+  return res.data;
+};
+
 // ─── FEE STRUCTURES ──────────────────────────
 
 export const createFeeStructure = async (data) => {
@@ -132,13 +176,24 @@ export const getSiblingFees = async (studentId) => {
 // ─── ACADEMIC YEARS ─────────────────────────
 
 export const getAcademicYears = async () => {
-  const res = await axios.get('/fees/academic-years');
-  return res.data;
+  try {
+    const res = await axios.get('/fees/academic-years');
+    const years = normalizeAcademicYearList(res.data);
+    if (years.length > 0) return years;
+  } catch (error) {
+    const status = error?.response?.status;
+    if (status && ![403, 404].includes(status)) throw error;
+  }
+
+  try {
+    return await getAcademicYearsFromStudentFees();
+  } catch {
+    return [];
+  }
 };
 
 export const getAcademicYear = async () => {
-  const res = await axios.get('/fees/academic-years');
-  return res.data;
+  return getAcademicYears();
 };
 
 // ─── TRANSPORT RECALC ───────────────────────
