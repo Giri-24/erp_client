@@ -75,51 +75,28 @@ const [fees, setFees] = useState([]);
   const [linking, setLinking] = useState(false);
 
   // PDF export for a student row (custom layout)
-  const handlePrintPDF = async (student) => {
-    try {
-      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-      // Card background
-      pdf.setFillColor(245, 247, 250);
-      pdf.roundedRect(40, 40, 515, 120, 16, 16, 'F');
+ const handlePrintPDF = async () => {
+  try {
+    const input = document.getElementById("pdfContent");
+    if (!input) return;
 
-      // Avatar circle
-      pdf.setFillColor(230, 240, 255);
-      pdf.circle(80, 100, 32, 'F');
-      pdf.setFontSize(22);
-      pdf.setTextColor(60, 90, 150);
-      pdf.text((student.name || '?').charAt(0).toUpperCase(), 80, 108, { align: 'center', baseline: 'middle' });
+    const canvas = await html2canvas(input, { scale: 3 });
 
-      // Student Name
-      pdf.setFontSize(18);
-      pdf.setTextColor(30, 30, 30);
-      pdf.text(student.name || 'Unknown', 130, 80);
+    const imgData = canvas.toDataURL("image/png");
 
-      // Admission No
-      pdf.setFontSize(10);
-      pdf.setTextColor(120, 120, 120);
-      pdf.text(`Admission No: ${student.admission?.admissionNo || student.id}`, 130, 100);
+    const pdf = new jsPDF("p", "mm", "a4");
 
-      // Class & Section
-      pdf.text(`Class: ${student.standard || student.admission?.standard || '-'}${student.section ? ' - ' + student.section : ''}`, 130, 115);
+    const imgWidth = 210;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      // Parent Name
-      pdf.text(`Parent: ${student.family?.fatherName || 'Private'}`, 130, 130);
+    pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
 
-      // Gender & Status
-      pdf.setFontSize(10);
-      pdf.setTextColor(60, 90, 150);
-      pdf.text(`Gender: ${student.gender || '-'}`, 420, 100);
-      pdf.setTextColor((student.users?.isActive ?? 1) ? 16 : 200, (student.users?.isActive ?? 1) ? 185 : 30, (student.users?.isActive ?? 1) ? 129 : 30);
-      pdf.text((student.users?.isActive ?? 1) ? 'ACTIVE' : 'ARCHIVED', 420, 120);
-
-      // Optionally, add icons (camera, link, etc.) as text or skip for PDF simplicity
-
-      // Save
-      pdf.save(`Student_${student.admission?.admissionNo || student.id}.pdf`);
-    } catch (err) {
-      message.error("Failed to generate PDF");
-    }
-  };
+    pdf.save(`Admission_${detailStudent?.admission?.admissionNo}.pdf`);
+  } catch (err) {
+    console.error(err);
+    message.error("PDF generation failed");
+  }
+};
 
   // Archive handler (soft delete)
   const handleArchive = async (studentId) => {
@@ -493,8 +470,10 @@ const [fees, setFees] = useState([]);
                              </Popconfirm>
                              {/* Issue PDF button */}
                              <button
-                               onClick={() => handlePrintPDF(s)}
-                               className="w-9 h-9 rounded-xl bg-slate-50 text-slate-900 flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+onClick={() => {
+  setDetailStudent(s);
+  setTimeout(() => handlePrintPDF(), 300);
+}}                               className="w-9 h-9 rounded-xl bg-slate-50 text-slate-900 flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm"
                                title="Issue PDF"
                              >
                                <span className="material-symbols-outlined text-[18px] leading-none">picture_as_pdf</span>
@@ -865,8 +844,172 @@ const [fees, setFees] = useState([]);
         )}
       </Modal>
 
-      
+
+    <div
+  id="pdfContent"
+  style={{
+    position: "absolute",
+    left: "-9999px",
+    width: "794px", // A4 width
+    minHeight: "1123px", // A4 height
+    background: "#fff",
+    padding: "20px",
+    fontFamily: "Arial",
+    fontSize: "13px",
+    color: "#000"
+  }}
+>
+  {/* HEADER */}
+  <div style={{ background: "#f59e0b", padding: "15px", position: "relative", textAlign: "center" }}>
+    <img
+      src="/logo.png"
+      alt="logo"
+      style={{ position: "absolute", left: "20px", top: "10px", width: "60px" }}
+    />
+
+    <h2 style={{ margin: 0 }}>MATRIC HR SEC SCHOOL</h2>
+    <p style={{ margin: 0, fontSize: "12px" }}>Excellence in Education - Salem</p>
+
+    <div style={{
+      position: "absolute",
+      right: "20px",
+      top: "10px",
+      border: "1px dashed white",
+      padding: "15px",
+      fontSize: "10px"
+    }}>
+      PASTE PHOTO
     </div>
+  </div>
+
+  {/* FORM TITLE */}
+  <div style={{
+    textAlign: "center",
+    background: "#f59e0b",
+    color: "#fff",
+    width: "220px",
+    margin: "10px auto",
+    padding: "5px",
+    fontWeight: "bold"
+  }}>
+    ADMISSION FORM
+  </div>
+
+  {/* FIELD ROW FUNCTION */}
+  {[
+    ["Student's Name", detailStudent?.name],
+    ["Father's Name", detailStudent?.family?.fatherName],
+    ["Mother's Name", detailStudent?.family?.motherName],
+  ].map(([label, value], i) => (
+    <div key={i} style={{ display: "flex", marginBottom: "8px" }}>
+      <b style={{ width: "170px" }}>{label} :</b>
+      <div style={{ flex: 1, borderBottom: "1px dotted #999" }}>{value}</div>
+    </div>
+  ))}
+
+  {/* DOB + GENDER */}
+  <div style={{ display: "flex", marginBottom: "10px" }}>
+    <div style={{ width: "50%" }}>
+      <b>Date of Birth :</b> {dayjs(detailStudent?.dob).format("DD/MM/YYYY")}
+    </div>
+    <div style={{ width: "50%", textAlign: "right" }}>
+      <b>Gender :</b> {detailStudent?.gender}
+    </div>
+  </div>
+
+  {/* ADDRESS BOX */}
+  <div style={{ border: "1px dashed #999", padding: "10px", marginTop: "10px" }}>
+    <b style={{ color: "#f59e0b" }}>RESIDENTIAL ADDRESS</b>
+
+    <div style={{ borderBottom: "1px dotted #999", marginTop: "5px" }}>
+      Address Line 1 : {detailStudent?.address?.line1}
+    </div>
+
+    <div style={{ display: "flex", marginTop: "5px" }}>
+      <div style={{ flex: 1, borderBottom: "1px dotted #999" }}>
+        City : {detailStudent?.address?.city}
+      </div>
+
+      <div style={{ flex: 1, borderBottom: "1px dotted #999", textAlign: "right" }}>
+        Pincode : {detailStudent?.address?.pin}
+      </div>
+    </div>
+  </div>
+
+  {/* RELIGION */}
+  <div style={{ display: "flex", marginTop: "10px" }}>
+    <div style={{ width: "50%" }}>
+      <b>Religion :</b> {detailStudent?.religion}
+    </div>
+    <div style={{ width: "50%", textAlign: "right" }}>
+      <b>Nationality :</b> Indian
+    </div>
+  </div>
+
+  {/* ACADEMIC */}
+  <h4 style={{ marginTop: "15px", color: "#f59e0b" }}>ACADEMIC PERFORMANCE</h4>
+
+  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
+    <thead>
+      <tr style={{ background: "#f3e8d6" }}>
+        <th style={{ border: "1px solid #ccc" }}>Subject</th>
+        <th style={{ border: "1px solid #ccc" }}>Max Marks</th>
+        <th style={{ border: "1px solid #ccc" }}>Marks Obtained</th>
+        <th style={{ border: "1px solid #ccc" }}>Percentage</th>
+      </tr>
+    </thead>
+    <tbody>
+      {detailStudent?.academics?.length > 0 ? (
+        detailStudent.academics.map((sub, i) => (
+          <tr key={i}>
+            <td style={{ border: "1px solid #ccc" }}>{sub.subject}</td>
+            <td style={{ border: "1px solid #ccc" }}>{sub.maxMarks}</td>
+            <td style={{ border: "1px solid #ccc" }}>{sub.marksObtained}</td>
+            <td style={{ border: "1px solid #ccc" }}>{sub.percentage}%</td>
+          </tr>
+        ))
+      ) : (
+        <tr>
+          <td colSpan="4">No Data</td>
+        </tr>
+      )}
+    </tbody>
+  </table>
+
+  {/* CONTACT */}
+  <div style={{ marginTop: "10px" }}>
+    <p><b>Phone Number :</b> {detailStudent?.family?.fatherPhone}</p>
+    <p><b>Email Address :</b> {detailStudent?.family?.parentsEmail}</p>
+
+    <div style={{ display: "flex" }}>
+      <div style={{ width: "50%" }}>
+        <b>Admission For :</b> {detailStudent?.standard}
+      </div>
+      <div style={{ width: "50%", textAlign: "right" }}>
+        <b>Section :</b> {detailStudent?.section}
+      </div>
+    </div>
+  </div>
+
+  {/* DECLARATION */}
+  <div style={{ textAlign: "center", marginTop: "30px" }}>
+    <b>DECLARATION</b>
+    <p style={{ fontSize: "11px" }}>
+      I hereby declare that I will obey all the rules and regulations of the institution.
+    </p>
+  </div>
+
+  <div style={{ display: "flex", justifyContent: "space-between", marginTop: "50px" }}>
+    <span>Student's Signature</span>
+    <span>Authorized Signature</span>
+  </div>
+</div>
+
+
+    </div>
+
+
+
   );
 };
 

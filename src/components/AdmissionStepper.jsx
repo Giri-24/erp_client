@@ -246,6 +246,26 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
   const [availableYears, setAvailableYears] = useState([]);
   const [draftExists, setDraftExists] = useState(false);
 
+
+async function generatePDF() {
+  try {
+    const input = document.getElementById("pdfContent");
+    if (!input) return;
+
+    const canvas = await html2canvas(input); // ✅ REQUIRED
+    const imgData = canvas.toDataURL("image/png");
+
+    const pdf = new jsPDF("p", "mm", "a4");
+    pdf.addImage(imgData, "PNG", 0, 0, 210, 297);
+
+    pdf.save(`Admission_${formData.admissionNo || "draft"}.pdf`);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+  
+
   // Check for local drafts on mount
   useEffect(() => {
     const savedDraft = localStorage.getItem("admission_draft");
@@ -256,12 +276,14 @@ const AdmissionStepper = ({ editData, clearEditData }) => {
           <div className="flex items-center gap-3">
             <span>You have a saved draft!</span>
             <button
+              type="button"
               className="px-3 py-1 bg-primary text-white text-xs rounded-lg hover:bg-primary-container transition-all"
               onClick={handleRestoreDraft}
             >
               Restore
             </button>
             <button
+              type="button"
               className="text-error text-xs hover:underline"
               onClick={handleClearDraft}
             >
@@ -617,6 +639,22 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     { label: "Aadhar", file: formData.aadharStudentFile, key: "aadharStudent" },
     { label: "Transfer Certificate", file: formData.transferCertFile, key: "transferCert" },
   ].filter((doc) => doc.file?.[0]);
+
+  const getSafePreviewUrl = (fileItem) => {
+    if (!fileItem) return null;
+    if (fileItem.url) return fileItem.url;
+    if (fileItem.thumbUrl) return fileItem.thumbUrl;
+
+    if (fileItem.originFileObj instanceof Blob) {
+      try {
+        return URL.createObjectURL(fileItem.originFileObj);
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  };
 
   useEffect(() => {
     if (!watchedSubjects || watchedSubjects.length === 0) return;
@@ -1649,74 +1687,17 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       icon: <CheckCircleOutlined />,
       content: (
         <div id="reviewStepContent" className="space-y-10">
-          {/* Download PDF Button */}
-          <div className="flex justify-end mb-4">
-            <Button
-              icon={<DownloadOutlined />}
-              type="primary"
-              onClick={async () => {
-                try {
-                  const { exportStudentPdfFormatted } = await import("../utils/exportStudentPdf");
-                  const academicYear = formData.academicYear || "year";
-                  const admissionNo = formData.admissionNo || "number";
-                  const filename = `Admission_PSF_${academicYear}_${admissionNo}.pdf`;
-                  // Map formData to PDF fields
-                  const pdfData = {
-                    studentName: formData.name,
-                    fatherName: formData.fatherName,
-                    motherName: formData.motherName,
-                    birthDate: formData.dob?.format?.("DD/MM/YYYY") || formData.dob,
-                    gender: formData.gender,
-                    addressLine1: [formData.doorNo || formData.line1, formData.street || formData.line2].filter(Boolean).join(", "),
-                    city: formData.city,
-                    pincode: formData.pin,
-                    religion: formData.religion,
-                    nationality: formData.nationality || "Indian",
-                    exam: formData.examName,
-                    regNo: formData.registerNo,
-                    examYear: formData.examYear,
-                    academicTable: (formData.subjects || []).map(sub => ({
-                      subject: sub.subjectName,
-                      maxMarks: sub.maxMarks,
-                      marksObtained: sub.obtainedMarks,
-                      percentage: sub.maxMarks ? `${((sub.obtainedMarks / sub.maxMarks) * 100).toFixed(2)}%` : "-"
-                    })),
-                    phone: formData.fatherPhone,
-                    email: formData.email,
-                    aadhar: formData.aadharNo,
-                    bloodGroup: formData.bloodGroup,
-                    admissionFor: formData.standard,
-                    section: formData.section,
-                    academicYear: formData.academicYear,
-                    transport: formData.vanNeeded ? "Van" : "No",
-                    rteStudent: formData.rteApplied ? "Yes" : "No",
-                  };
-                  // Optionally, load logo as base64 (fallback to no logo if fails)
-                  let logoBase64 = undefined;
-                  try {
-                    const logoUrl = require("../assets/logo.jpeg");
-                    if (logoUrl) {
-                      const toBase64 = url => fetch(url).then(r => r.blob()).then(blob => new Promise((res, rej) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => res(reader.result);
-                        reader.onerror = rej;
-                        reader.readAsDataURL(blob);
-                      }));
-                      logoBase64 = await toBase64(logoUrl);
-                    }
-                  } catch (e) {
-                    // Ignore logo error, proceed without logo
-                  }
-                  exportStudentPdfFormatted(pdfData, filename, logoBase64);
-                } catch (err) {
-                  message.error("Failed to generate PDF. Please try again.");
-                  // Optionally log error: console.error(err);
-                }
-              }}
-            >
-              Download PDF
-            </Button>
-          </div>
+          
+           {/* Download PDF Button */}
+<div className="flex justify-end mb-4">
+  <Button
+    icon={<DownloadOutlined />}
+    type="primary"
+    onClick={generatePDF}
+  >
+    Download PDF
+  </Button>
+</div>
           <div className="form-section-header">
             <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Student Admission</h3>
             <p className="text-slate-500 text-sm font-medium">Verify the integrity of all data vectors before final academic sealing.</p>
@@ -1903,9 +1884,11 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                 
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
                    {reviewDocuments.map((doc, idx) => {
-                     const isUploaded = doc.file?.[0];
-                     const fileUrl = isUploaded ? (doc.file[0].url || (doc.file[0].originFileObj ? URL.createObjectURL(doc.file[0].originFileObj) : "")) : null;
-                     const isPdf = doc.file?.[0]?.type === "application/pdf" || doc.file?.[0]?.name?.toLowerCase().endsWith(".pdf");
+                     const fileItem = doc.file?.[0];
+                     const fileUrl = getSafePreviewUrl(fileItem);
+                     const fileType = fileItem?.type || "";
+                     const fileName = fileItem?.name || "";
+                     const isPdf = fileType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
 
                      return (
                        <div key={idx} 
@@ -1962,7 +1945,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   />
 )}
       <div className="flex justify-end mt-4">
-        <button onClick={() => setIsPreviewOpen(false)}>Close</button>
+        <button type="button" onClick={() => setIsPreviewOpen(false)}>Close</button>
       </div>
 
     </div>
@@ -2228,39 +2211,8 @@ const styles = {
   }
 };
 
-const generatePDF = async () => {
-  const input = document.getElementById("pdfContent");
-  if (!input) return;
 
-  const canvas = await html2canvas(input, {
-    scale: 2,
-    useCORS: true,
-    backgroundColor: "#ffffff",
-    windowWidth: 800,
-  });
-
-  const imgWidth = 210; // mm
-  const pageHeight = 297; // mm
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-  let heightLeft = imgHeight;
-
-  const pdf = new jsPDF("p", "mm", "a4");
-  let position = 0;
-
-  const imgData = canvas.toDataURL("image/png");
-
-  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
-
-  while (heightLeft >= 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-  }
-
-  pdf.save(`Admission_${formData.admissionNo || "draft"}.pdf`);
-};
+ 
 
   return (
     <div className="admission-container">
@@ -2340,6 +2292,7 @@ Enroll Admission            </p>
               <div>
                 {current > 0 && (
                   <button 
+                    type="button"
                     onClick={prev} 
                     className="nav-btn btn-ghost"
                   >
@@ -2352,6 +2305,7 @@ Enroll Admission            </p>
               <div className="flex gap-4">
                 {current < steps.length - 1 ? (
                   <button 
+                    type="button"
                     onClick={next} 
                     className="nav-btn btn-primary"
                   >
@@ -2360,6 +2314,7 @@ Enroll Admission            </p>
                   </button>
                 ) : (
                   <button
+                    type="button"
                     className="nav-btn btn-primary bg-teal-600 hover:bg-teal-700"
                     onClick={async () => {
                       try {
