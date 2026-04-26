@@ -327,6 +327,8 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     // ...add more as needed
   });
 
+  const getDefaultSection = () => "A";
+
   useEffect(() => {
     const fetchAdmissionNo = async () => {
       try {
@@ -365,11 +367,12 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
         caste: editData.caste,
         motherTongue: editData.motherTongue,
         aadharNo: editData.aadharNo,
-        customCommunity: editData.community === "OTHERS" ? editData.communityOther : undefined,
+        communityOther: editData.community === "OTHERS" ? editData.communityOther : undefined,
         bloodGroup: editData.bloodGroup,
         identityMark1: editData.identification1,
         identityMark2: editData.identification2,
         previouslyStudied: editData.previousSchool,
+        previousSchoolStandard: editData.previousSchoolStandard || editData.previousStandard,
         section: editData.section || undefined,
         academicYear: editData.academicYear || undefined,
         vanNeeded: editData.transportMode === "Van" ? true : false,
@@ -386,12 +389,16 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
         motherWhatsAppNo: editData.family?.motherWhatsapp,
         familyIncome: String(editData.family?.familyIncome),
         sibblings: editData.family?.siblings,
+        siblingsCount: Number(editData.family?.siblings) || 0,
         preferredPhone: editData.family?.preferredPhone || "father",
         parentsEmail: editData.family?.parentsEmail,
         line1: editData.address?.line1,
         line2: editData.address?.line2,
         doorNo: editData.address?.line1,
         street: editData.address?.line2,
+        landmark: editData.address?.landmark,
+        city: editData.address?.city,
+        state: editData.address?.state || "Tamil Nadu",
         pin: editData.address?.pin,
         admissionNo: editData.admission?.admissionNo,
         admissionFrom: editData.admission?.admissionFrom ? dayjs(editData.admission.admissionFrom) : null,
@@ -470,7 +477,7 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const lastNames = ["Sharma", "Patel", "Kumar", "Singh", "Reddy", "Verma", "Rao", "Das", "Nair", "Iyer"];
     const randName = () => firstNames[Math.floor(Math.random() * firstNames.length)] + " " + lastNames[Math.floor(Math.random() * lastNames.length)];
     const randGender = () => Math.random() > 0.5 ? "MALE" : "FEMALE";
-    const randCommunity = () => ["BC", "MBC", "SC", "OTHERS"][Math.floor(Math.random() * 4)];
+    const randCommunity = () => ["BC", "MBC", "OBC", "SC", "ST", "SCA", "OTHERS"][Math.floor(Math.random() * 7)];
     const randBloodGroup = () => ["A+", "B+", "O+", "AB+", "O-"][Math.floor(Math.random() * 5)];
     const communitySelected = randCommunity();
     setCommunity(communitySelected);
@@ -491,6 +498,7 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
       identityMark1: "Mole on right cheek",
       identityMark2: "Scar on left hand",
       previouslyStudied: "Govt Hr Sec School",
+      previousSchoolStandard: "10th",
       vanNeeded: Math.random() > 0.5,
 
       fatherName: randName(),
@@ -507,9 +515,12 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
       familyIncome: "150000",
       sibblings: "1",
+      siblingsCount: 1,
 
       line1: "12, Main Road",
       line2: "Gandhi Nagar",
+      city: "Erode",
+      state: "Tamil Nadu",
       pin: random6(),
 
       examName: "10th Standard",
@@ -552,6 +563,10 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     message: "Phone number must be 10 digits",
     pattern: /^\d{10}$/,
   };
+  const optionalAadharRule = {
+    message: "Aadhar number must be 12 digits",
+    pattern: /^\d{12}$/,
+  };
   const pinRule = {
     required: true,
     message: "PIN must be 6 digits",
@@ -561,9 +576,6 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   const profilePhotoChecked = Form.useWatch("profilePhotoChecked", form);
   const watchedStandard = Form.useWatch("standard", form);
   const watchedSubjects = Form.useWatch("subjects", form) || [];
-  const siblingSchool = Form.useWatch("siblingSchool", form);
-  const sibling1School = Form.useWatch("sibling1School", form);
-  const sibling2School = Form.useWatch("sibling2School", form);
   const isSingleParent = Form.useWatch("isSingleParent", form);
   const boardExamType = Form.useWatch("boardExamType", form);
   const siblingReviewItems = (() => {
@@ -576,22 +588,35 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
 
     return Array.from({ length: totalSiblings }, (_, index) => {
       const siblingNumber = index + 1;
-      const schoolType = formData?.[`sibling${siblingNumber}School`];
-      const otherSchoolName = formData?.[`sibling${siblingNumber}OtherSchoolName`]?.trim();
+      const siblingName = formData?.[`sibling${siblingNumber}Name`]?.trim();
+      const schoolName = formData?.[`sibling${siblingNumber}School`]?.trim();
+      const standard = formData?.[`sibling${siblingNumber}Standard`]?.trim();
 
-      if (!schoolType && !otherSchoolName) {
+      if (!siblingName && !schoolName && !standard) {
         return null;
       }
 
-      const isSameSchool = schoolType === "same" || schoolType === "Same School";
-
       return {
         siblingNumber,
-        label: isSameSchool ? "Same School" : otherSchoolName || "Other School",
-        schoolTypeLabel: isSameSchool ? "Same School" : "Other School",
+        siblingName: siblingName || `Sibling ${siblingNumber}`,
+        schoolName: schoolName || "-",
+        standard: standard || "-",
       };
     }).filter(Boolean);
   })();
+
+  const preferredContacts = Array.isArray(formData?.preferredPhone)
+    ? formData.preferredPhone
+    : formData?.preferredPhone
+      ? [formData.preferredPhone]
+      : [];
+
+  const reviewDocuments = [
+    { label: "Birth Certificate", file: formData.birthCertFile, key: "birthCert" },
+    { label: "Community Certificate", file: formData.communityCertFile, key: "communityCert" },
+    { label: "Aadhar", file: formData.aadharStudentFile, key: "aadharStudent" },
+    { label: "Transfer Certificate", file: formData.transferCertFile, key: "transferCert" },
+  ].filter((doc) => doc.file?.[0]);
 
   useEffect(() => {
     if (!watchedSubjects || watchedSubjects.length === 0) return;
@@ -743,7 +768,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
               </Form.Item>
             </Col>
              <Col span={12}>
-              <Form.Item name="section" label="Section">
+              <Form.Item name="section" label="Section" initialValue="A">
                 <Select placeholder="Select section" allowClear>
                   <Select.Option value="A">A</Select.Option>
                   <Select.Option value="B">B</Select.Option>
@@ -777,7 +802,10 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                 <Select onChange={(v) => setCommunity(v)}>
                   <Select.Option value="BC">BC</Select.Option>
                   <Select.Option value="MBC">MBC</Select.Option>
+                  <Select.Option value="OBC">OBC</Select.Option>
                   <Select.Option value="SC">SC</Select.Option>
+                  <Select.Option value="ST">ST</Select.Option>
+                  <Select.Option value="SCA">SCA</Select.Option>
                   <Select.Option value="OTHERS">Others</Select.Option>
                 </Select>
               </Form.Item>
@@ -802,6 +830,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
             <Col span={12}><Form.Item name="identityMark1" label="Identity Mark 1" rules={[requiredRule]}><Input /></Form.Item></Col>
             <Col span={12}><Form.Item name="identityMark2" label="Identity Mark 2" rules={[requiredRule]}><Input /></Form.Item></Col>
             <Col span={12}><Form.Item name="previouslyStudied" label="Previously Studied" rules={[requiredRule]}><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item name="previousSchoolStandard" label="Previous School Standard" rules={[requiredRule]}><Input placeholder="e.g. 10th" /></Form.Item></Col>
            
            
           </Row>
@@ -858,7 +887,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
               <Form.Item name="fatherOccupation" label="Father Occupation">
                 <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
               </Form.Item>
-              <Form.Item name="fatherAadharNo" label="Father Aadhar">
+              <Form.Item name="fatherAadharNo" label="Father Aadhar" rules={[optionalAadharRule]}>
                 <Input maxLength={12} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
               </Form.Item>
             </Col>
@@ -892,7 +921,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
               <Form.Item name="motherOccupation" label="Mother Occupation">
                 <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
-              <Form.Item name="motherAadharNo" label="Mother Aadhar">
+              <Form.Item name="motherAadharNo" label="Mother Aadhar" rules={[optionalAadharRule]}>
                 <Input maxLength={12} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
               
@@ -987,34 +1016,38 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     </h4>
 
     <Row gutter={16}>
-      
-      <Col span={12}>
+      <Col span={8}>
+        <Form.Item
+          name={`sibling${index + 1}Name`}
+          label={`Sibling ${index + 1} Name`}
+        >
+          <Input placeholder="Enter name" />
+        </Form.Item>
+      </Col>
+
+      <Col span={8}>
         <Form.Item
           name={`sibling${index + 1}School`}
           label={`Sibling ${index + 1} School`}
         >
-          <Select placeholder="Select option">
-            <Select.Option value="same">Same School</Select.Option>
-            <Select.Option value="other">Other School</Select.Option>
-          </Select>
+          <Input placeholder="Enter school name" />
         </Form.Item>
       </Col>
 
-      <Form.Item shouldUpdate noStyle>
-        {({ getFieldValue }) =>
-          getFieldValue(`sibling${index + 1}School`) === "other" && (
-            <Col span={12}>
-              <Form.Item
-                name={`sibling${index + 1}OtherSchoolName`}
-                label="Other School Name"
-                rules={[{ required: false, message: "Enter school name" }]}
-              >
-                <Input placeholder="Enter school name" />
-              </Form.Item>
-            </Col>
-          )
-        }
-      </Form.Item>
+      <Col span={8}>
+        <Form.Item
+          name={`sibling${index + 1}Standard`}
+          label={`Sibling ${index + 1} Standard`}
+        >
+          <Select placeholder="Select standard" allowClear>
+            <Select.Option value="LKG">LKG</Select.Option>
+            <Select.Option value="UKG">UKG</Select.Option>
+            {[...Array(12)].map((_, i) => (
+              <Select.Option key={i + 1} value={String(i + 1)}>{`${i + 1}${['st','nd','rd'][i] || 'th'} Standard`}</Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+      </Col>
 
     </Row>
 
@@ -1162,25 +1195,25 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
             </Col>
 
             <Col span={12}>
-              <Form.Item name="street" label="Street / Area" rules={[requiredRule]}>
+              <Form.Item name="street" label="Street / Village" rules={[requiredRule]}>
                 <Input />
               </Form.Item>
             </Col>
 
             <Col span={12}>
-              <Form.Item name="landmark" label="Landmark">
+              <Form.Item name="landmark" label="Taluk">
                 <Input />
               </Form.Item>
             </Col>
 
             <Col span={12}>
-              <Form.Item name="city" label="City" rules={[requiredRule]}>
+              <Form.Item name="city" label="District" rules={[requiredRule]}>
                 <Input />
               </Form.Item>
             </Col>
 
             <Col span={12}>
-              <Form.Item name="state" label="State" rules={[requiredRule]}>
+              <Form.Item name="state" label="State" initialValue="Tamil Nadu" rules={[requiredRule]}>
                 <Input />
               </Form.Item>
             </Col>
@@ -1224,7 +1257,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
               </Col>
               {boardExamType === "Other" && (
                 <Col span={6}>
-                  <Form.Item name="boardName" label="Board Name" rules={[{ required: true, message: 'Enter board name' }]}>
+                  <Form.Item name="boardName" label="Board Name" rules={[{ required: true, message: 'Enter board name' }]}> 
                     <Input placeholder="e.g. CBSE, ICSE" />
                   </Form.Item>
                 </Col>
@@ -1237,6 +1270,16 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
               <Col span={6}>
                 <Form.Item name="registerNo" label="Register No">
                   <Input />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item name="academicStream" label="Academic Stream / Group">
+                  <Select placeholder="Select group">
+                    <Select.Option value="GROUP_1">Physics, Chemistry, Maths, Biology</Select.Option>
+                    <Select.Option value="GROUP_2">Physics, Chemistry, Maths, Computer Science</Select.Option>
+                    <Select.Option value="GROUP_3">Physics, Chemistry, Biology, Computer Science</Select.Option>
+                    <Select.Option value="GROUP_4">Commerce, Economics, Accountancy, Computer Application</Select.Option>
+                  </Select>
                 </Form.Item>
               </Col>
             </Row>
@@ -1524,7 +1567,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       { value: "aadharFather", label: "Aadhar (Father)" },
       { value: "aadharMother", label: "Aadhar (Mother)" },
       { value: "transferCert", label: "Transfer Certificate" },
-      { value: "3 Photos received", label: "3 Hot Copy photos" },
+      { value: "3 Photos received", label: "3 Hard Copy photos" },
     ]}
   />
 </Form.Item>
@@ -1605,7 +1648,75 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       title: "Review",
       icon: <CheckCircleOutlined />,
       content: (
-        <div className="space-y-10">
+        <div id="reviewStepContent" className="space-y-10">
+          {/* Download PDF Button */}
+          <div className="flex justify-end mb-4">
+            <Button
+              icon={<DownloadOutlined />}
+              type="primary"
+              onClick={async () => {
+                try {
+                  const { exportStudentPdfFormatted } = await import("../utils/exportStudentPdf");
+                  const academicYear = formData.academicYear || "year";
+                  const admissionNo = formData.admissionNo || "number";
+                  const filename = `Admission_PSF_${academicYear}_${admissionNo}.pdf`;
+                  // Map formData to PDF fields
+                  const pdfData = {
+                    studentName: formData.name,
+                    fatherName: formData.fatherName,
+                    motherName: formData.motherName,
+                    birthDate: formData.dob?.format?.("DD/MM/YYYY") || formData.dob,
+                    gender: formData.gender,
+                    addressLine1: [formData.doorNo || formData.line1, formData.street || formData.line2].filter(Boolean).join(", "),
+                    city: formData.city,
+                    pincode: formData.pin,
+                    religion: formData.religion,
+                    nationality: formData.nationality || "Indian",
+                    exam: formData.examName,
+                    regNo: formData.registerNo,
+                    examYear: formData.examYear,
+                    academicTable: (formData.subjects || []).map(sub => ({
+                      subject: sub.subjectName,
+                      maxMarks: sub.maxMarks,
+                      marksObtained: sub.obtainedMarks,
+                      percentage: sub.maxMarks ? `${((sub.obtainedMarks / sub.maxMarks) * 100).toFixed(2)}%` : "-"
+                    })),
+                    phone: formData.fatherPhone,
+                    email: formData.email,
+                    aadhar: formData.aadharNo,
+                    bloodGroup: formData.bloodGroup,
+                    admissionFor: formData.standard,
+                    section: formData.section,
+                    academicYear: formData.academicYear,
+                    transport: formData.vanNeeded ? "Van" : "No",
+                    rteStudent: formData.rteApplied ? "Yes" : "No",
+                  };
+                  // Optionally, load logo as base64 (fallback to no logo if fails)
+                  let logoBase64 = undefined;
+                  try {
+                    const logoUrl = require("../assets/logo.jpeg");
+                    if (logoUrl) {
+                      const toBase64 = url => fetch(url).then(r => r.blob()).then(blob => new Promise((res, rej) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => res(reader.result);
+                        reader.onerror = rej;
+                        reader.readAsDataURL(blob);
+                      }));
+                      logoBase64 = await toBase64(logoUrl);
+                    }
+                  } catch (e) {
+                    // Ignore logo error, proceed without logo
+                  }
+                  exportStudentPdfFormatted(pdfData, filename, logoBase64);
+                } catch (err) {
+                  message.error("Failed to generate PDF. Please try again.");
+                  // Optionally log error: console.error(err);
+                }
+              }}
+            >
+              Download PDF
+            </Button>
+          </div>
           <div className="form-section-header">
             <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Student Admission</h3>
             <p className="text-slate-500 text-sm font-medium">Verify the integrity of all data vectors before final academic sealing.</p>
@@ -1623,7 +1734,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                         Persona Profile
                       </h4>
                       {formData.profilePhoto?.[0] && (
-                        <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-white shadow-xl rotate-3">
+                        <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-white shadow-xl">
                            <img 
                              src={formData.profilePhoto[0].url || (formData.profilePhoto[0].originFileObj ? URL.createObjectURL(formData.profilePhoto[0].originFileObj) : "")} 
                              alt="Student" 
@@ -1704,24 +1815,34 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
                       <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Paternal</h5>
-                      <div className="space-y-1">
+                     <div className="space-y-1.5">
                          <div className="text-sm font-black text-slate-900">{formData.fatherName}</div>
                          <div className="text-xs font-bold text-slate-500">{formData.fatherOccupation}</div>
                          <div className="text-xs font-bold text-blue-600 flex items-center gap-1 mt-2">
                             <span className="material-symbols-outlined text-[14px]">call</span>
                             {formData.fatherPhone}
                          </div>
+                       <div className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                         <span className="material-symbols-outlined text-[14px]">chat</span>
+                         {formData.fatherWhatsAppNo || "-"}
+                       </div>
+                       <div className="text-xs font-bold text-slate-500">Aadhar: {formData.fatherAadharNo || "-"}</div>
                       </div>
                    </div>
                    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
                       <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Maternal</h5>
-                      <div className="space-y-1">
+                     <div className="space-y-1.5">
                          <div className="text-sm font-black text-slate-900">{formData.motherName}</div>
                          <div className="text-xs font-bold text-slate-500">{formData.motherOccupation}</div>
                          <div className="text-xs font-bold text-blue-600 flex items-center gap-1 mt-2">
                             <span className="material-symbols-outlined text-[14px]">call</span>
                             {formData.motherPhone}
                          </div>
+                       <div className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                         <span className="material-symbols-outlined text-[14px]">chat</span>
+                         {formData.motherWhatsAppNo || "-"}
+                       </div>
+                       <div className="text-xs font-bold text-slate-500">Aadhar: {formData.motherAadharNo || "-"}</div>
                       </div>
                    </div>
                 </div>
@@ -1731,12 +1852,25 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                       <h5 className="text-[9px] font-black uppercase text-amber-600 tracking-widest mb-2 flex items-center gap-2">
                          <span className="material-symbols-outlined text-sm">shield_person</span> Guardian Nexus
                       </h5>
-                      <div className="flex justify-between items-center text-xs">
-                         <span className="font-extrabold text-slate-900">{formData.guardianName} ({formData.guardianRelation})</span>
-                         <span className="font-bold text-slate-500">{formData.guardianPhone}</span>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                       <span className="font-extrabold text-slate-900">{formData.guardianName} ({formData.guardianRelation})</span>
+                       <span className="font-bold text-slate-500">Phone: {formData.guardianPhone || "-"}</span>
+                       <span className="font-bold text-emerald-700">WhatsApp: {formData.guardianWhatsapp || "-"}</span>
+                       <span className="font-bold text-slate-500">Aadhar: {formData.guardianAadhar || "-"}</span>
+                       <span className="font-bold text-slate-500 md:col-span-2">Occupation: {formData.guardianOccupation || "-"}</span>
                       </div>
                    </div>
                 )}
+
+                 <div className="mb-8 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                  <h5 className="text-[9px] font-black uppercase text-blue-600 tracking-widest mb-2">Contact Preference</h5>
+                  <div className="text-xs text-slate-700 font-bold">Preferred: {preferredContacts.length ? preferredContacts.join(", ") : "-"}</div>
+                  <div className="mt-2 text-xs text-slate-700">Father WhatsApp: <span className="font-bold">{formData.fatherWhatsAppNo || "-"}</span></div>
+                  <div className="text-xs text-slate-700">Mother WhatsApp: <span className="font-bold">{formData.motherWhatsAppNo || "-"}</span></div>
+                  {formData.isSingleParent && (
+                    <div className="text-xs text-slate-700">Guardian WhatsApp: <span className="font-bold">{formData.guardianWhatsapp || "-"}</span></div>
+                  )}
+                 </div>
 
                 <div className="space-y-4">
                    <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Sibling Context</h5>
@@ -1746,11 +1880,11 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                           key={sibling.siblingNumber}
                           className="px-5 py-3 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700 border border-slate-100"
                         >
-                           <span className="text-slate-900">Sibling {sibling.siblingNumber}</span>
+                          <span className="text-slate-900">{sibling.siblingName}</span>
                            <span className="text-slate-400 mx-1">-</span>
-                           <span>{sibling.label}</span>
+                          <span>{sibling.schoolName}</span>
                            <div className="mt-1 text-[9px] uppercase tracking-wider text-slate-400">
-                              {sibling.schoolTypeLabel}
+                            Standard: {sibling.standard}
                            </div>
                         </div>
                       ))}
@@ -1768,12 +1902,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                 </h4>
                 
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-                   {[
-                     { label: "Birth Cert", file: formData.birthCertFile, key: "birthCert" },
-                     { label: "Community", file: formData.communityCertFile, key: "communityCert" },
-                     { label: "Aadhar", file: formData.aadharStudentFile, key: "aadharStudent" }
-                   ].map((doc, idx) => {
-                     const isChecked = formData.documentsChecked?.includes(doc.key);
+                   {reviewDocuments.map((doc, idx) => {
                      const isUploaded = doc.file?.[0];
                      const fileUrl = isUploaded ? (doc.file[0].url || (doc.file[0].originFileObj ? URL.createObjectURL(doc.file[0].originFileObj) : "")) : null;
                      const isPdf = doc.file?.[0]?.type === "application/pdf" || doc.file?.[0]?.name?.toLowerCase().endsWith(".pdf");
@@ -1785,7 +1914,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   setSelectedDoc({ ...doc, fileUrl, isPdf });
   setIsPreviewOpen(true);
 }}
-                       className={`relative group aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all ${isChecked ? 'border-teal-500 shadow-lg' : 'border-slate-200 opacity-60'}`}>
+                       className="relative group aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all border-teal-500 shadow-lg">
                           {fileUrl ? (
                              isPdf ? (
                                <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-4">
@@ -1802,8 +1931,8 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                              </div>
                           )}
                           <div className="absolute top-2 right-2">
-                             <span className={`w-5 h-5 rounded-lg flex items-center justify-center text-[10px] ${isChecked ? 'bg-teal-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                <span className="material-symbols-outlined text-xs">{isChecked ? 'check' : 'close'}</span>
+                              <span className="w-5 h-5 rounded-lg flex items-center justify-center text-[10px] bg-teal-500 text-white">
+                                <span className="material-symbols-outlined text-xs">check</span>
                              </span>
                           </div>
                        </div>
@@ -1811,6 +1940,11 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                        
                      );
                    })}
+                   {reviewDocuments.length === 0 && (
+                    <div className="col-span-full text-xs text-slate-400 italic">
+                      No uploaded documents available for preview.
+                    </div>
+                   )}
 
                    {isPreviewOpen && selectedDoc && (
   <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
@@ -2188,7 +2322,16 @@ Enroll Admission            </p>
               layout="vertical"
               requiredMark={false}
               className="admission-form"
-              onValuesChange={(_, all) => setFormData(all)}
+              onValuesChange={(changedValues, allValues) => {
+                if (Object.prototype.hasOwnProperty.call(changedValues, "standard") && !allValues.section) {
+                  const autoSection = getDefaultSection();
+                  form.setFieldsValue({ section: autoSection });
+                  setFormData({ ...allValues, section: autoSection });
+                  return;
+                }
+
+                setFormData(allValues);
+              }}
             >
               {steps[current].content}
             </Form>
@@ -2260,8 +2403,9 @@ Enroll Admission            </p>
                            identification1: values.identityMark1,
                            identification2: values.identityMark2,
                            previousSchool: values.previouslyStudied,
+                           previousSchoolStandard: values.previousSchoolStandard,
                            transportMode: values.vanNeeded ? "Van" : "Local",
-                           section: values.section || undefined,
+                           section: values.section || getDefaultSection(),
                            academicYear: values.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
                            family: {
                              fatherName: values.fatherName,
@@ -2275,7 +2419,7 @@ Enroll Admission            </p>
                              motherOccupation: values.motherOccupation,
                              motherWhatsapp: values.motherWhatsAppNo,
                              familyIncome: Number(values.familyIncome) || 0,
-                             siblings: String(values.sibblings || ""),
+                             siblings: String(values.siblingsCount || values.sibblings || ""),
                              preferredPhone: values.preferredPhone || "father",
                              parentsEmail: values.parentsEmail,
                              // Single parent & guardian
@@ -2293,10 +2437,18 @@ Enroll Admission            </p>
                              sibling2Name: values.sibling2Name,
                              sibling2Standard: values.sibling2Standard,
                              sibling2School: values.sibling2School,
+                             siblingDetails: Array.from({ length: Number(values.siblingsCount) || 0 }, (_, i) => ({
+                               name: values[`sibling${i + 1}Name`],
+                               school: values[`sibling${i + 1}School`],
+                               standard: values[`sibling${i + 1}Standard`],
+                             })),
                            },
                            address: {
                              line1: values.doorNo,
                              line2: values.street,
+                             landmark: values.landmark,
+                             city: values.city,
+                             state: values.state || "Tamil Nadu",
                              pin: values.pin,
                            },
                            documents: documents,

@@ -81,12 +81,76 @@ const StaffAllowancePage = () => {
     } catch (err) { message.error(err?.response?.data?.message || "Return failed"); }
   };
 
+  const [summaryError, setSummaryError] = useState("");
+  // Store records from summary API for correct return mapping
+  const [summaryRecords, setSummaryRecords] = useState([]);
+  // Return modal for summary
+  const [summaryReturnModal, setSummaryReturnModal] = useState({ open: false, item: null, max: 0 });
+  const [summaryReturnQty, setSummaryReturnQty] = useState(1);
+  const handleSummaryReturn = async () => {
+    if (!summaryReturnModal.item) return;
+    // Try to find the correct teacherFreeItemId from summaryRecords
+    let teacherFreeItemId = summaryReturnModal.item.teacherFreeItemId || summaryReturnModal.item.id;
+    // If not found, try to match from summaryRecords
+    if (!teacherFreeItemId && summaryRecords.length > 0) {
+      // Try to match by itemId, staffId, academicYear, and outstanding quantity
+      const s = summaryReturnModal.item;
+      const match = summaryRecords.find(r => {
+        // Match by itemId, staffId, academicYear, and outstanding
+        const itemIdMatch = (r.itemId === (s.itemId || s.item?.id));
+        const staffIdMatch = (r.staffId === summaryStaffId);
+        const yearMatch = (r.academicYear === summaryYear);
+        const outstanding = (r.quantity || 0) - (r.returnedQuantity || 0);
+        return itemIdMatch && staffIdMatch && yearMatch && outstanding > 0;
+      });
+      if (match) teacherFreeItemId = match.id;
+    }
+    if (!teacherFreeItemId) {
+      message.error("No teacherFreeItemId found for this item.");
+      return;
+    }
+    try {
+      await returnTeacherFreeItem({
+        teacherFreeItemId,
+        quantity: summaryReturnQty,
+        returnedDate: new Date().toISOString().slice(0, 10)
+      });
+      message.success("Item returned");
+      setSummaryReturnModal({ open: false, item: null, max: 0 });
+      setSummaryReturnQty(1);
+      loadSummary();
+      loadData();
+    } catch (err) {
+      message.error(err?.response?.data?.message || "Return failed");
+    }
+  };
+
   const loadSummary = async () => {
-    if (!summaryStaffId) { message.error("Select a staff member"); return; }
+    setSummaryError("");
+    if (!summaryStaffId) { setSummary([]); setSummaryRecords([]); setSummaryError("Please select a staff member."); return; }
     try {
       const data = await getTeacherFreeItemSummary(summaryStaffId, summaryYear);
-      setSummary(data || []);
-    } catch { message.error("Failed to load summary"); }
+      console.log("Summary API response:", data);
+      // If API returns { items: [...], records: [...] }
+      if (data && Array.isArray(data.items)) {
+        setSummary(data.items);
+        setSummaryRecords(Array.isArray(data.records) ? data.records : []);
+        if (data.items.length === 0) setSummaryError("No summary found for the selected staff and year.");
+      } else if (Array.isArray(data)) {
+        setSummary(data);
+        setSummaryRecords([]);
+        if (data.length === 0) setSummaryError("No summary found for the selected staff and year.");
+      } else {
+        setSummary([]);
+        setSummaryRecords([]);
+        setSummaryError("No summary found for the selected staff and year.");
+      }
+    } catch (err) {
+      setSummary([]);
+      setSummaryRecords([]);
+      setSummaryError("Failed to load summary.");
+      message.error("Failed to load summary");
+    }
   };
 
   const filteredRecords = freeItems.filter((fi) => {
@@ -280,8 +344,8 @@ const StaffAllowancePage = () => {
                   <div key={fi.id} className={`grid grid-cols-7 px-6 py-4 items-center ${idx % 2 === 0 ? "bg-white" : "bg-surface-container-low/30"}`}>
                     <span className="text-sm font-bold text-on-surface">{fi.staff?.name || fi.staffId}</span>
                     <span className="text-sm text-on-surface-variant">{fi.item?.name || fi.itemId}</span>
-                    <span className="text-sm font-bold text-on-surface">{fi.quantity}</span>
-                    <span className={`text-sm font-bold ${returned > 0 ? "text-[#44ddc1]" : "text-on-surface-variant"}`}>{returned}</span>
+                    <span className="text-sm font-bold text-on-surface">{typeof fi.quantityGiven !== 'undefined' ? fi.quantityGiven : (typeof fi.quantity !== 'undefined' ? fi.quantity : 0)}</span>
+                    <span className={`text-sm font-bold ${returned > 0 ? "text-[#44ddc1]" : "text-on-surface-variant"}`}>{typeof fi.quantityReturned !== 'undefined' ? fi.quantityReturned : returned}</span>
                     <span className="text-sm text-on-surface-variant">{fi.academicYear}</span>
                     <span className="text-sm text-on-surface-variant">{new Date(fi.createdAt).toLocaleDateString("en-IN")}</span>
                     <div>
@@ -319,37 +383,59 @@ const StaffAllowancePage = () => {
               <span className="material-symbols-outlined text-lg">search</span>Get Summary
             </button>
           </div>
-          {summary.length > 0 && (
+          {summaryError && (
+            <div className="text-center text-error font-bold text-sm py-6">{summaryError}</div>
+          )}
+          {summary.length > 0 && !summaryError && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {summary.map((s, idx) => (
-                <div key={idx} className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary-container/30 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-primary">redeem</span>
+              {summary.map((s, idx) => {
+                const held = typeof s.remaining !== 'undefined' ? s.remaining : (typeof s.netHeld !== 'undefined' ? s.netHeld : 0);
+                return (
+                  <div key={idx} className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary-container/30 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-primary">redeem</span>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-on-surface">{s.item?.name || s.itemName || "—"}</h4>
+                        <p className="text-[10px] text-on-surface-variant">Limit: {s.freeLimit || "—"}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-on-surface">{s.item?.name || s.itemName || "—"}</h4>
-                      <p className="text-[10px] text-on-surface-variant">Limit: {s.freeLimit || "—"}</p>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-surface-container-low rounded-xl p-2">
+                        <p className="font-extrabold text-lg text-primary">{s.totalGiven || 0}</p>
+                        <p className="text-[10px] text-on-surface-variant">Given</p>
+                      </div>
+                      <div className="bg-surface-container-low rounded-xl p-2">
+                        <p className="font-extrabold text-lg text-[#44ddc1]">{s.totalReturned || 0}</p>
+                        <p className="text-[10px] text-on-surface-variant">Returned</p>
+                      </div>
+                      <div className="bg-surface-container-low rounded-xl p-2">
+                        <p className="font-extrabold text-lg text-error">{held}</p>
+                        <p className="text-[10px] text-on-surface-variant">Remaining</p>
+                      </div>
                     </div>
+                    {/* Return Item button hidden as requested */}
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-surface-container-low rounded-xl p-2">
-                      <p className="font-extrabold text-lg text-primary">{s.totalGiven || 0}</p>
-                      <p className="text-[10px] text-on-surface-variant">Given</p>
-                    </div>
-                    <div className="bg-surface-container-low rounded-xl p-2">
-                      <p className="font-extrabold text-lg text-[#44ddc1]">{s.totalReturned || 0}</p>
-                      <p className="text-[10px] text-on-surface-variant">Returned</p>
-                    </div>
-                    <div className="bg-surface-container-low rounded-xl p-2">
-                      <p className="font-extrabold text-lg text-error">{s.remaining || 0}</p>
-                      <p className="text-[10px] text-on-surface-variant">Remaining</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
+              {/* Return Modal for Staff Summary */}
+              <Modal open={summaryReturnModal.open} title="Return Item" onCancel={() => setSummaryReturnModal({ open: false, item: null, max: 0 })} onOk={handleSummaryReturn} okText="Return" width={400}>
+                {summaryReturnModal.item && (
+                  <div className="space-y-3 mt-4">
+                    <p className="text-sm"><span className="text-on-surface-variant">Item:</span> <span className="font-bold">{summaryReturnModal.item.item?.name || summaryReturnModal.item.itemName || "—"}</span></p>
+                    <p className="text-sm"><span className="text-on-surface-variant">Held:</span> <span className="font-bold">{summaryReturnModal.max}</span></p>
+                    <div>
+                      <label className="text-xs font-bold text-on-surface-variant uppercase">Return Quantity</label>
+                      <input type="number" min={1} max={summaryReturnModal.max} value={summaryReturnQty}
+                        onChange={e => setSummaryReturnQty(Math.max(1, Math.min(summaryReturnModal.max, Number(e.target.value))))}
+                        className="w-full bg-surface-container-high rounded-xl py-2.5 px-4 text-sm border-none outline-none mt-1" />
+                    </div>
+                  </div>
+                )}
+              </Modal>
         </div>
       )}
 

@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Modal, Select, message } from "antd";
+import { Modal, Select, message, Popconfirm } from "antd";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import instance from "../utils/axios";
 import dayjs from "dayjs";
 import { linkSiblings, demoteIndividualStudents } from "../modules/admission/admission.service";
@@ -72,7 +74,63 @@ const [fees, setFees] = useState([]);
   const [targetSiblingIds, setTargetSiblingIds] = useState([]);
   const [linking, setLinking] = useState(false);
 
-  // ── data ─────────────────────────────────────────────────────────────────
+  // PDF export for a student row (custom layout)
+  const handlePrintPDF = async (student) => {
+    try {
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      // Card background
+      pdf.setFillColor(245, 247, 250);
+      pdf.roundedRect(40, 40, 515, 120, 16, 16, 'F');
+
+      // Avatar circle
+      pdf.setFillColor(230, 240, 255);
+      pdf.circle(80, 100, 32, 'F');
+      pdf.setFontSize(22);
+      pdf.setTextColor(60, 90, 150);
+      pdf.text((student.name || '?').charAt(0).toUpperCase(), 80, 108, { align: 'center', baseline: 'middle' });
+
+      // Student Name
+      pdf.setFontSize(18);
+      pdf.setTextColor(30, 30, 30);
+      pdf.text(student.name || 'Unknown', 130, 80);
+
+      // Admission No
+      pdf.setFontSize(10);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(`Admission No: ${student.admission?.admissionNo || student.id}`, 130, 100);
+
+      // Class & Section
+      pdf.text(`Class: ${student.standard || student.admission?.standard || '-'}${student.section ? ' - ' + student.section : ''}`, 130, 115);
+
+      // Parent Name
+      pdf.text(`Parent: ${student.family?.fatherName || 'Private'}`, 130, 130);
+
+      // Gender & Status
+      pdf.setFontSize(10);
+      pdf.setTextColor(60, 90, 150);
+      pdf.text(`Gender: ${student.gender || '-'}`, 420, 100);
+      pdf.setTextColor((student.users?.isActive ?? 1) ? 16 : 200, (student.users?.isActive ?? 1) ? 185 : 30, (student.users?.isActive ?? 1) ? 129 : 30);
+      pdf.text((student.users?.isActive ?? 1) ? 'ACTIVE' : 'ARCHIVED', 420, 120);
+
+      // Optionally, add icons (camera, link, etc.) as text or skip for PDF simplicity
+
+      // Save
+      pdf.save(`Student_${student.admission?.admissionNo || student.id}.pdf`);
+    } catch (err) {
+      message.error("Failed to generate PDF");
+    }
+  };
+
+  // Archive handler (soft delete)
+  const handleArchive = async (studentId) => {
+    try {
+      await instance.delete(`/admissions/${studentId}`);
+      message.success("Student archived");
+      fetchStudents();
+    } catch {
+      message.error("Failed to archive student");
+    }
+  };
   const fetchStudents = () => {
     instance.get("/admissions").then((res) => {
       const approved = (res.data || []).filter((s) => s.admission?.isApproved);
@@ -355,7 +413,7 @@ const [fees, setFees] = useState([]);
 
                   return (
                     <React.Fragment key={s.id}>
-                      <tr className="group transition-all hover:bg-slate-50/50">
+                      <tr id={`student-row-${s.id}`} className="group transition-all hover:bg-slate-50/50">
                         <td className="text-center">
                           <button
                             onClick={() => setExpandedId(isExpanded ? null : s.id)}
@@ -424,6 +482,23 @@ const [fees, setFees] = useState([]);
                              >
                                <span className="material-symbols-outlined text-[18px] leading-none">edit_note</span>
                              </button>
+                             {/* Archive button */}
+                             <Popconfirm title="Archive student record?" onConfirm={() => handleArchive(s.id)}>
+                               <button
+                                 className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+                                 title="Archive"
+                               >
+                                 <span className="material-symbols-outlined text-[18px] leading-none">archive</span>
+                               </button>
+                             </Popconfirm>
+                             {/* Issue PDF button */}
+                             <button
+                               onClick={() => handlePrintPDF(s)}
+                               className="w-9 h-9 rounded-xl bg-slate-50 text-slate-900 flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                               title="Issue PDF"
+                             >
+                               <span className="material-symbols-outlined text-[18px] leading-none">picture_as_pdf</span>
+                             </button>
                           </div>
                         </td>
                       </tr>
@@ -431,28 +506,99 @@ const [fees, setFees] = useState([]);
                       {isExpanded && (
                         <tr className="bg-slate-50/30">
                           <td colSpan={6} className="px-12 py-6">
-                             <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
-                                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-6 flex items-center gap-2">
-                                   <span className="material-symbols-outlined text-sm">family_history</span> Student
-                                </h4>
-                                {s.siblings?.length === 0 ? (
-                                  <div className="text-[11px] font-bold text-slate-400 italic">No sibling records associated with this profile.</div>
-                                ) : (
-                                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                      {s.siblings.map(sib => (
-                                        <div key={sib.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
-                                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-white text-[10px] font-black text-slate-500`}>
-                                              {initials(sib.name)}
-                                           </div>
-                                           <div>
-                                              <div className="text-[12px] font-black text-slate-900">{sib.name}</div>
-                                              <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{sib.standard} | {sib.admissionNo}</div>
-                                           </div>
-                                        </div>
-                                      ))}
-                                   </div>
-                                )}
-                             </div>
+                            <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm grid grid-cols-1 lg:grid-cols-12 gap-8">
+                              {/* Student Profile Overview */}
+                              <div className="lg:col-span-3 flex flex-col items-center text-center">
+                                <div className="relative mb-6">
+                                  {photoPath ? (
+                                    <img 
+                                      src={`/erp/api/${photoPath.replace(/\\/g, '/')}`} 
+                                      className="w-40 h-40 rounded-[40px] object-cover border-4 border-white shadow-2xl" 
+                                      alt={s.name}
+                                    />
+                                  ) : (
+                                    <div className="w-40 h-40 rounded-[40px] bg-slate-200 text-slate-400 flex items-center justify-center text-5xl font-black border-4 border-white shadow-xl">
+                                      {s.name?.charAt(0)}
+                                    </div>
+                                  )}
+                                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg">
+                                    Roll #{s.admission?.admissionNo || s.id}
+                                  </div>
+                                </div>
+                                <h2 className="text-2xl font-black text-slate-900 tracking-tighter mb-1">{s.name}</h2>
+                                <div className="flex items-center gap-2 justify-center mb-6">
+                                  <span className="px-3 py-1 bg-teal-50 text-teal-600 text-[10px] font-black uppercase tracking-widest rounded-full">{s.gender}</span>
+                                  <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest rounded-full">{s.bloodGroup}</span>
+                                </div>
+                                <div className="w-full space-y-2">
+                                  <div className="flex justify-between items-center p-3 bg-white rounded-2xl border border-slate-100 text-xs shadow-sm">
+                                    <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Admission Date</span>
+                                    <span className="font-black text-slate-900">{s.admission?.admissionDate ? dayjs(s.admission?.admissionDate).format('YYYY-MM-DD') : '-'}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center p-3 bg-white rounded-2xl border border-slate-100 text-xs shadow-sm">
+                                    <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Current Grade</span>
+                                    <span className="font-black text-slate-900">{s.standard || s.admission?.standard}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* Detailed Info Groups */}
+                              <div className="lg:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[14px]">verified_user</span> Governance Data
+                                  </h4>
+                                  <div className="grid grid-cols-1 gap-y-2">
+                                    <div><span className="font-bold text-xs text-slate-400">Religion:</span> <span className="font-black text-xs text-slate-900">{s.religion}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Community:</span> <span className="font-black text-xs text-slate-900">{s.community}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Caste:</span> <span className="font-black text-xs text-slate-900">{s.caste}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Mother Tongue:</span> <span className="font-black text-xs text-slate-900">{s.motherTongue}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Aadhar ID:</span> <span className="font-black text-xs text-slate-900">{s.aadharNo}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Identification:</span> <span className="font-black text-xs text-slate-900">{s.identification1}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">School Origination:</span> <span className="font-black text-xs text-slate-900">{s.previousSchool}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Transport Mode:</span> <span className="font-black text-xs text-slate-900">{s.transportMode}</span></div>
+                                  </div>
+                                </div>
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[14px]">family_history</span> Family Matrix
+                                  </h4>
+                                  <div className="grid grid-cols-1 gap-y-2">
+                                    <div><span className="font-bold text-xs text-slate-400">Father:</span> <span className="font-black text-xs text-slate-900">{s.family?.fatherName}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Father Mob.:</span> <span className="font-black text-xs text-slate-900">{s.family?.fatherPhone}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Mother:</span> <span className="font-black text-xs text-slate-900">{s.family?.motherName}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Mother Mob.:</span> <span className="font-black text-xs text-slate-900">{s.family?.motherPhone}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Primary Email:</span> <span className="font-black text-xs text-slate-900">{s.family?.parentsEmail}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Annual Income:</span> <span className="font-black text-xs text-slate-900">₹{s.family?.familyIncome || 0}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Sibling Registry:</span> <span className="font-black text-xs text-slate-900">{s.family?.siblings ? "Active" : "None"}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Residential Area:</span> <span className="font-black text-xs text-slate-900">{s.address?.city}</span></div>
+                                  </div>
+                                </div>
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[14px]">school</span> Academic Standing
+                                  </h4>
+                                  <div className="grid grid-cols-1 gap-y-2">
+                                    <div><span className="font-bold text-xs text-slate-400">Registration No:</span> <span className="font-black text-xs text-slate-900">{s.admission?.registerNo}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Academic Period:</span> <span className="font-black text-xs text-slate-900">{s.admission?.academicYear}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Valid From:</span> <span className="font-black text-xs text-slate-900">{s.admission?.admissionFrom}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Valid To:</span> <span className="font-black text-xs text-slate-900">{s.admission?.admissionTo}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Hostel Request:</span> <span className="font-black text-xs text-slate-900">{s.family?.hostelRequired ? "Yes" : "No"}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">RTE Status:</span> <span className="font-black text-xs text-slate-900">{s.rte ? "Yes" : "No"}</span></div>
+                                  </div>
+                                </div>
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[14px]">ink_pen</span> Administrative Seal
+                                  </h4>
+                                  <div className="grid grid-cols-1 gap-y-2">
+                                    <div><span className="font-bold text-xs text-slate-400">Staff Seal:</span> <span className="font-black text-xs text-slate-900">{s.admission?.staffSignature}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Principal Seal:</span> <span className="font-black text-xs text-slate-900">{s.admission?.principalSignature}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">System Auditor:</span> <span className="font-black text-xs text-slate-900">{s.admission?.approvedByRole}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Audit Timestamp:</span> <span className="font-black text-xs text-slate-900">{s.admission?.approvedAt ? dayjs(s.admission.approvedAt).format("DD MMM YYYY, HH:mm") : "-"}</span></div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       )}

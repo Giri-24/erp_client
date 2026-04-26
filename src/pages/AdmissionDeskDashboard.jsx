@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { message, Spin, Tag } from "antd";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import dayjs from "dayjs";
 import {
   getAdmissionDashboardSummary,
@@ -11,6 +13,40 @@ import { getAcademicYears } from "../modules/fees/fees.service";
 const fmt = (v) => Number(v || 0).toLocaleString("en-IN");
 
 const AdmissionDeskDashboard = ({ onNavigate }) => {
+  const dashboardRef = useRef(null);
+    // PDF Download Handler
+    const handleDownloadPDF = async () => {
+      const input = dashboardRef.current;
+      if (!input) return;
+      try {
+        // Use html2canvas to capture the dashboard
+        const canvas = await html2canvas(input, { scale: 2, useCORS: true });
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+        // Calculate width/height to fit A4
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let position = 0;
+        // If content is longer than one page, add pages
+        if (imgHeight < pageHeight) {
+          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        } else {
+          let remainingHeight = imgHeight;
+          let y = 0;
+          while (remainingHeight > 0) {
+            pdf.addImage(imgData, "PNG", 0, y ? 0 : position, imgWidth, imgHeight);
+            remainingHeight -= pageHeight;
+            if (remainingHeight > 0) pdf.addPage();
+            y++;
+          }
+        }
+        pdf.save("AdmissionDeskDashboard.pdf");
+      } catch (err) {
+        message.error("Failed to generate PDF");
+      }
+    };
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [pending, setPending] = useState([]);
@@ -75,7 +111,7 @@ const AdmissionDeskDashboard = ({ onNavigate }) => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500" ref={dashboardRef}>
       {/* Header */}
       <div className="flex justify-between items-end">
         <div>
@@ -87,6 +123,13 @@ const AdmissionDeskDashboard = ({ onNavigate }) => {
           </p>
         </div>
         <div className="flex gap-3">
+                    <button
+                      onClick={handleDownloadPDF}
+                      className="px-4 py-2 bg-primary text-white rounded-xl font-bold shadow hover:opacity-90 transition-all"
+                      type="button"
+                    >
+                      Download PDF
+                    </button>
           <select
             value={academicYear}
             onChange={(e) => setAcademicYear(e.target.value)}
@@ -163,7 +206,7 @@ const AdmissionDeskDashboard = ({ onNavigate }) => {
         {[
           { key: "admission", icon: "add_circle", label: "New Application", color: "bg-primary/10 text-primary" },
           { key: "admission-view", icon: "list_alt", label: "All Admissions", color: "bg-secondary-fixed text-on-secondary-fixed-variant" },
-          { key: "approval", icon: "rule", label: "Approvals Queue", color: "bg-amber-50 text-amber-700" },
+         // { key: "approval", icon: "rule", label: "Approvals Queue", color: "bg-amber-50 text-amber-700" },
           { key: "bulk-upload", icon: "upload", label: "Bulk Upload", color: "bg-tertiary-fixed text-on-tertiary-fixed-variant" },
           { key: "students", icon: "group", label: "View Students", color: "bg-primary-fixed text-primary" },
         ].map((action) => (

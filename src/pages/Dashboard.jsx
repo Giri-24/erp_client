@@ -206,9 +206,10 @@ const Dashboard = () => {
       icon: "person_add",
       permission: canAdmissionRead,
       children: [
-        { key: "admission-view", label: "All Admissions", icon: "list_alt", permission: canAdmissionRead },
+        // { key: "admission-view", label: "All Admissions", icon: "list_alt", permission: canAdmissionRead },
         { key: "admission", label: "Applications", icon: "add_circle", permission: canAdmissionRead },
-        { key: "approval", label: "Approvals Queue", icon: "rule", permission: canAdmissionRead && (adminSettings?.requireApprovalForAdmission ?? true) },
+        // HIDE Approvals Queue sidebar link without deleting code
+        { key: "approval", label: "Approvals Queue", icon: "rule", permission: false },
         { key: "bulk-upload", label: "Bulk", icon: "upload", permission: canAdmissionRead },
         { key: "promotion", label: "Student Promotion", icon: "swap_horiz", permission: canAdmissionRead },
       ],
@@ -350,7 +351,7 @@ const Dashboard = () => {
     switch (selectedKey) {
       case "dashboard":           return getRoleDashboard();
       case "admission":           return <AdmissionPage editData={editData} clearEditData={() => setEditData(null)} />;
-      case "admission-view":      return <AdmissionView onEdit={(record) => { setEditData(record); setSelectedKey("admission"); }} />;
+      // case "admission-view":      return <AdmissionView onEdit={(record) => { setEditData(record); setSelectedKey("admission"); }} />;
       case "admission-edit":      return <AdmissionEdit />;
       case "bulk-upload":         return <BulkUploadPage />;
       case "promotion":           return <PromotionPage />;
@@ -358,7 +359,8 @@ const Dashboard = () => {
                                           onCollectFee={(studentId) => { setFeeStudentId(studentId); setSelectedKey("fees-collect"); }} 
                                           onEdit={(record) => { setEditData(record); setSelectedKey("admission"); }}
                                         />;
-      case "approval":            return <ApprovalsView />;
+      // HIDE ApprovalsView page without deleting code
+    //  case "approval":            return null; // <ApprovalsView />
       case "profile":             return <ProfilePage />;
       case "admin-settings":      return isTransportManager ? getRoleDashboard() : <AdminSettings />;
       case "fees-structure":      return <FeeStructurePage />;
