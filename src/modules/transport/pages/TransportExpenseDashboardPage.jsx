@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
   exportTransportExpenses,
+  getAllBuses,
   getTransportExpenses,
 } from "../transport.service";
 import { getAcademicYears, getPaymentStatusReport } from "../../fees/fees.service";
@@ -46,6 +47,15 @@ const formatDateHeading = (value) => {
   }
 };
 
+const toCsvDateText = (value) => {
+  const dateKey = toDateKey(value);
+  if (!dateKey) return "";
+
+  const [year, month, day] = dateKey.split("-");
+  const ddmmyyyy = day && month && year ? `${day}-${month}-${year}` : dateKey;
+  return `\t${ddmmyyyy}`;
+};
+
 const getBusLabel = (expense) => {
   const bus = expense?.bus;
   return (
@@ -62,6 +72,36 @@ const getBusLabel = (expense) => {
     "Unassigned"
   );
 };
+
+const getBusId = (item) => {
+  return (
+    item?.id ||
+    item?._id ||
+    item?.busId ||
+    item?.bus?.id ||
+    item?.bus?._id ||
+    item?.bus?.busId ||
+    ""
+  );
+};
+
+const getBusOptionLabel = (bus) => {
+  return (
+    bus?.number ||
+    bus?.busNo ||
+    bus?.busNumber ||
+    bus?.vanNo ||
+    bus?.vehicleNo ||
+    bus?.vehicleNumber ||
+    bus?.plateNo ||
+    bus?.registrationNo ||
+    bus?.regNo ||
+    bus?.name ||
+    "Unnamed Bus"
+  );
+};
+
+const normalizeBusFilterValue = (value) => String(value || "").trim().toUpperCase();
 
 const getDetails = (expense) => {
   switch (expense?.category) {
@@ -133,6 +173,7 @@ const getPaymentStudentId = (payment) => {
 
 export default function TransportExpenseDashboardPage() {
   const [monthlyExpenses, setMonthlyExpenses] = useState([]);
+  const [buses, setBuses] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
   const [transportPayments, setTransportPayments] = useState([]);
@@ -172,6 +213,28 @@ export default function TransportExpenseDashboardPage() {
       cancelled = true;
     };
   }, [selectedMonth]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getAllBuses()
+      .then((data) => {
+        if (!cancelled) {
+          setBuses(Array.isArray(data) ? data : []);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          toast.error("Failed to load buses");
+          setBuses([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -363,19 +426,37 @@ export default function TransportExpenseDashboardPage() {
   }, [monthlyExpenses, activeCategory, showPastHistory, selectedDate, selectedMonth, currentMonthLabel]);
 
   const busFilterOptions = useMemo(() => {
-    const options = new Set();
-    scopedEntries.forEach((expense) => {
-      options.add(getBusLabel(expense));
+    const map = new Map();
+
+    // Primary source: master bus list, same as Add Expense page.
+    buses.forEach((bus) => {
+      const label = getBusOptionLabel(bus);
+      const normalizedLabel = normalizeBusFilterValue(label);
+      if (!normalizedLabel || map.has(normalizedLabel)) return;
+      map.set(normalizedLabel, label);
     });
-    return Array.from(options).sort((left, right) => left.localeCompare(right));
-  }, [scopedEntries]);
+
+    // Fallback: if an entry exists for a bus that is no longer in master list, keep it filterable.
+    scopedEntries.forEach((expense) => {
+      const label = getBusLabel(expense);
+      const normalizedLabel = normalizeBusFilterValue(label);
+      if (!normalizedLabel || map.has(normalizedLabel)) return;
+      map.set(normalizedLabel, label);
+    });
+
+    return Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }, [buses, scopedEntries]);
 
   const filteredEntries = useMemo(() => {
     const keyword = keywordFilter.trim().toLowerCase();
 
     return scopedEntries.filter((expense) => {
       const busLabel = getBusLabel(expense);
-      if (busFilter !== "ALL" && busLabel !== busFilter) {
+      const normalizedBusLabel = normalizeBusFilterValue(busLabel);
+
+      if (busFilter !== "ALL" && normalizedBusLabel !== busFilter) {
         return false;
       }
 
@@ -389,38 +470,48 @@ export default function TransportExpenseDashboardPage() {
     });
   }, [scopedEntries, busFilter, keywordFilter]);
 
-  const groupedByDate = useMemo(() => {
-    const map = new Map();
+  const orderedEntries = useMemo(() => {
+    return filteredEntries
+      .slice()
+      .sort((left, right) => {
+        const leftTime = new Date(left?.date || 0).getTime();
+        const rightTime = new Date(right?.date || 0).getTime();
+        if (rightTime !== leftTime) {
+          return rightTime - leftTime;
+        }
 
-    filteredEntries.forEach((expense) => {
-      const dateKey = toDateKey(expense?.date);
-      if (!map.has(dateKey)) {
-        map.set(dateKey, {
-          date: dateKey,
-          entries: [],
-          total: 0,
-        });
-      }
-      const group = map.get(dateKey);
-      group.entries.push(expense);
-      group.total += Number(expense?.amount || 0);
-    });
+        const leftCreated = new Date(left?.createdAt || 0).getTime();
+        const rightCreated = new Date(right?.createdAt || 0).getTime();
+        if (rightCreated !== leftCreated) {
+          return rightCreated - leftCreated;
+        }
 
-    return Array.from(map.values()).sort((left, right) => new Date(right.date) - new Date(left.date));
+        const leftId = String(left?.id || left?._id || "");
+        const rightId = String(right?.id || right?._id || "");
+        return rightId.localeCompare(leftId);
+      });
   }, [filteredEntries]);
 
+  useEffect(() => {
+    if (busFilter === "ALL") {
+      return;
+    }
+
+    const exists = busFilterOptions.some((option) => option.value === busFilter);
+    if (!exists) {
+      setBusFilter("ALL");
+    }
+  }, [busFilter, busFilterOptions]);
+
   const handleExportCsv = () => {
-    if (!filteredEntries.length) {
+    if (!orderedEntries.length) {
       toast.error("No records found to export");
       return;
     }
 
     const headers = ["Date", "Bus", "Category", "Details", "Amount"];
-    const rows = filteredEntries
-      .slice()
-      .sort((left, right) => new Date(right?.date || 0) - new Date(left?.date || 0))
-      .map((expense) => [
-        toDateKey(expense?.date),
+    const rows = orderedEntries.map((expense) => [
+      toCsvDateText(expense?.date),
         getBusLabel(expense),
         expense?.category || "",
         getDetails(expense),
@@ -646,8 +737,8 @@ export default function TransportExpenseDashboardPage() {
                 className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a]"
               >
                 <option value="ALL">All Buses</option>
-                {busFilterOptions.map((label) => (
-                  <option key={label} value={label}>{label}</option>
+                {busFilterOptions.map((busOption) => (
+                  <option key={busOption.value} value={busOption.value}>{busOption.label}</option>
                 ))}
               </select>
             </div>
@@ -689,37 +780,26 @@ export default function TransportExpenseDashboardPage() {
 
           {loading ? (
             <div className="py-10 text-center text-gray-500">Loading expenses...</div>
-          ) : groupedByDate.length === 0 ? (
+          ) : orderedEntries.length === 0 ? (
             <div className="py-10 text-center text-gray-500">No entries found for the selected filters.</div>
           ) : (
             <div className="space-y-5">
-              {groupedByDate.map((group) => (
-                <div key={group.date} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-3">
-                    <p className="font-semibold text-gray-900">{formatDateHeading(group.date)}</p>
-                    <p className="text-sm font-semibold text-[#00152a]">Daily Total: {formatCurrency(group.total)}</p>
+              {orderedEntries.map((expense, index) => (
+                <div
+                  key={expense?.id || expense?._id || `${toDateKey(expense?.date)}-${expense?.busId || "bus"}-${index}`}
+                  className="grid grid-cols-1 gap-2 rounded-lg bg-white p-3 border border-gray-100 sm:grid-cols-12"
+                >
+                  <div className="sm:col-span-2 text-sm font-medium text-gray-900">
+                    {formatDateHeading(expense?.date)}
                   </div>
-
-                  <div className="space-y-2">
-                    {group.entries
-                      .slice()
-                      .sort((left, right) => new Date(right?.date || 0) - new Date(left?.date || 0))
-                      .map((expense, index) => (
-                        <div
-                          key={expense?.id || expense?._id || `${group.date}-${expense?.busId || "bus"}-${index}`}
-                          className="grid grid-cols-1 gap-2 rounded-lg bg-white p-3 border border-gray-100 sm:grid-cols-12"
-                        >
-                          <div className="sm:col-span-4 text-sm font-medium text-gray-900">
-                            {getBusLabel(expense)}
-                          </div>
-                          <div className="sm:col-span-5 text-sm text-gray-600">
-                            {expense?.category} • {getDetails(expense)}
-                          </div>
-                          <div className="sm:col-span-3 text-sm font-semibold text-right text-gray-900">
-                            {formatCurrency(expense?.amount)}
-                          </div>
-                        </div>
-                      ))}
+                  <div className="sm:col-span-3 text-sm font-medium text-gray-900">
+                    {getBusLabel(expense)}
+                  </div>
+                  <div className="sm:col-span-4 text-sm text-gray-600">
+                    {expense?.category} • {getDetails(expense)}
+                  </div>
+                  <div className="sm:col-span-3 text-sm font-semibold text-right text-gray-900">
+                    {formatCurrency(expense?.amount)}
                   </div>
                 </div>
               ))}

@@ -16,6 +16,28 @@ const EXPENSE_TYPES = [
 
 const MULTI_BUS_TYPES = new Set(["MAINTENANCE", "PARTS", "TAX"]);
 
+const PART_NAME_OPTIONS = [
+  "New Tyre",
+  "Retread tyre",
+  "Gear box",
+  "Engine",
+  "Radiator",
+  "Electrical",
+  "Clutch",
+  "Main Axil",
+  "Spring Cut",
+  "Streeing Box",
+  "Camera, GPRS",
+];
+
+const MAINTENANCE_OPTIONS = [
+  "FC work",
+  "Greeze filling",
+  "Puncture & Tyre Checking",
+  "Fuel - Via Cash & Card",
+  "Other Expense",
+];
+
 const INITIAL_FORM = {
   busNo: "",
   busIds: [],
@@ -27,6 +49,7 @@ const INITIAL_FORM = {
   pricePerLitre: "",
   amount: "",
   workshop: "",
+  workshopName: "",
   description: "",
   partName: "",
   quantity: "",
@@ -210,14 +233,23 @@ export default function TransportExpensePage() {
           },
         ];
       case "MAINTENANCE":
+        const maintenanceDescriptionParts = [];
+        if (form.workshopName) {
+          maintenanceDescriptionParts.push(`Workshop: ${form.workshopName}`);
+        }
+        if (form.description) {
+          maintenanceDescriptionParts.push(form.description);
+        }
+        if (form.isShared) {
+          maintenanceDescriptionParts.push("(Shared split equally)");
+        }
+
         return selectedBusIds.map((busId, index) => ({
           busId,
           date: form.date,
           category: "MAINTENANCE",
           workshop: form.workshop,
-          description: form.isShared
-            ? `${form.description ? `${form.description} ` : ""}(Shared split equally)`.trim()
-            : form.description,
+          description: maintenanceDescriptionParts.join(" ").trim(),
           amount: distributeAmounts(Number(form.amount || 0), selectedBusIds.length, Boolean(form.isShared))[index],
         }));
       case "PARTS":
@@ -233,6 +265,7 @@ export default function TransportExpensePage() {
       case "TAX":
         return selectedBusIds.map((busId) => ({
           busId,
+
           date: form.date,
           category: "TAX",
           taxType: form.taxType,
@@ -473,15 +506,35 @@ export default function TransportExpensePage() {
         <>
           <div className="grid md:grid-cols-2 gap-5 mt-5">
             <div>
-              <label className="text-sm font-medium">Workshop</label>
-              <input
+              <label className="text-sm font-medium">Maintenance Type</label>
+              <select
                 name="workshop"
                 value={form.workshop}
                 onChange={handleChange}
                 className="w-full mt-1 border rounded-xl px-3 py-2"
-              />
+              >
+                <option value="">Select maintenance type</option>
+                {MAINTENANCE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </div>
 
+            <div>
+              <label className="text-sm font-medium">Workshop Name</label>
+              <input
+                name="workshopName"
+                value={form.workshopName}
+                onChange={handleChange}
+                placeholder="Enter workshop name"
+                className="w-full mt-1 border rounded-xl px-3 py-2"
+              />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5 mt-5">
             <div>
               <label className="text-sm font-medium">Amount</label>
               <input
@@ -495,7 +548,7 @@ export default function TransportExpensePage() {
           </div>
 
           <div className="mt-5">
-            <label className="text-sm font-medium">Description</label>
+            <label className="text-sm font-medium">Notes</label>
             <textarea
               name="description"
               value={form.description}
@@ -523,12 +576,19 @@ export default function TransportExpensePage() {
           <div className="grid md:grid-cols-2 gap-5 mt-5">
             <div>
               <label className="text-sm font-medium">Part Name</label>
-              <input
+              <select
                 name="partName"
                 value={form.partName}
                 onChange={handleChange}
                 className="w-full mt-1 border rounded-xl px-3 py-2"
-              />
+              >
+                <option value="">Select part name</option>
+                {PART_NAME_OPTIONS.map((partName) => (
+                  <option key={partName} value={partName}>
+                    {partName}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -593,6 +653,7 @@ export default function TransportExpensePage() {
                 <option value="ROAD TAX">Road Tax</option>
                 <option value="PERMIT">Permit</option>
                 <option value="INSURANCE">Insurance</option>
+                <option value="Green Tax">Green tax</option>
               </select>
             </div>
 
