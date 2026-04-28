@@ -60,6 +60,11 @@ const DEFAULT_SETTINGS = {
     wageLimit: 21000,    // ESI applicable if gross <= 21000
     dailyWageThreshold: 176,
   },
+  psf: {
+    enabled: false,
+    employeeRate: 0,
+    wageLimit: 0,
+  },
   pt: {
     enabled: false, // Professional Tax
     amount: 200,
@@ -114,6 +119,11 @@ const PFESIPage = () => {
             dailyWageThreshold: data.esi?.dailyWageThreshold
               ?? data.esiDailyWageThreshold
               ?? DEFAULT_SETTINGS.esi.dailyWageThreshold,
+          },
+          psf: {
+            enabled: data.psf?.enabled ?? data.psfEnabled ?? DEFAULT_SETTINGS.psf.enabled,
+            employeeRate: data.psf?.employeeRate ?? data.psfEmployeeRate ?? DEFAULT_SETTINGS.psf.employeeRate,
+            wageLimit: data.psf?.wageLimit ?? data.psfWageLimit ?? DEFAULT_SETTINGS.psf.wageLimit,
           },
           pt: {
             enabled: data.pt?.enabled ?? data.ptEnabled ?? DEFAULT_SETTINGS.pt.enabled,
@@ -213,6 +223,9 @@ const PFESIPage = () => {
         esiEmployerRate: values.esiEmployerRate,
         esiWageLimit: values.esiWageLimit,
         esiDailyWageThreshold: values.esiDailyWageThreshold,
+        psfEnabled: values.psfEnabled,
+        psfEmployeeRate: values.psfEmployeeRate,
+        psfWageLimit: values.psfWageLimit,
         ptEnabled: values.ptEnabled,
         ptAmount: values.ptAmount,
         basicRate: values.basicRate,
@@ -236,6 +249,11 @@ const PFESIPage = () => {
           employerRate: values.esiEmployerRate,
           wageLimit: values.esiWageLimit,
           dailyWageThreshold: values.esiDailyWageThreshold,
+        },
+        psf: {
+          enabled: values.psfEnabled,
+          employeeRate: values.psfEmployeeRate,
+          wageLimit: values.psfWageLimit,
         },
         pt: {
           enabled: values.ptEnabled,
@@ -269,6 +287,9 @@ const PFESIPage = () => {
       esiEmployerRate: settings.esi.employerRate,
       esiWageLimit: settings.esi.wageLimit,
       esiDailyWageThreshold: settings.esi.dailyWageThreshold ?? 176,
+      psfEnabled: settings.psf?.enabled ?? false,
+      psfEmployeeRate: settings.psf?.employeeRate ?? 0,
+      psfWageLimit: settings.psf?.wageLimit ?? 0,
       ptEnabled: settings.pt?.enabled,
       ptAmount: settings.pt?.amount,
       basicRate: settings.salaryStructure?.basicRate ?? 50,
@@ -288,6 +309,7 @@ const PFESIPage = () => {
       uanNumber: record.uanNumber,
       pfEnabled: record.pfEnabled !== false,
       esiEnabled: record.esiEnabled !== false,
+      psfEnabled: record.psfEnabled !== false,
       basicSalary: record.basicSalary,
       grossSalary: record.grossSalary,
       isStipend: record.isStipend || false,
@@ -479,6 +501,16 @@ const PFESIPage = () => {
         </Col>
         <Col span={4}>
           <Card size="small">
+            <Statistic title="PSF Employee" value={settings.psf?.employeeRate ?? 0} suffix="%" valueStyle={{ color: "#7cb305" }} />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card size="small">
+            <Statistic title="PSF Wage Limit" prefix="₹" value={settings.psf?.wageLimit ?? 0} />
+          </Card>
+        </Col>
+        <Col span={4}>
+          <Card size="small">
             <Statistic title="Basic Rate" value={settings.salaryStructure?.basicRate ?? 50} suffix="%" valueStyle={{ color: "#722ed1" }} />
           </Card>
         </Col>
@@ -565,6 +597,19 @@ const PFESIPage = () => {
             </Form.Item>
           </Space>
 
+          <Divider orientation="left">PSF (Professional Services Fund)</Divider>
+          <Form.Item name="psfEnabled" label="PSF Enabled" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Space size="large" wrap>
+            <Form.Item name="psfEmployeeRate" label="Employee Rate (%)">
+              <InputNumber min={0} max={100} step={0.25} />
+            </Form.Item>
+            <Form.Item name="psfWageLimit" label="Wage Limit (₹)">
+              <InputNumber min={0} step={1000} />
+            </Form.Item>
+          </Space>
+
           <Divider orientation="left">Professional Tax</Divider>
           <Form.Item name="ptEnabled" label="PT Enabled" valuePropName="checked">
             <Switch />
@@ -625,6 +670,9 @@ const PFESIPage = () => {
               <Switch />
             </Form.Item>
             <Form.Item name="esiEnabled" label="ESI Applicable" valuePropName="checked">
+              <Switch />
+            </Form.Item>
+            <Form.Item name="psfEnabled" label="PSF Applicable" valuePropName="checked">
               <Switch />
             </Form.Item>
             <Form.Item name="isStipend" label="Stipend (No PF)" valuePropName="checked">

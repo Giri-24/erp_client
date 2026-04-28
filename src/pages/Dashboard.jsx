@@ -55,6 +55,10 @@ import ESSLSyncPage from "../modules/hr/pages/ESSLSyncPage";
 import PayrollPage from "../modules/hr/pages/PayrollPage";
 import AdvanceRequestPage from "../modules/hr/pages/AdvanceRequestPage";
 import SalaryAbstractPage from "../modules/hr/pages/SalaryAbstractPage";
+import IncrementManagementPage from "../modules/hr/pages/IncrementManagementPage";
+import LoanManagementPage from "../modules/hr/pages/LoanManagementPage";
+import StatutoryReportPage from "../modules/hr/pages/StatutoryReportPage";
+import StatutorySettingsPage from "../modules/hr/pages/StatutorySettingsPage";
 
 import POSDashboardPage from "../modules/pos/pages/POSDashboardPage";
 import StoreItemsPage from "../modules/pos/pages/StoreItemsPage";
@@ -265,9 +269,13 @@ const Dashboard = () => {
         { key: "hr-leaves", label: "My Leaves", icon: "event_busy", permission: canHRLeave },
         { key: "hr-permission", label: "Permission", icon: "timer", permission: canHRPermission },
         { key: "hr-pf-esi", label: "PF & ESI", icon: "account_balance", permission: canHRStatutory && !isTeacherOrStaffSelf },
+        { key: "hr-statutory-settings", label: "Statutory Settings", icon: "tune", permission: canHRStatutory && !isTeacherOrStaffSelf },
+        { key: "hr-statutory-report", label: "PF / Non-PF Report", icon: "bar_chart", permission: canHRStatutory && !isTeacherOrStaffSelf },
         { key: "hr-essl", label: "ESSL Sync", icon: "fingerprint", permission: canHRESSL && !isTeacherOrStaffSelf },
         { key: "hr-payroll", label: "My Payslip", icon: "payments", permission: canHRPayroll || isTeacherOrStaffSelf },
         { key: "hr-advance", label: "Advance / Loan", icon: "request_quote", permission: canHRPayroll || canHRAdvanceSelf },
+        { key: "hr-increment", label: "Salary Increment", icon: "trending_up", permission: canHRPayroll && !isTeacherOrStaffSelf },
+        { key: "hr-loan-management", label: "Loan Management", icon: "account_balance_wallet", permission: canHRPayroll && !isTeacherOrStaffSelf },
         { key: "hr-salary-abstract", label: "Salary Abstract", icon: "summarize", permission: canHRPayroll && !isTeacherOrStaffSelf },
       ],
     },
@@ -392,9 +400,13 @@ const Dashboard = () => {
       case "hr-leaves":           return <LeaveManagementPage selfOnly={isTeacherOrStaffSelf} />;
       case "hr-permission":       return <PermissionPage selfOnly={isTeacherOrStaffSelf} />;
       case "hr-pf-esi":           return <PFESIPage />;
+      case "hr-statutory-settings": return <StatutorySettingsPage />;
+      case "hr-statutory-report": return <StatutoryReportPage />;
       case "hr-essl":             return <ESSLSyncPage />;
       case "hr-payroll":          return <PayrollPage selfOnly={isTeacherOrStaffSelf} />;
       case "hr-advance":          return <AdvanceRequestPage selfOnly={isTeacherOrStaffSelf} />;
+      case "hr-increment":        return <IncrementManagementPage />;
+      case "hr-loan-management":  return <LoanManagementPage />;
       case "hr-salary-abstract":  return <SalaryAbstractPage />;
       case "pos-dashboard":       return <POSDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
       case "pos-items":           return <StoreItemsPage />;

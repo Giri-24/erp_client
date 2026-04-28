@@ -187,12 +187,17 @@ const StaffManagementPage = () => {
     setLoading(false);
   };
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (staffId = null) => {
     try {
-      const res = await instance.get("/admissions");
-      setStudents(res.data.filter((s) => s.users?.isActive !== false));
+      const res = await instance.get("/students");
+      const rows = Array.isArray(res.data) ? res.data : [];
+      // Only show active students and exclude already-linked children of another staff.
+      const available = rows.filter(
+        (s) => s?.users?.isActive !== false && (!s.staffParentId || s.staffParentId === staffId),
+      );
+      setStudents(available);
     } catch {
-      /* ignore */
+      setStudents([]);
     }
   };
 
@@ -264,7 +269,7 @@ const StaffManagementPage = () => {
       return;
     }
     setLinkStaffId(staffId);
-    fetchStudents();
+    fetchStudents(staffId);
     setLinkModal(true);
   };
 
@@ -526,7 +531,7 @@ const StaffManagementPage = () => {
       title: "Actions",
       key: "actions",
       fixed: 'right',
-      width: 120,
+      width: 160,
       render: (_, record) => (
         <div style={{ display: 'flex', gap: 4 }}>
           <Tooltip title="View Profile">
@@ -538,6 +543,17 @@ const StaffManagementPage = () => {
               style={{ borderRadius: '8px' }}
             />
           </Tooltip>
+          {canUpdateStaff && (
+            <Tooltip title="Map Child">
+              <Button
+                type="text"
+                icon={<LinkOutlined style={{ color: '#10b981' }} />}
+                size="middle"
+                onClick={() => openLinkChild(record.id)}
+                style={{ borderRadius: '8px' }}
+              />
+            </Tooltip>
+          )}
           {canUpdateStaff && (
             <Tooltip title="Modify Record">
               <Button 
@@ -1046,6 +1062,17 @@ const StaffManagementPage = () => {
                         <div style={{ width: 10, height: 32, background: '#10b981', borderRadius: 5 }}></div>
                         <span style={{ fontWeight: 900, fontSize: 24, letterSpacing: '-0.02em', color: 'var(--primary)' }}>Family Lineage</span>
                         <Tag style={{ marginLeft: 8, borderRadius: 20, fontWeight: 800 }}>{selectedStaff.children.length} SIBLINGS</Tag>
+                        {canUpdateStaff && (
+                          <Button
+                            size="small"
+                            type="primary"
+                            icon={<LinkOutlined />}
+                            onClick={() => openLinkChild(selectedStaff.id)}
+                            style={{ marginLeft: 8, borderRadius: 8 }}
+                          >
+                            Map Child
+                          </Button>
+                        )}
                       </div>
                       <Table
                         dataSource={selectedStaff.children?.filter(c => c.isActive !== false && c.users?.isActive !== false)}
@@ -1409,7 +1436,7 @@ const StaffManagementPage = () => {
             className="premium-select"
             onChange={(studentId) => handleLinkChild(studentId)}
             filterOption={(input, option) =>
-              option.children.toLowerCase().includes(input.toLowerCase())
+              String(option?.children || "").toLowerCase().includes(input.toLowerCase())
             }
           >
             {students.map((s) => (
