@@ -379,6 +379,30 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   useEffect(() => {
     if (editData) {
       const primaryAcademic = editData.academics?.[0] || {};
+      const doc = editData.documents?.[0] || {};
+
+      const profilePhotoFile = doc.photoPath
+        ? [{ uid: "-1", name: "Profile Photo", status: "done", url: `/erp/api/${String(doc.photoPath).replace(/\\/g, '/')}` }]
+        : [];
+      const birthCertFile = doc.birthCertPath
+        ? [{ uid: "-1", name: "Birth Certificate", status: "done", url: `/erp/api/${String(doc.birthCertPath).replace(/\\/g, '/')}` }]
+        : [];
+      const communityCertFile = doc.communityCertPath
+        ? [{ uid: "-1", name: "Community Certificate", status: "done", url: `/erp/api/${String(doc.communityCertPath).replace(/\\/g, '/')}` }]
+        : [];
+      const aadharStudentFile = doc.aadharStudentPath
+        ? [{ uid: "-1", name: "Aadhar", status: "done", url: `/erp/api/${String(doc.aadharStudentPath).replace(/\\/g, '/')}` }]
+        : [];
+      const transferCertFile = doc.transferCertPath
+        ? [{ uid: "-1", name: "Transfer Certificate", status: "done", url: `/erp/api/${String(doc.transferCertPath).replace(/\\/g, '/')}` }]
+        : [];
+
+      const documentsChecked = [
+        (doc.birthCert || birthCertFile.length > 0) && "birthCert",
+        (doc.communityCert || communityCertFile.length > 0) && "communityCert",
+        (doc.aadharStudent || aadharStudentFile.length > 0) && "aadharStudent",
+      ].filter(Boolean);
+
       const flatData = {
         name: editData.name,
         standard: normalizeStandardValue(editData.standard || editData.admission?.standard),
@@ -451,15 +475,18 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
         sibling2Name: editData.family?.sibling2Name,
         sibling2Standard: editData.family?.sibling2Standard,
         sibling2School: editData.family?.sibling2School,
+
+        profilePhotoChecked: !!doc.photoPath,
+        profilePhoto: profilePhotoFile,
+        birthCertFile,
+        communityCertFile,
+        aadharStudentFile,
+        transferCertFile,
+        documentsChecked,
       };
 
-      // Handle documents for checkbox group
-      const doc = editData.documents?.[0] || {};
-      const docSelection = [];
-      if (doc.birthCert) docSelection.push("birthCert");
-      if (doc.communityCert) docSelection.push("communityCert");
-      if (doc.aadharStudent) docSelection.push("aadharStudent");
-      flatData.documents = docSelection;
+      // Keep legacy document selection field for compatibility.
+      flatData.documents = documentsChecked;
 
       // Handle hard copy flags
       const hardCopySelection = [];
@@ -471,19 +498,6 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
       if (doc.transferCertHardCopy) hardCopySelection.push("transferCert");
       flatData.hardCopyDocs = hardCopySelection;
       flatData.photosReceived = doc.photosReceived || false;
-
-      // Handle photo structure assuming we are getting a valid image config
-      if (doc.photo || doc.photoPath) {
-        flatData.profilePhotoChecked = true;
-        flatData.profilePhoto = [
-          {
-            uid: "-1",
-            name: "photo.jpg",
-            status: "done",
-            url: doc.photoPath ? `/erp/api/${doc.photoPath.replace(/\\/g, '/')}` : "https://via.placeholder.com/150",
-          },
-        ];
-      }
 
       form.setFieldsValue(flatData);
       setFormData(flatData);
@@ -685,10 +699,11 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
 
       form.setFieldsValue({
         documentsChecked: [
-          doc.birthCert && "birthCert",
-          doc.communityCert && "communityCert",
-          doc.aadharStudent && "aadharStudent",
+          (doc.birthCert || doc.birthCertPath) && "birthCert",
+          (doc.communityCert || doc.communityCertPath) && "communityCert",
+          (doc.aadharStudent || doc.aadharStudentPath) && "aadharStudent",
         ].filter(Boolean),
+        profilePhotoChecked: !!doc.photoPath,
       });
     }
   }, [editData]);
@@ -715,12 +730,19 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   // helper
   const getDefaultFile = (path, name = "file") => {
     if (!path) return [];
+    const normalizedPath = String(path).replace(/\\/g, '/');
+    const url = /^https?:\/\//i.test(normalizedPath)
+      ? normalizedPath
+      : normalizedPath.startsWith('/erp/api/')
+        ? normalizedPath
+        : `/erp/api/${normalizedPath.replace(/^\/+/, '')}`;
+
     return [
       {
         uid: "-1",
         name,
         status: "done",
-        url: `/erp/api/${path.replace(/\\/g, '/')}`,
+        url,
       },
     ];
   };
@@ -1717,7 +1739,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                       {formData.profilePhoto?.[0] && (
                         <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-white shadow-xl">
                            <img 
-                             src={formData.profilePhoto[0].url || (formData.profilePhoto[0].originFileObj ? URL.createObjectURL(formData.profilePhoto[0].originFileObj) : "")} 
+                             src={getSafePreviewUrl(formData.profilePhoto?.[0]) || ""}
                              alt="Student" 
                              className="w-full h-full object-cover"
                            />

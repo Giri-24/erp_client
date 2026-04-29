@@ -75,7 +75,7 @@ const DetailRow = ({ icon, label, value }) => (
     let list = drivers;
     if (selectedRoute !== "all") {
       list = list.filter((d) => {
-        const dRoute = d.route?.id || d.route?._id || d.route;
+        const dRoute = d?.bus?.route?.id || d?.bus?.route?._id || d?.assignedRouteId || d?.route?.id || d?.route?._id || d?.route;
         return String(dRoute) === String(selectedRoute);
       });
     }
@@ -90,7 +90,7 @@ const DetailRow = ({ icon, label, value }) => (
         (d) =>
           (d.name || "").toLowerCase().includes(q) ||
           (d.phone || d.mobile || "").toLowerCase().includes(q) ||
-          (d.busNumber || d.vehicleNo || "").toLowerCase().includes(q) ||
+          (d.bus?.number || d.assignedBusNumber || d.busNumber || d.vehicleNo || "").toLowerCase().includes(q) ||
           (d.licenseNo || "").toLowerCase().includes(q)
       );
     }
@@ -100,23 +100,23 @@ const DetailRow = ({ icon, label, value }) => (
   const routeDriverCounts = useMemo(() => {
     const counts = {};
     drivers.forEach((d) => {
-      const rId = d.route?.id || d.route?._id || d.route;
+      const rId = d?.bus?.route?.id || d?.bus?.route?._id || d?.assignedRouteId || d?.route?.id || d?.route?._id || d?.route;
       if (rId) counts[rId] = (counts[rId] || 0) + 1;
     });
     return counts;
   }, [drivers]);
 
   const getRouteName = (driver) => {
-    const rId = driver.route?.id || driver.route?._id || driver.route;
+    const rId = driver?.bus?.route?.id || driver?.bus?.route?._id || driver?.assignedRouteId || driver?.route?.id || driver?.route?._id || driver?.route;
     if (!rId) return "Unassigned";
     const r = routeMap[rId];
-    return r ? r.routeName || `Route #${r.routeNo}` : "Unknown Route";
+    return r ? r?.routeName || driver?.assignedRouteName || `Route #${r.routeNo}` : (driver?.assignedRouteName || "Unknown Route");
   };
 
   const getRouteNo = (driver) => {
-    const rId = driver.route?.id || driver.route?._id || driver.route;
+    const rId = driver?.bus?.route?.id || driver?.bus?.route?._id || driver?.assignedRouteId || driver?.route?.id || driver?.route?._id || driver?.route;
     const r = rId ? routeMap[rId] : null;
-    return r?.routeNo || "—";
+    return r?.routeNo || driver?.assignedRouteNo || "—";
   };
 
   /* ── modal helpers ── */
@@ -137,7 +137,7 @@ const DetailRow = ({ icon, label, value }) => (
       busId: driver.bus?.id || driver.busId || undefined,
       licenseNo: driver.licenseNo || "",
       bloodGroup: driver.bloodGroup || undefined,
-      route: driver.route?.id || driver.route?._id || driver.route || undefined,
+      route: driver.bus?.route?.id || driver.bus?.route?._id || driver.assignedRouteId || driver.route?.id || driver.route?._id || driver.route || undefined,
       status: driver.status || "ACTIVE",
     });
     setModalOpen(true);

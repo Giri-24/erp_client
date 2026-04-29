@@ -335,8 +335,8 @@ const FeeStructurePage = () => {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
                       { key: "tuitionFee", label: "Tuition Fee", primary: true },
-                      { key: "transportFee", label: "Transport" },
-                      { key: "hostelFee", label: "Hostel" },
+                      // { key: "transportFee", label: "Transport" },
+                      // { key: "hostelFee", label: "Hostel" },
                       { key: "bookFee", label: "Books / Kit" },
                     ].map(({ key, label, primary }) => (
                       <div
@@ -360,19 +360,19 @@ const FeeStructurePage = () => {
                   </div>
   
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-white p-4 rounded-xl">
+                    {/* <div className="bg-white p-4 rounded-xl">
                       <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">Other Fee</p>
                       <div className="relative">
                         <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm font-bold">₹</span>
-                        <input
+                        {/* <input
                           type="number" min={0}
                           value={form.otherFee || ""}
                           onChange={(e) => setField("otherFee", Number(e.target.value) || 0)}
                           className="w-full border-none p-0 pl-4 focus:ring-0 text-lg font-bold text-primary bg-transparent outline-none"
                           placeholder="0"
-                        />
+                        /> 
                       </div>
-                    </div>
+                    </div> */}
                     <div className="bg-white p-4 rounded-xl">
                       <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">No. of Terms</p>
                       <input

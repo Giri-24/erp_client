@@ -23,7 +23,6 @@ import {
 } from "antd";
 import {
   EditOutlined,
-  SaveOutlined,
   SettingOutlined,
   DownloadOutlined,
   EyeOutlined,
@@ -38,10 +37,9 @@ import {
   generateESIReport,
 } from "../hr.service";
 import { getAllStaff } from "../../staff/staff.service";
+import { exportToCSV } from "../../pos/exportCsv";
 import dayjs from "dayjs";
 import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
-
-const { Option } = Select;
 
 // Default PF & ESI rates as per Indian statutory norms
 const DEFAULT_SETTINGS = {
@@ -444,103 +442,270 @@ const PFESIPage = () => {
     { title: "Total", dataIndex: "totalESI", render: (v) => <Tag color="cyan">₹{(v || 0).toLocaleString()}</Tag> },
   ];
 
+  const shellStyle = {
+    background: "var(--surface-container-low, #f8fafc)",
+    borderRadius: 24,
+    padding: 20,
+    border: "1px solid var(--surface-container-high, #e2e8f0)",
+  };
+
+  const cardStyle = {
+    borderRadius: 16,
+    border: "1px solid var(--surface-container-high, #e2e8f0)",
+    boxShadow: "none",
+  };
+
+  const tableContainerStyle = {
+    background: "#fff",
+    borderRadius: 18,
+    padding: 18,
+    border: "1px solid var(--surface-container-high, #e2e8f0)",
+    boxShadow: "var(--shadow-ambient-sm)",
+  };
+
+  const handleExportCsv = () => {
+    if (activeTab === "staff") {
+      if (!staffPFESI.length) {
+        message.warning("No staff PF/ESI records to export");
+        return;
+      }
+
+      const rows = staffPFESI.map((row) => {
+        const pf = calcPF(row.grossSalary, row.isStipend);
+        const esi = calcESI(row.grossSalary);
+        return {
+          ...row,
+          pfEmployee: pf.employee,
+          pfEmployer: pf.employer,
+          pfBase: pf.base,
+          esiEmployee: esi.employee,
+          esiEmployer: esi.employer,
+          esiBase: esi.base,
+          esiDailyWage: esi.dailyWage,
+          esiApplicable: esi.applicable ? "Yes" : "No",
+          type: row.isStipend ? "Stipend" : "Regular",
+        };
+      });
+
+      exportToCSV(
+        rows,
+        [
+          { key: "employeeId", label: "Emp ID" },
+          { key: "staffName", label: "Name" },
+          { key: "department", label: "Department" },
+          { key: "grossSalary", label: "Gross Salary" },
+          { key: (r) => Math.round((Number(r.grossSalary || 0) * basicRate) / 100), label: "Basic (50%)" },
+          { key: "pfNumber", label: "PF No" },
+          { key: "uanNumber", label: "UAN" },
+          { key: "esiNumber", label: "ESI No" },
+          { key: "type", label: "Type" },
+          { key: "pfBase", label: "PF Base" },
+          { key: "pfEmployee", label: "PF Employee" },
+          { key: "pfEmployer", label: "PF Employer" },
+          { key: "esiBase", label: "ESI Base" },
+          { key: "esiDailyWage", label: "ESI Daily Wage" },
+          { key: "esiApplicable", label: "ESI Applicable" },
+          { key: "esiEmployee", label: "ESI Employee" },
+          { key: "esiEmployer", label: "ESI Employer" },
+          { key: "dailyRate", label: "Daily Rate" },
+          { key: (r) => (r.pfEnabled !== false ? "Yes" : "No"), label: "PF Enabled" },
+          { key: (r) => (r.esiEnabled !== false ? "Yes" : "No"), label: "ESI Enabled" },
+          { key: (r) => (r.psfEnabled !== false ? "Yes" : "No"), label: "PSF Enabled" },
+        ],
+        "staff_pf_esi",
+      );
+      return;
+    }
+
+    if (activeTab === "pf-report") {
+      if (!pfReport.length) {
+        message.warning("No PF report records to export");
+        return;
+      }
+
+      exportToCSV(
+        pfReport,
+        [
+          { key: "employeeId", label: "Emp ID" },
+          { key: "staffName", label: "Name" },
+          { key: "uanNumber", label: "UAN" },
+          { key: "pfNumber", label: "PF No" },
+          { key: "basicSalary", label: "Basic" },
+          { key: "pfBase", label: "PF Base (50%)" },
+          { key: "employeePF", label: "Employee PF" },
+          { key: "employerPF", label: "Employer PF" },
+          { key: "adminCharges", label: "Admin" },
+          { key: "edliCharges", label: "EDLI" },
+          { key: "totalPF", label: "Total PF" },
+        ],
+        `pf_report_${reportMonth.format("YYYY_MM")}`,
+      );
+      return;
+    }
+
+    if (activeTab === "esi-report") {
+      if (!esiReport.length) {
+        message.warning("No ESI report records to export");
+        return;
+      }
+
+      exportToCSV(
+        esiReport,
+        [
+          { key: "employeeId", label: "Emp ID" },
+          { key: "staffName", label: "Name" },
+          { key: "esiNumber", label: "ESI No" },
+          { key: "grossSalary", label: "Gross" },
+          { key: "esiBase", label: "ESI Base (80%)" },
+          { key: "dailyEsiWage", label: "Daily Wage" },
+          { key: "employeeESI", label: "Employee ESI" },
+          { key: "employerESI", label: "Employer ESI" },
+          { key: "totalESI", label: "Total ESI" },
+        ],
+        `esi_report_${reportMonth.format("YYYY_MM")}`,
+      );
+    }
+  };
+
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 }}>
-        <div>
-          <div className="page-breadcrumb">
-            <span>HR</span>
-            <span style={{ fontSize: 14 }}>›</span>
-            <span style={{ color: "#00152a", fontWeight: 700 }}>PF & ESI</span>
+    <div style={{ padding: 2 }}>
+      <div
+        style={{
+          background: "linear-gradient(135deg, rgba(0,21,42,0.96), rgba(18,52,86,0.95))",
+          borderRadius: 24,
+          padding: 16,
+          marginBottom: 18,
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "var(--shadow-ambient-sm)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 10, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 12, opacity: 0.75, fontWeight: 600, letterSpacing: 0.4, marginBottom: 6 }}>
+              HR  /  STATUTORY COMPLIANCE
+            </div>
+            <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 30, fontWeight: 800, margin: "0 0 6px",color:"white", letterSpacing: "-0.02em" }}>
+              PF & ESI Management
+            </h2>
+            <p style={{ fontSize: 13, margin: 0, opacity: 0.85, fontFamily: "'Public Sans', sans-serif" }}>
+              Provident Fund and ESI setup, per-staff applicability, and monthly statutory reporting.
+            </p>
           </div>
-          <h2 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 28, fontWeight: 800, color: "#00152a", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
-            PF & ESI Management
-          </h2>
-          <p style={{ color: "#43474d", fontSize: 13, margin: 0, fontFamily: "'Public Sans', sans-serif" }}>
-            Provident Fund, ESI statutory compliance — rates, staff mapping, and monthly reports.
-          </p>
+          {canManage && (
+            <Button
+              icon={<SettingOutlined />}
+              onClick={openSettings}
+              size="large"
+              style={{
+                borderRadius: 12,
+                background: "#fff",
+                color: "#00152a",
+                border: "none",
+                fontWeight: 700,
+              }}
+            >
+              Configure Rates
+            </Button>
+          )}
         </div>
-        {canManage && (
-          <Button icon={<SettingOutlined />} onClick={openSettings}>
-            Configure Rates
-          </Button>
-        )}
       </div>
 
       {/* Rate Summary */}
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={4}>
-          <Card size="small">
+      <div style={shellStyle}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--primary)" }}>Current Statutory Rates</div>
+        <Tag color="processing" style={{ borderRadius: 999, paddingInline: 10 }}>Live Configuration</Tag>
+      </div>
+      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="PF Employee" value={settings.pf.employeeRate} suffix="%" valueStyle={{ color: "#1890ff" }} />
           </Card>
         </Col>
-        <Col span={4}>
-          <Card size="small">
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="PF Employer" value={settings.pf.employerRate} suffix="%" valueStyle={{ color: "#1890ff" }} />
           </Card>
         </Col>
-        <Col span={4}>
-          <Card size="small">
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="PF Wage Limit" prefix="₹" value={settings.pf.wageLimit} />
           </Card>
         </Col>
-        <Col span={4}>
-          <Card size="small">
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="ESI Employee" value={settings.esi.employeeRate} suffix="%" valueStyle={{ color: "#13c2c2" }} />
           </Card>
         </Col>
-        <Col span={4}>
-          <Card size="small">
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="ESI Employer" value={settings.esi.employerRate} suffix="%" valueStyle={{ color: "#13c2c2" }} />
           </Card>
         </Col>
-        <Col span={4}>
-          <Card size="small">
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="ESI Wage Limit" prefix="₹" value={settings.esi.wageLimit} />
           </Card>
         </Col>
-        <Col span={4}>
-          <Card size="small">
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="PSF Employee" value={settings.psf?.employeeRate ?? 0} suffix="%" valueStyle={{ color: "#7cb305" }} />
           </Card>
         </Col>
-        <Col span={4}>
-          <Card size="small">
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="PSF Wage Limit" prefix="₹" value={settings.psf?.wageLimit ?? 0} />
           </Card>
         </Col>
-        <Col span={4}>
-          <Card size="small">
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="Basic Rate" value={settings.salaryStructure?.basicRate ?? 50} suffix="%" valueStyle={{ color: "#722ed1" }} />
           </Card>
         </Col>
-        <Col span={4}>
-          <Card size="small">
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="HRA Rate" value={settings.salaryStructure?.hraRate ?? 30} suffix="%" valueStyle={{ color: "#eb2f96" }} />
           </Card>
         </Col>
-        <Col span={4}>
-          <Card size="small">
+        <Col xs={24} sm={12} md={8} lg={6} xl={4}>
+          <Card size="small" style={cardStyle}>
             <Statistic title="ESI Daily Threshold" prefix="₹" value={settings.esi?.dailyWageThreshold ?? 176} />
           </Card>
         </Col>
       </Row>
+      </div>
 
-      <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
-        { key: "staff", label: "Staff PF/ESI" },
-        { key: "pf-report", label: "PF Report" },
-        { key: "esi-report", label: "ESI Report" },
-      ]} />
+      <div style={{ ...shellStyle, marginTop: 14 }}>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        style={{ marginBottom: 12 }}
+        items={[
+          { key: "staff", label: "Staff PF/ESI" },
+          { key: "pf-report", label: "PF Report" },
+          { key: "esi-report", label: "ESI Report" },
+        ]}
+      />
 
-      {(activeTab === "pf-report" || activeTab === "esi-report") && (
-        <div style={{ display: "flex", gap: 16, marginBottom: 16, alignItems: "center" }}>
-          <DatePicker picker="month" value={reportMonth} onChange={(d) => d && setReportMonth(d)} allowClear={false} />
-          <Button icon={<DownloadOutlined />}>Export</Button>
+      {(activeTab === "staff" || activeTab === "pf-report" || activeTab === "esi-report") && (
+        <div style={{ display: "flex", gap: 12, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
+          {(activeTab === "pf-report" || activeTab === "esi-report") && (
+            <DatePicker
+              picker="month"
+              value={reportMonth}
+              onChange={(d) => d && setReportMonth(d)}
+              allowClear={false}
+              size="large"
+            />
+          )}
+          <Button icon={<DownloadOutlined />} size="large" style={{ borderRadius: 10 }} onClick={handleExportCsv}>
+            Export
+          </Button>
         </div>
       )}
 
-      <div style={{ background: "#f0f4f8", borderRadius: 16, padding: 4 }}>
-        <div style={{ background: "#fff", borderRadius: 14, padding: 24 }}>
+      <div style={tableContainerStyle}>
           {activeTab === "staff" && (
             <Table columns={staffColumns} dataSource={staffPFESI} rowKey="staffId" loading={loading} scroll={{ x: 1200 }} pagination={{ pageSize: 50 }} />
           )}
@@ -550,7 +715,7 @@ const PFESIPage = () => {
           {activeTab === "esi-report" && (
             <Table columns={esiReportColumns} dataSource={esiReport} rowKey="staffId" loading={loading} scroll={{ x: 900 }} pagination={{ pageSize: 50 }} />
           )}
-        </div>
+      </div>
       </div>
 
       {/* Settings Modal */}

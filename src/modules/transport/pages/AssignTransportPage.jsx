@@ -379,24 +379,7 @@ const AssignTransportPage = ({ initialStudentId, onMounted }) => {
                   size="large"
                 />
               </div>
-
-              {/* Bus Number dropdown (populated by selected route) */}
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-primary ml-1">Bus Number</label>
-                <select
-                  value={busno}
-                  onChange={e => setBusno(e.target.value)}
-                  className="w-full px-4 py-3.5 bg-surface-container-high border-none rounded-xl font-body text-on-surface appearance-none focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer text-sm"
-                  disabled={!selectedRoute || !routeBuses.length}
-                >
-                  <option value="">{!selectedRoute ? "Select a route first" : routeBuses.length ? "Select Bus" : "No buses for this route"}</option>
-                  {routeBuses.map((bus) => (
-                    <option key={bus.id} value={bus.number}>{bus.number} (Capacity: {bus.capacity})</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Route row (academic year now in filter bar above) */}
+     {/* Route row (academic year now in filter bar above) */}
               <div className="grid grid-cols-1 gap-5">
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-primary ml-1">Route</label>
@@ -417,6 +400,23 @@ const AssignTransportPage = ({ initialStudentId, onMounted }) => {
                   </div>
                 </div>
               </div>
+              {/* Bus Number dropdown (populated by selected route) */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-primary ml-1">Bus Number</label>
+                <select
+                  value={busno}
+                  onChange={e => setBusno(e.target.value)}
+                  className="w-full px-4 py-3.5 bg-surface-container-high border-none rounded-xl font-body text-on-surface appearance-none focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer text-sm"
+                  disabled={!selectedRoute || !routeBuses.length}
+                >
+                  <option value="">{!selectedRoute ? "Select a route first" : routeBuses.length ? "Select Bus" : "No buses for this route"}</option>
+                  {routeBuses.map((bus) => (
+                    <option key={bus.id} value={bus.number}>{bus.number} (Capacity: {bus.capacity})</option>
+                  ))}
+                </select>
+              </div>
+
+         
 
               {selectedRoute?.stops?.length > 0 && (
                 <div className="space-y-1.5">
