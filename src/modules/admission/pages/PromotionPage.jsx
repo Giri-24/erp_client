@@ -24,6 +24,7 @@ const PromotionPage = () => {
   const [academicYear, setAcademicYear] = useState('2025-2026');
   const [newAcademicYear, setNewAcademicYear] = useState('2026-2027');
   const [summary, setSummary] = useState(null);
+  const [blockingError, setBlockingError] = useState(null);
 
   const loadSummary = async () => {
     try {
@@ -70,10 +71,21 @@ const PromotionPage = () => {
             : await promoteStudents(payload);
 
           setResult(res);
+          setBlockingError(null);
           message.success(`All students ${isDemotion ? 'demoted' : 'promoted'} successfully!`);
           await loadSummary();
         } catch (err) {
-          message.error('Operation failed');
+          const apiMessage = err?.response?.data?.message || 'Operation failed';
+          const missingFeeStructures = err?.response?.data?.missingFeeStructures || [];
+          if (missingFeeStructures.length > 0) {
+            setBlockingError({
+              message: apiMessage,
+              missingFeeStructures,
+            });
+          } else {
+            setBlockingError(null);
+          }
+          message.error(Array.isArray(apiMessage) ? apiMessage.join(', ') : apiMessage);
         } finally {
           setLoading(false);
         }
@@ -134,12 +146,63 @@ const PromotionPage = () => {
               </Button>
             </Form>
 
+            {blockingError && (
+              <div style={{ marginTop: 16 }}>
+                <Alert
+                  type="error"
+                  showIcon
+                  message="Promotion blocked"
+                  description={
+                    <div>
+                      <p style={{ marginBottom: 8 }}>{blockingError.message}</p>
+                      <p style={{ marginBottom: 6 }}>Missing fee structures for:</p>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        {blockingError.missingFeeStructures.map((standard) => (
+                          <li key={standard}>{standard}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  }
+                />
+              </div>
+            )}
+
             {result && (
               <div style={{ marginTop: 20 }}>
                 <Space direction="vertical">
                   <strong>Updated Students: {result.updatedCount}</strong>
                   <span>New Academic Year: {result.newAcademicYear}</span>
+                  {typeof result.autoFeeAssignedCount === 'number' && (
+                    <span>Fee assigned automatically: {result.autoFeeAssignedCount}</span>
+                  )}
+                  {typeof result.studentsWithPreviousYearPendingCount === 'number' && (
+                    <span>Students with previous-year pending: {result.studentsWithPreviousYearPendingCount}</span>
+                  )}
                 </Space>
+
+                {Array.isArray(result.studentsWithPreviousYearPending) && result.studentsWithPreviousYearPending.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="Collect previous-year pending fees"
+                      description="These students were promoted, but they still have pending dues for the previous academic year. Collect previous-year dues and current-year dues as needed."
+                    />
+                    <Table
+                      style={{ marginTop: 12 }}
+                      size="small"
+                      rowKey={(row) => row.studentId}
+                      pagination={{ pageSize: 6 }}
+                      dataSource={result.studentsWithPreviousYearPending}
+                      columns={[
+                        { title: 'Student', dataIndex: 'name' },
+                        { title: 'Admission No', dataIndex: 'admissionNo', render: (value) => value || '-' },
+                        { title: 'From Year', dataIndex: 'previousAcademicYear' },
+                        { title: 'Pending', dataIndex: 'pendingAmount', render: (value) => `₹${Number(value || 0).toLocaleString('en-IN')}` },
+                      ]}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
