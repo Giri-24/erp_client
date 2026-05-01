@@ -44,7 +44,11 @@ import {
 } from "../hr.service";
 import { getAllStaff } from "../../staff/staff.service";
 import dayjs from "dayjs";
+import { exportPayrollToCSV } from "./payrollExportUtil";
 import { hasPermission, PERMISSIONS, getCurrentUser } from "../../../utils/permissions";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -236,6 +240,139 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
     } catch {
       setSelectedPayslip(record);
       setPayslipModal(true);
+    }
+  };
+
+  const handleDownloadPayslip = async (record) => {
+    try {
+      if (!record.id) {
+        message.error("Payslip record ID is missing.");
+        return;
+      }
+      const payslip = await getPayslip(record.id);
+      if (!payslip || !payslip.staff) {
+        message.error("Payslip data not found for this staff.");
+        return;
+      }
+      const doc = new jsPDF();
+      autoTable(doc, {
+        startY: 24,
+        head: [["Field", "Value"]],
+        body: [
+          ["Employee", payslip.staff?.name || "-"],
+          ["Emp ID", payslip.staff?.employeeId || "-"],
+          ["Department", payslip.staff?.department || "-"],
+          ["Designation", payslip.staff?.designation || "-"],
+          ["Category", payslip.staff?.category || "-"],
+          ["Pay Mode", payslip.staff?.paymentMode || "-"],
+        ],
+      });
+      doc.text("Payslip", 14, 16);
+      doc.save(`Payslip_${payslip.staff?.employeeId || "staff"}.pdf`);
+    } catch (err) {
+      console.error("Payslip download error:", err);
+      message.error(err?.response?.data?.message || err?.message || "Failed to download payslip");
+    }
+  };
+
+  const handleDownloadPayslipForm = async () => {
+    try {
+      if (!selectedPayslip) {
+        message.error("Payslip data not found.");
+        return;
+      }
+      const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const left = 40; // Increased left padding
+      let y = 40;
+      doc.setFontSize(20);
+      doc.text("Salary Slip", 300, y, { align: "center" });
+      y += 30;
+      doc.setFontSize(12);
+      // Show Pay Period: <Month Year> (when payslip is generated)
+      const now = new Date();
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const payPeriodStr = `Pay Period: ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+      doc.text(payPeriodStr, left, y); y += 18;
+      doc.text(`Pay Date: ${selectedPayslip.payDate || selectedPayslip.month || '-'}`, left, y); y += 18;
+      doc.text(`Employee Name: ${selectedPayslip.staff?.name || '-'}`, left, y); y += 18;
+      doc.text(`Emp ID: ${selectedPayslip.staff?.employeeId || '-'}`, left, y); y += 18;
+      doc.text(`Department: ${selectedPayslip.staff?.department || '-'}`, left, y); y += 18;
+      doc.text(`Designation: ${selectedPayslip.staff?.designation || '-'}`, left, y); y += 18;
+      doc.text(`Category: ${selectedPayslip.staff?.category || '-'}`, left, y); y += 18;
+      doc.text(`Pay Mode: ${selectedPayslip.staff?.paymentMode || '-'}`, left, y); y += 24;
+      // Earnings & Deductions Table
+      autoTable(doc, {
+        startY: y,
+        margin: { left, right: left },
+        head: [["Earnings", "Amount", "Deductions", "Amount"]],
+        body: [
+          ["Basic Salary", `₹${(selectedPayslip.basicSalary || 0).toLocaleString()}`, "LOP Deduction", `₹${(selectedPayslip.lopDeduction || 0).toLocaleString()}`],
+          ["HRA", `₹${(selectedPayslip.hra || 0).toLocaleString()}`, "PF Employee", isActingDriverCategory(selectedPayslip.category) ? "N/A" : `₹${(selectedPayslip.pfDeduction || 0).toLocaleString()}`],
+          ["Travel Allowance", `₹${(selectedPayslip.travelAllowance || 0).toLocaleString()}`, "ESI Employee", isActingDriverCategory(selectedPayslip.category) ? "N/A" : `₹${(selectedPayslip.esiDeduction || 0).toLocaleString()}`],
+          ["Other Allowances", `₹${(selectedPayslip.otherAllowances || 0).toLocaleString()}`, "Professional Tax", isActingDriverCategory(selectedPayslip.category) ? "N/A" : `₹${(selectedPayslip.ptDeduction || 0).toLocaleString()}`],
+          ["Extra Allowance", `₹${(selectedPayslip.extraAllowance || 0).toLocaleString()}`, "Fixed Advance", isActingDriverCategory(selectedPayslip.category) ? "N/A" : `₹${(selectedPayslip.fixedAdvanceDeduction || 0).toLocaleString()}`],
+          ["Gross Salary", `₹${(selectedPayslip.grossSalary || 0).toLocaleString()}`, "Total Deductions", `₹${(selectedPayslip.totalDeductions || 0).toLocaleString()}`],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: 'bold' },
+        styles: { fontSize: 11, cellPadding: 6 },
+      });
+      y = doc.lastAutoTable.finalY + 16;
+      // Net Pay
+      autoTable(doc, {
+        startY: y,
+        margin: { left, right: left },
+        head: [["Net Pay", "Amount"]],
+        body: [["Net Pay", `₹${(selectedPayslip.netSalary || 0).toLocaleString()}`]],
+        theme: 'grid',
+        headStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: 'bold' },
+        styles: { fontSize: 12, cellPadding: 6 },
+      });
+      y = doc.lastAutoTable.finalY + 16;
+      // Employer Contributions
+      autoTable(doc, {
+        startY: y,
+        margin: { left, right: left },
+        head: [["Employer Contributions", "Amount"]],
+        body: [
+          ["Employer PF", `₹${(selectedPayslip.employerPfContribution || 0).toLocaleString()}`],
+          ["Employer ESI", `₹${(selectedPayslip.employerEsiContribution || 0).toLocaleString()}`],
+          ["CTC (Gross + Employer PF + ESI)", `₹${(selectedPayslip.ctc || selectedPayslip.grossSalary || 0).toLocaleString()}`],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: 'bold' },
+        styles: { fontSize: 11, cellPadding: 6 },
+      });
+      doc.save(`Payslip_${selectedPayslip.staff?.employeeId || "staff"}.pdf`);
+    } catch (err) {
+      console.error("Payslip form download error:", err);
+      message.error("Failed to download payslip as form");
+    }
+  };
+
+  const handleDownloadPayslipView = async () => {
+    try {
+      const payslipElement = document.getElementById("payslip-view-content");
+      if (!payslipElement) {
+        message.error("Payslip view not found.");
+        return;
+      }
+      const canvas = await html2canvas(payslipElement, { scale: 2 });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      // Fit image to page width, keep aspect ratio
+      const imgWidth = pageWidth - 40;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      pdf.addImage(imgData, "PNG", 20, 20, imgWidth, imgHeight);
+      pdf.save(`Payslip_${selectedPayslip?.staff?.employeeId || "staff"}.pdf`);
+    } catch (err) {
+      console.error("Payslip view download error:", err);
+      message.error("Failed to download payslip view");
     }
   };
 
@@ -487,7 +624,13 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
 
       <div style={{ display: "flex", gap: 16, marginBottom: 16, alignItems: "center" }}>
         <DatePicker picker="month" value={selectedMonth} onChange={(d) => d && setSelectedMonth(d)} allowClear={false} />
-        <Button icon={<DownloadOutlined />}>Export</Button>
+        <Button
+          icon={<DownloadOutlined />}
+          onClick={() => exportPayrollToCSV(payrollData, selectedMonth.format("YYYY-MM"))}
+          disabled={!payrollData.length}
+        >
+          Export CSV
+        </Button>
       </div>
 
       <div style={{ background: "#f0f4f8", borderRadius: 16, padding: 4 }}>
@@ -570,21 +713,37 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
       {/* Payslip Modal */}
       <Modal title="Payslip" open={payslipModal} onCancel={() => setPayslipModal(false)} footer={[
         <Button key="close" onClick={() => setPayslipModal(false)}>Close</Button>,
-        <Button key="print" type="primary" icon={<DownloadOutlined />} onClick={() => window.print()}>Print</Button>,
+        <Button key="print" icon={<DownloadOutlined />} onClick={handleDownloadPayslipForm}>Download PDF</Button>,
+        <Button key="printBtn" icon={<CalculatorOutlined />} onClick={() => window.print()}>Print</Button>,
       ]} width={680}>
         {selectedPayslip && (
-          <div>
+          <div id="payslip-view-content">
             <div style={{ textAlign: "center", marginBottom: 16 }}>
               <h3>Monthly Payslip — {selectedPayslip.month || selectedMonth.format("MMMM YYYY")}</h3>
             </div>
-            <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="Employee">{selectedPayslip.staffName}</Descriptions.Item>
-              <Descriptions.Item label="Emp ID">{selectedPayslip.employeeId}</Descriptions.Item>
-              <Descriptions.Item label="Department">{selectedPayslip.department || "-"}</Descriptions.Item>
-              <Descriptions.Item label="Designation">{selectedPayslip.designation || "-"}</Descriptions.Item>
-              <Descriptions.Item label="Category">{CATEGORY_LABELS[selectedPayslip.category] || selectedPayslip.category || "-"}</Descriptions.Item>
-              <Descriptions.Item label="Pay Mode">{selectedPayslip.paymentMode === "BANK_TRANSFER" ? "Bank Transfer" : selectedPayslip.paymentMode === "CASH" ? "Cash" : "-"}</Descriptions.Item>
-            </Descriptions>
+            {/* Staff Info Table (as per user request) */}
+            <table style={{ width: '100%', marginBottom: 16, borderCollapse: 'collapse', fontSize: 13 }}>
+              <tbody>
+                <tr>
+                  <td style={{ fontWeight: 600, padding: 4 }}>Employee</td>
+                  <td style={{ padding: 4 }}>{selectedPayslip.staff?.name || '-'}</td>
+                  <td style={{ fontWeight: 600, padding: 4 }}>Emp ID</td>
+                  <td style={{ padding: 4 }}>{selectedPayslip.staff?.employeeId || '-'}</td>
+                </tr>
+                <tr>
+                  <td style={{ fontWeight: 600, padding: 4 }}>Department</td>
+                  <td style={{ padding: 4 }}>{selectedPayslip.staff?.department || '-'}</td>
+                  <td style={{ fontWeight: 600, padding: 4 }}>Designation</td>
+                  <td style={{ padding: 4 }}>{selectedPayslip.staff?.designation || '-'}</td>
+                </tr>
+                <tr>
+                  <td style={{ fontWeight: 600, padding: 4 }}>Category</td>
+                  <td style={{ padding: 4 }}>{selectedPayslip.staff?.category || '-'}</td>
+                  <td style={{ fontWeight: 600, padding: 4 }}>Pay Mode</td>
+                  <td style={{ padding: 4 }}>{selectedPayslip.staff?.paymentMode || '-'}</td>
+                </tr>
+              </tbody>
+            </table>
 
             {isActingDriverCategory(selectedPayslip.category) && (
               <Alert
