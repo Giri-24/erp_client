@@ -43,6 +43,7 @@ import {
   updatePayrollManual,
 } from "../hr.service";
 import { getAllStaff } from "../../staff/staff.service";
+import { getAdminSettings } from "../../settings/settings.service";
 import dayjs from "dayjs";
 import { hasPermission, PERMISSIONS, getCurrentUser } from "../../../utils/permissions";
 
@@ -77,6 +78,7 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const [lopReport, setLopReport] = useState([]);
   const [staff, setStaff] = useState([]);
   const [settings, setSettings] = useState(null);
+  const [adminSettings, setAdminSettings] = useState(null);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [payslipModal, setPayslipModal] = useState(false);
@@ -94,6 +96,22 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
   const canApprovePayroll = hasPermission(PERMISSIONS.HR_PAYROLL_APPROVE);
   const currentUser = getCurrentUser();
   const isSelfOnly = selfOnlyProp || (!canManagePayroll && !canApprovePayroll);
+
+  const normalizeAssetSrc = (value) => {
+    if (!value) return "";
+    if (value.startsWith("data:image") || value.startsWith("http://") || value.startsWith("https://")) return value;
+    return `/erp/api/${String(value).replace(/^\/+/, "").replace(/\\/g, "/")}`;
+  };
+
+  const getDocumentAssets = () => {
+    const assets = adminSettings?.documentAssets || {};
+    return {
+      hrSignature: assets.hrSignature || adminSettings?.hrSignature || "",
+      chairmanSignature: assets.chairmanSignature || adminSettings?.chairmanSignature || "",
+      managerSignature: assets.managerSignature || adminSettings?.managerSignature || "",
+      rubberStamp: assets.rubberStamp || adminSettings?.rubberStamp || "",
+    };
+  };
 
   const fetchPayroll = async () => {
     setLoading(true);
@@ -146,12 +164,24 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
     } catch { /* ignore */ }
   };
 
+  const fetchAdminDocSettings = async () => {
+    try {
+      const data = await getAdminSettings();
+      setAdminSettings(data || null);
+    } catch {
+      setAdminSettings(null);
+    }
+  };
+
   useEffect(() => {
     if (!isSelfOnly) {
       fetchStaff();
       fetchSettings();
     }
+    fetchAdminDocSettings();
   }, []);
+
+  const docAssets = getDocumentAssets();
 
   useEffect(() => {
     if (activeTab === "payroll") fetchPayroll();
@@ -676,6 +706,38 @@ const PayrollPage = ({ selfOnly: selfOnlyProp } = {}) => {
                 <Tag color="purple">₹{(selectedPayslip.ctc || selectedPayslip.grossSalary || 0).toLocaleString()}</Tag>
               </Descriptions.Item>
             </Descriptions>
+
+            <Divider orientation="left">Authorization</Divider>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ width: 180, borderTop: "1px dashed #999", paddingTop: 8, textAlign: "center", fontSize: 12, fontWeight: 600 }}>
+                {normalizeAssetSrc(docAssets.hrSignature) && (
+                  <img src={normalizeAssetSrc(docAssets.hrSignature)} alt="HR Signature" style={{ width: 140, height: 44, objectFit: "contain", marginBottom: 4 }} />
+                )}
+                HR Signature
+              </div>
+              <div style={{ width: 180, borderTop: "1px dashed #999", paddingTop: 8, textAlign: "center", fontSize: 12, fontWeight: 600 }}>
+                {normalizeAssetSrc(docAssets.managerSignature) && (
+                  <img src={normalizeAssetSrc(docAssets.managerSignature)} alt="Manager Signature" style={{ width: 140, height: 44, objectFit: "contain", marginBottom: 4 }} />
+                )}
+                Authorized Signatory
+              </div>
+              <div style={{ width: 180, borderTop: "1px dashed #999", paddingTop: 8, textAlign: "center", fontSize: 12, fontWeight: 600 }}>
+                {normalizeAssetSrc(docAssets.chairmanSignature) && (
+                  <img src={normalizeAssetSrc(docAssets.chairmanSignature)} alt="Chairman Signature" style={{ width: 140, height: 44, objectFit: "contain", marginBottom: 4 }} />
+                )}
+                Chairman Signature
+              </div>
+              <div style={{ minWidth: 110, textAlign: "center" }}>
+                {normalizeAssetSrc(docAssets.rubberStamp) ? (
+                  <img src={normalizeAssetSrc(docAssets.rubberStamp)} alt="Rubber Stamp" style={{ width: 90, height: 90, objectFit: "contain" }} />
+                ) : (
+                  <div style={{ width: 90, height: 90, border: "1px dashed #94a3b8", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b", fontSize: 10 }}>
+                    Seal
+                  </div>
+                )}
+                <div style={{ fontSize: 11, marginTop: 4, fontWeight: 600 }}>Rubber Stamp</div>
+              </div>
+            </div>
           </div>
         )}
       </Modal>

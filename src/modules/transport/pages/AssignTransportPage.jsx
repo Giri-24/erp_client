@@ -71,7 +71,7 @@ const AssignTransportPage = ({ initialStudentId, onMounted }) => {
 
         const normalizedYears = years || [];
         setAvailableYears(normalizedYears);
-        setAcademicYear((current) => current || normalizedYears[0] || "2026-2027");
+        setAcademicYear((current) => current || normalizedYears[0] || "");
         setRoutes(routeData || []);
         
         const active = (admissionsResponse.data || []).filter(
@@ -116,7 +116,7 @@ const AssignTransportPage = ({ initialStudentId, onMounted }) => {
       setIsSplClass(!!assignment.isSplClass);
       setSplClassDaysUsed(assignment.splClassDaysUsed ?? "");
       setTotalWorkingDays(assignment.totalWorkingDays ?? "");
-      setAcademicYear(assignment.academicYear || academicYear || availableYears[0] || "2026-2027");
+      setAcademicYear(assignment.academicYear || academicYear || availableYears[0] || "");
       const route = routes.find((r) => r.id === assignment.routeId);
       setSelectedRoute(route || null);
       setRouteBuses(route?.buses || []);

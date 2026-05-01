@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Form, Input, Switch, Button, message, Row, Col, Checkbox, Typography, Select, Table, Space, Spin } from 'antd';
+import { Form, Input, Switch, Button, message, Row, Col, Checkbox, Typography, Select, Table, Space, Spin, Upload } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   getAdminSettings,
@@ -13,6 +13,15 @@ import {
 } from '../modules/settings/settings.service';
 
 const AdminSettings = () => {
+  const DOCUMENT_ASSET_FIELDS = [
+    { key: 'principalSignature', label: 'Principal Signature' },
+    { key: 'hrSignature', label: 'HR Signature' },
+    { key: 'chairmanSignature', label: 'Chairman Signature' },
+    { key: 'accountantSignature', label: 'Accountant Signature' },
+    { key: 'managerSignature', label: 'Manager Signature' },
+    { key: 'rubberStamp', label: 'Rubber Stamp / Seal' },
+  ];
+
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,12 +45,46 @@ const AdminSettings = () => {
   const [feeReceiptSaving, setFeeReceiptSaving] = useState(false);
   const [newFieldName, setNewFieldName] = useState('');
   const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [documentAssets, setDocumentAssets] = useState({});
+
+  const normalizeAssetSrc = (value) => {
+    if (!value) return '';
+    if (value.startsWith('data:image') || value.startsWith('http://') || value.startsWith('https://')) return value;
+    return `/erp/api/${String(value).replace(/^\/+/, '').replace(/\\/g, '/')}`;
+  };
+
+  const toBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleDocumentAssetUpload = async (assetKey, file) => {
+    try {
+      if (!file?.type?.startsWith('image/')) {
+        message.error('Only image files are allowed');
+        return Upload.LIST_IGNORE;
+      }
+      const base64 = await toBase64(file);
+      setDocumentAssets((prev) => ({ ...prev, [assetKey]: base64 }));
+      message.success('Image uploaded');
+    } catch {
+      message.error('Failed to process image');
+    }
+    return false;
+  };
+
+  const clearDocumentAsset = (assetKey) => {
+    setDocumentAssets((prev) => ({ ...prev, [assetKey]: '' }));
+  };
 
   const loadSettings = async () => {
     try {
       setLoading(true);
       const data = await getAdminSettings();
       form.setFieldsValue(data);
+      setDocumentAssets(data?.documentAssets || {});
     } catch {
       message.error('Failed to load settings');
     } finally {
@@ -157,15 +200,33 @@ const AdminSettings = () => {
   }, []);
 
   const onFinish = async (values) => {
-      console.log("SENDING:", values); // 👈 ADD HERE (FIRST LINE)
-
     try {
       setSaving(true);
-      await updateAdminSettings(values);
+      await updateAdminSettings({
+        ...values,
+        documentAssets,
+      });
       message.success('Settings updated');
       await loadSettings();
     } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to update settings');
+      const serverMessage = err?.response?.data?.message || '';
+
+      if (typeof serverMessage === 'string' && serverMessage.toLowerCase().includes('documentassets') && serverMessage.toLowerCase().includes('should not exist')) {
+        try {
+          await updateAdminSettings({
+            ...values,
+            documentassert: documentAssets,
+          });
+          message.success('Settings updated');
+          await loadSettings();
+          return;
+        } catch (retryErr) {
+          message.error(retryErr?.response?.data?.message || 'Failed to update settings');
+          return;
+        }
+      }
+
+      message.error(serverMessage || 'Failed to update settings');
     } finally {
       setSaving(false);
     }
@@ -336,6 +397,43 @@ const AdminSettings = () => {
                   <Switch />
                 </Form.Item>
               </Col>
+            </Row>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0 16px' }}>
+              <span style={{ width: 3, height: 20, background: '#44ddc1', borderRadius: 9999, display: 'inline-block' }} />
+              <span style={{ fontFamily: "'Manrope', sans-serif", fontSize: 14, fontWeight: 700, color: '#43474d' }}>Document Signatures & Authorization Seal</span>
+            </div>
+
+            <Row gutter={[16, 16]}>
+              {DOCUMENT_ASSET_FIELDS.map((asset) => {
+                const imgSrc = normalizeAssetSrc(documentAssets?.[asset.key]);
+                return (
+                  <Col span={8} key={asset.key}>
+                    <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, background: '#fafafa' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8 }}>{asset.label}</div>
+                      <div style={{ height: 80, borderRadius: 8, border: '1px dashed #d1d5db', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10, overflow: 'hidden' }}>
+                        {imgSrc ? (
+                          <img src={imgSrc} alt={asset.label} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                        ) : (
+                          <span style={{ fontSize: 11, color: '#9ca3af' }}>No image uploaded</span>
+                        )}
+                      </div>
+                      <Space>
+                        <Upload
+                          showUploadList={false}
+                          accept="image/*"
+                          beforeUpload={(file) => handleDocumentAssetUpload(asset.key, file)}
+                        >
+                          <Button size="small">Upload</Button>
+                        </Upload>
+                        <Button size="small" danger onClick={() => clearDocumentAsset(asset.key)} disabled={!imgSrc}>
+                          Remove
+                        </Button>
+                      </Space>
+                    </div>
+                  </Col>
+                );
+              })}
             </Row>
 
             <Button type="primary" htmlType="submit" loading={saving}>

@@ -46,6 +46,22 @@ const initials = (name = "") => {
     : name.slice(0, 2).toUpperCase();
 };
 
+const REQUIRED_DOCUMENT_CONFIG = [
+  { key: "birthCert", label: "Birth Certificate" },
+  { key: "communityCert", label: "Community Certificate" },
+  { key: "aadharStudent", label: "Student Aadhaar" },
+];
+
+const hasDocumentUploaded = (documentRow, key) => {
+  if (!documentRow) return false;
+  return Boolean(documentRow[key] || documentRow[`${key}Path`]);
+};
+
+const getMissingRequiredDocuments = (student) => {
+  const documentRow = student?.documents?.[0];
+  return REQUIRED_DOCUMENT_CONFIG.filter(({ key }) => !hasDocumentUploaded(documentRow, key));
+};
+
 // ── component ─────────────────────────────────────────────────────────────
 const StudentView = ({ onCollectFee, onEdit }) => {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -298,7 +314,7 @@ const [fees, setFees] = useState([]);
               onChange={(e) => { setClassFilter(e.target.value); setPage(1); }}
               className="filter-input px-4 py-2.5 text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer"
             >
-              <option value="">All Grades</option>
+              <option value="">All Standard</option>
               {classOptions.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -338,16 +354,7 @@ const [fees, setFees] = useState([]);
                 className="w-full filter-input py-2.5 pl-11 pr-4 text-[10px] font-bold outline-none !bg-slate-50/50"
               />
            </div>
-           <div className="relative w-64">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm leading-none">person</span>
-              <input
-                type="text"
-                value={fatherFilter}
-                onChange={(e) => { setFatherFilter(e.target.value); setPage(1); }}
-                placeholder="Parent / Guardian Name"
-                className="w-full filter-input py-2.5 pl-11 pr-4 text-[10px] font-bold outline-none !bg-slate-50/50"
-              />
-           </div>
+          
            {(classFilter || sectionFilter || genderFilter || areaFilter || fatherFilter || siblingFilter || searchText) && (
              <button
                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setAreaFilter(""); setFatherFilter(""); setSiblingFilter(""); setSearchText(""); setPage(1); }}
@@ -369,7 +376,7 @@ const [fees, setFees] = useState([]);
                 <th>Student Details</th>
                 <th>Academic STD</th>
                 <th>Father's Name</th>
-                <th>Status</th>
+                <th>Area</th>
                 <th className="text-right">Operations</th>
               </tr>
             </thead>
@@ -387,6 +394,11 @@ const [fees, setFees] = useState([]);
                   const name = s.name || "Unknown";
                   const initialsStr = initials(name);
                   let photoPath = s.documents?.[0]?.photoPath;
+                  const missingRequiredDocs = getMissingRequiredDocuments(s);
+                  const hasMissingRequiredDocs = missingRequiredDocs.length > 0;
+                  const missingRequiredDocsTitle = hasMissingRequiredDocs
+                    ? `Missing: ${missingRequiredDocs.map((doc) => doc.label).join(", ")}`
+                    : "All required documents uploaded";
 
                   return (
                     <React.Fragment key={s.id}>
@@ -401,13 +413,31 @@ const [fees, setFees] = useState([]);
                         </td>
                         <td>
                           <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center font-black text-[10px] border-2 border-white shadow-sm overflow-hidden">
+                            <div className="relative w-10 h-10">
+                              {hasMissingRequiredDocs && (
+                                <span
+                                  className="absolute -top-1 -right-1 z-10 w-3 h-3 rounded-full bg-rose-500 ring-2 ring-white"
+                                  title={missingRequiredDocsTitle}
+                                />
+                              )}
+                              <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center font-black text-[10px] border-2 border-white shadow-sm overflow-hidden">
                                {photoPath ? (
                                  <img src={`/erp/api/${photoPath.replace(/\\/g, '/')}`} className="w-full h-full object-cover" alt="" />
                                ) : initialsStr}
+                              </div>
                             </div>
                             <div>
-                               <div className="text-[13px] font-black text-slate-900 tracking-tight leading-none mb-1">{name}</div>
+                               <div className="flex items-center gap-2 mb-1">
+                                 <div className="text-[13px] font-black text-slate-900 tracking-tight leading-none">{name}</div>
+                                 {hasMissingRequiredDocs && (
+                                   <span
+                                     className="inline-flex items-center px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 text-[8px] font-black uppercase tracking-widest"
+                                     title={missingRequiredDocsTitle}
+                                   >
+                                     Docs Missing
+                                   </span>
+                                 )}
+                               </div>
                                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{s.admission?.admissionNo || s.id}</div>
                             </div>
                           </div>
@@ -425,8 +455,8 @@ const [fees, setFees] = useState([]);
                            </div>
                         </td>
                         <td>
-                           <span className={`status-tag ${(s.users?.isActive ?? 1) ? 'bg-teal-50 text-teal-600' : 'bg-rose-50 text-rose-600'}`}>
-                              {(s.users?.isActive ?? 1) ? 'Active' : 'Archived'}
+                           <span className={`status-tag ${(s.address?.street ?? 1) ? 'bg-teal-50 text-teal-600' : 'bg-rose-50 text-rose-600'}`}>
+                              {(s.address?.street ?? 1) ? `${s.address.street}` : 'Rural'}
                            </span>
                         </td>
                         <td>
@@ -447,9 +477,12 @@ const [fees, setFees] = useState([]);
                              </button>
                              <button
                                onClick={() => { setDetailStudent(s); setDetailModalOpen(true); }}
-                               className="w-9 h-9 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm"
-                               title="Full Bio"
+                               className="relative w-9 h-9 rounded-xl bg-slate-50 text-slate-600 flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                               title={hasMissingRequiredDocs ? `Full Bio. ${missingRequiredDocsTitle}` : "Full Bio"}
                              >
+                               {hasMissingRequiredDocs && (
+                                 <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                               )}
                                <span className="material-symbols-outlined text-[18px] leading-none">badge</span>
                              </button>
                              <button
@@ -517,6 +550,12 @@ onClick={() => {
                                   <div className="flex justify-between items-center p-3 bg-white rounded-2xl border border-slate-100 text-xs shadow-sm">
                                     <span className="text-slate-400 font-bold uppercase tracking-widest text-[9px]">Current Grade</span>
                                     <span className="font-black text-slate-900">{s.standard || s.admission?.standard}</span>
+                                  </div>
+                                  <div className={`flex justify-between items-center p-3 rounded-2xl border text-xs shadow-sm ${hasMissingRequiredDocs ? 'bg-rose-50 border-rose-100' : 'bg-white border-slate-100'}`}>
+                                    <span className={`font-bold uppercase tracking-widest text-[9px] ${hasMissingRequiredDocs ? 'text-rose-500' : 'text-slate-400'}`}>Required Docs</span>
+                                    <span className={`font-black ${hasMissingRequiredDocs ? 'text-rose-600' : 'text-teal-600'}`} title={missingRequiredDocsTitle}>
+                                      {hasMissingRequiredDocs ? `${missingRequiredDocs.length} Missing` : 'Complete'}
+                                    </span>
                                   </div>
                                 </div>
                               </div>
@@ -784,7 +823,7 @@ onClick={() => {
                                     <div className="text-lg font-black">{detailStudent.academics[0].registerNo}</div>
                                  </div>
                               </div>
-                              <div className="grid grid-cols-3 gap-6">
+                              <div className="grid grid-cols-4 gap-6">
                                  <div className="bg-white/5 p-5 rounded-2xl border border-white/10 text-center">
                                     <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Aggregate</div>
                                     <div className="text-xl font-black text-teal-400">{detailStudent.academics[0].totalObtainedMarks} / {detailStudent.academics[0].totalMaxMarks}</div>
@@ -796,6 +835,10 @@ onClick={() => {
                                  <div className="bg-white/5 p-5 rounded-2xl border border-white/10 text-center">
                                     <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Session</div>
                                     <div className="text-xl font-black text-white">{detailStudent.academics[0].monthYear}</div>
+                                 </div>
+                                 <div className="bg-white/5 p-5 rounded-2xl border border-white/10 text-center">
+                                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Stream</div>
+                                    <div className="text-xl font-black text-teal-400">{detailStudent.academics[0].stream || 'General'}</div>
                                  </div>
                               </div>
                            </div>

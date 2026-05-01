@@ -360,7 +360,7 @@ const Dashboard = () => {
   const renderContent = () => {
     switch (selectedKey) {
       case "dashboard":           return getRoleDashboard();
-      case "admission":           return <AdmissionPage editData={editData} clearEditData={() => setEditData(null)} />;
+      case "admission":           return <AdmissionPage editData={editData} clearEditData={() => setEditData(null)} onAfterUpdate={editData ? () => { setEditData(null); setSelectedKey("students"); } : undefined} />;
       // case "admission-view":      return <AdmissionView onEdit={(record) => { setEditData(record); setSelectedKey("admission"); }} />;
       case "admission-edit":      return <AdmissionEdit />;
       case "bulk-upload":         return <BulkUploadPage />;

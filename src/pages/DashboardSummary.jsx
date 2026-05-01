@@ -49,11 +49,11 @@ const DashboardSummary = ({ onNavigate }) => {
       const years = await getAcademicYears();
       setAvailableYears(years || []);
 
-      const initialYear = years?.length > 0 ? years[0] : "2026-2027";
+      const initialYear = years?.length > 0 ? years[0] : "";
       setAcademicYear(initialYear);
     } catch {
       message.error("Failed to load academic years");
-      setAcademicYear("2026-2027");
+      setAcademicYear("");
     }
   };
 

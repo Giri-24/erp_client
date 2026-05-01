@@ -32,9 +32,9 @@ const TransportManagerDashboard = ({ onNavigate }) => {
     try {
       const years = await getTransportAcademicYears();
       setAvailableYears(years || []);
-      setAcademicYear(years?.[0] || "2026-2027");
+      setAcademicYear(years?.[0] || "");
     } catch {
-      setAcademicYear("2026-2027");
+      setAcademicYear("");
     }
   };
 

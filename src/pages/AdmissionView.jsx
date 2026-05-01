@@ -182,15 +182,29 @@ const pdfStyles = {
   signatureRow: {
     display: "flex",
     justifyContent: "space-between",
-    padding: "0 40px",
+    padding: "0 10px",
+    alignItems: "flex-end",
+    gap: "20px",
   },
   sigLine: {
-    width: "200px",
+    width: "220px",
     borderTop: "1px dotted #666",
     textAlign: "center",
     paddingTop: "8px",
     fontSize: "12px",
     fontWeight: "700",
+  },
+  sigImage: {
+    width: "140px",
+    height: "46px",
+    objectFit: "contain",
+    marginBottom: "6px",
+  },
+  stampImage: {
+    width: "90px",
+    height: "90px",
+    objectFit: "contain",
+    opacity: 0.95,
   },
   academicSection: {
     marginTop: "25px",
@@ -259,6 +273,22 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
   const [filterSibling, setFilterSibling] = useState("");
   const [filterArea, setFilterArea] = useState("");
   const [availableYears, setAvailableYears] = useState([]);
+
+  const getDocumentAssets = () => {
+    const assets = adminSettings?.documentAssets || {};
+    return {
+      principalSignature: assets.principalSignature || adminSettings?.principalSignature || "",
+      hrSignature: assets.hrSignature || adminSettings?.hrSignature || "",
+      chairmanSignature: assets.chairmanSignature || adminSettings?.chairmanSignature || "",
+      rubberStamp: assets.rubberStamp || adminSettings?.rubberStamp || "",
+    };
+  };
+
+  const normalizeAssetSrc = (value) => {
+    if (!value) return "";
+    if (value.startsWith("data:image") || value.startsWith("http://") || value.startsWith("https://")) return value;
+    return `/erp/api/${String(value).replace(/^\/+/, "").replace(/\\/g, "/")}`;
+  };
 
   const { hasPermission } = usePermissionHelpers();
   const canApprove = hasPermission(PERMISSIONS.ADMISSION_APPROVE) && (adminSettings?.requireApprovalForAdmission ?? true);
@@ -341,6 +371,8 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
       }
     }, 100);
   };
+
+  const documentAssets = getDocumentAssets();
 
   const loadAdminSettings = async () => {
     try {
@@ -1311,8 +1343,52 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
                   
                   <div style={pdfStyles.signatureRow}>
                     <div style={pdfStyles.sigLine}>Student's Signature</div>
-                    <div style={pdfStyles.sigLine}>Authorized's Signature</div>
+                    <div style={pdfStyles.sigLine}>
+                      {normalizeAssetSrc(documentAssets.principalSignature) && (
+                        <img
+                          src={normalizeAssetSrc(documentAssets.principalSignature)}
+                          alt="Principal Signature"
+                          style={pdfStyles.sigImage}
+                        />
+                      )}
+                      Principal Signature
+                    </div>
+                    <div style={pdfStyles.sigLine}>
+                      {normalizeAssetSrc(documentAssets.hrSignature) && (
+                        <img
+                          src={normalizeAssetSrc(documentAssets.hrSignature)}
+                          alt="HR Signature"
+                          style={pdfStyles.sigImage}
+                        />
+                      )}
+                      HR Signature
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '110px' }}>
+                      {normalizeAssetSrc(documentAssets.rubberStamp) ? (
+                        <img
+                          src={normalizeAssetSrc(documentAssets.rubberStamp)}
+                          alt="Rubber Stamp"
+                          style={pdfStyles.stampImage}
+                        />
+                      ) : (
+                        <div style={{ width: 90, height: 90, border: '1px dashed #94a3b8', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#64748b', marginBottom: 4 }}>
+                          Seal
+                        </div>
+                      )}
+                      <span style={{ fontSize: 11, fontWeight: 700 }}>Authorization Seal</span>
+                    </div>
                   </div>
+
+                  {normalizeAssetSrc(documentAssets.chairmanSignature) && (
+                    <div style={{ marginTop: 18, textAlign: 'right' }}>
+                      <img
+                        src={normalizeAssetSrc(documentAssets.chairmanSignature)}
+                        alt="Chairman Signature"
+                        style={pdfStyles.sigImage}
+                      />
+                      <div style={{ fontSize: 11, fontWeight: 700 }}>Chairman Signature</div>
+                    </div>
+                  )}
                </div>
             </div>
             {/* <div style={pdfStyles.footer}></div> */}

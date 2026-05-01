@@ -60,7 +60,7 @@ const TransportViewPage = () => {
       .then(([routeData, years]) => {
         setRoutes(routeData || []);
         setAvailableYears(years || []);
-        setAcademicYear((current) => current || years?.[0] || "2026-2027");
+        setAcademicYear((current) => current || years?.[0] || "");
       })
       .catch(() => {
         setRoutes([]);

@@ -15,6 +15,7 @@ import {
   getSiblingFees,
 } from "../fees.service";
 import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
+import { getAdminSettings } from "../../settings/settings.service";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => "₹" + Math.round(Number(v || 0)).toLocaleString("en-IN");
@@ -204,6 +205,13 @@ const CollectPaymentPage = ({ studentId }) => {
   const [extraTermNumbers, setExtraTermNumbers] = useState([]);
   const [admissionNoSearch, setAdmissionNoSearch] = useState("");
   const [siblingData, setSiblingData] = useState([]);
+  const [documentAssets, setDocumentAssets] = useState({});
+
+  const normalizeAssetSrc = (value) => {
+    if (!value) return "";
+    if (value.startsWith("data:image") || value.startsWith("http://") || value.startsWith("https://")) return value;
+    return `/erp/api/${String(value).replace(/^\/+/, "").replace(/\\/g, "/")}`;
+  };
 
   const setAmountFromSystem = (next) => {
     setAmount(String(next ?? ""));
@@ -239,6 +247,20 @@ const CollectPaymentPage = ({ studentId }) => {
   useEffect(() => {
     fetchAcademicYears();
     fetchReceiptNo();
+    (async () => {
+      try {
+        const settings = await getAdminSettings();
+        const assets = settings?.documentAssets || {};
+        setDocumentAssets({
+          principalSignature: assets.principalSignature || settings?.principalSignature || "",
+          hrSignature: assets.hrSignature || settings?.hrSignature || "",
+          chairmanSignature: assets.chairmanSignature || settings?.chairmanSignature || "",
+          rubberStamp: assets.rubberStamp || settings?.rubberStamp || "",
+        });
+      } catch {
+        setDocumentAssets({});
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -525,6 +547,8 @@ const CollectPaymentPage = ({ studentId }) => {
         .footer{margin-top:24px;display:flex;justify-content:space-between}
         .footer div{text-align:center}
         .sign-line{border-top:1px solid #333;width:150px;margin-top:40px;padding-top:4px;font-size:12px}
+        .sign-img{display:block;width:120px;height:40px;object-fit:contain;margin:0 auto 6px}
+        .stamp-img{display:block;width:70px;height:70px;object-fit:contain;margin:0 auto 6px}
         @media print{body{padding:0}}
       </style></head>
       <body>${content.innerHTML}</body>
@@ -1676,7 +1700,24 @@ const CollectPaymentPage = ({ studentId }) => {
               {printPayment.remarks && <p style={{ marginTop: 12 }}><strong>Remarks:</strong> {printPayment.remarks}</p>}
               <div className="footer">
                 <div><div className="sign-line">Student / Parent</div></div>
-                <div><div className="sign-line">Authorized Signatory</div></div>
+                <div>
+                  {normalizeAssetSrc(documentAssets?.hrSignature) && (
+                    <img src={normalizeAssetSrc(documentAssets.hrSignature)} alt="HR Signature" className="sign-img" />
+                  )}
+                  <div className="sign-line">HR Signature</div>
+                </div>
+                <div>
+                  {normalizeAssetSrc(documentAssets?.rubberStamp) && (
+                    <img src={normalizeAssetSrc(documentAssets.rubberStamp)} alt="Rubber Stamp" className="stamp-img" />
+                  )}
+                  <div className="sign-line">School Seal</div>
+                </div>
+                <div>
+                  {normalizeAssetSrc(documentAssets?.chairmanSignature) && (
+                    <img src={normalizeAssetSrc(documentAssets.chairmanSignature)} alt="Chairman Signature" className="sign-img" />
+                  )}
+                  <div className="sign-line">Chairman Signature</div>
+                </div>
               </div>
             </div>
           </div>

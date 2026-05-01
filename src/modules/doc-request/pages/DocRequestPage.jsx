@@ -18,6 +18,7 @@ import {
 } from "../doc-request.service";
 import instance from "../../../utils/axios";
 import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
+import { getAdminSettings } from "../../settings/settings.service";
 
 // ── helpers ──────────────────────────────────────────────────────────────
 const formatStd = (val) => {
@@ -40,8 +41,70 @@ const statusColor = (s) =>
 const typeLabel = (t) =>
   DOC_REQUEST_TYPES.find((o) => o.value === t)?.label || t;
 
+const normalizeAssetSrc = (value) => {
+  if (!value) return "";
+  if (value.startsWith("data:image") || value.startsWith("http://") || value.startsWith("https://")) return value;
+  return `/erp/api/${String(value).replace(/^\/+/, "").replace(/\\/g, "/")}`;
+};
+
+const toDataUrl = async (src) => {
+  if (!src) return "";
+  if (src.startsWith("data:image")) return src;
+  try {
+    const absolute = src.startsWith("http") ? src : `${window.location.origin}${src}`;
+    const res = await fetch(absolute);
+    const blob = await res.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return "";
+  }
+};
+
+const resolveDocumentAssets = async (assets = {}) => {
+  const principalSignature = await toDataUrl(normalizeAssetSrc(assets?.principalSignature));
+  const hrSignature = await toDataUrl(normalizeAssetSrc(assets?.hrSignature));
+  const chairmanSignature = await toDataUrl(normalizeAssetSrc(assets?.chairmanSignature));
+  const rubberStamp = await toDataUrl(normalizeAssetSrc(assets?.rubberStamp));
+  return { principalSignature, hrSignature, chairmanSignature, rubberStamp };
+};
+
+const drawAuthorizationBlock = (doc, w, y, resolvedAssets = {}) => {
+  const signY = y;
+  const leftX = 24;
+  const midX = w / 2 - 24;
+  const rightX = w - 72;
+
+  if (resolvedAssets.principalSignature) {
+    doc.addImage(resolvedAssets.principalSignature, "PNG", leftX, signY - 18, 42, 14);
+  }
+  doc.line(leftX, signY, leftX + 52, signY);
+  doc.setFontSize(9);
+  doc.text("Principal Signature", leftX + 6, signY + 5);
+
+  if (resolvedAssets.hrSignature) {
+    doc.addImage(resolvedAssets.hrSignature, "PNG", midX, signY - 18, 42, 14);
+  }
+  doc.line(midX, signY, midX + 52, signY);
+  doc.text("HR Signature", midX + 13, signY + 5);
+
+  if (resolvedAssets.chairmanSignature) {
+    doc.addImage(resolvedAssets.chairmanSignature, "PNG", rightX, signY - 18, 42, 14);
+  }
+  doc.line(rightX, signY, rightX + 52, signY);
+  doc.text("Chairman Signature", rightX + 4, signY + 5);
+
+  if (resolvedAssets.rubberStamp) {
+    doc.addImage(resolvedAssets.rubberStamp, "PNG", w / 2 - 14, signY - 8, 28, 28);
+  }
+};
+
 // ── PDF generators ───────────────────────────────────────────────────────
-const generateBonafidePDF = (data) => {
+const generateBonafidePDF = async (data, assets) => {
   const { request: req, school } = data;
   const st = req.student;
   const adm = st.admission;
@@ -81,18 +144,16 @@ const generateBonafidePDF = (data) => {
   doc.text(lines, 14, y, { lineHeightFactor: 1.8 });
   y += lines.length * 10 + 60;
 
-  // Signature
-  doc.text("………………………………….", w - 60, y);
-  y += 7;
+  const resolvedAssets = await resolveDocumentAssets(assets);
+  drawAuthorizationBlock(doc, w, y, resolvedAssets);
+  y += 16;
   doc.setFont(undefined, "italic");
-  doc.text("Signature of the Principal", w - 64, y);
-  y += 7;
   doc.text(`(Date: ${dayjs().format("DD-MM-YYYY")})`, w - 52, y);
 
   doc.save(`Bonafide_${st.name}_${req.ticketNo}.pdf`);
 };
 
-const generateTCPDF = (data) => {
+const generateTCPDF = async (data, assets) => {
   const { request: req, school } = data;
   const st = req.student;
   const adm = st.admission;
@@ -163,11 +224,9 @@ const generateTCPDF = (data) => {
 
   y = doc.lastAutoTable.finalY + 20;
 
-  // Signatures
-  doc.setFontSize(11);
-  doc.text("Class Teacher", 20, y);
-  doc.text("Principal", w - 50, y);
-  y += 5;
+  const resolvedAssets = await resolveDocumentAssets(assets);
+  drawAuthorizationBlock(doc, w, y, resolvedAssets);
+  y += 18;
   doc.setFontSize(9);
   doc.text("(Signature & Seal)", 16, y);
   doc.text("(Signature & Seal)", w - 54, y);
@@ -175,7 +234,7 @@ const generateTCPDF = (data) => {
   doc.save(`TC_${st.name}_${req.ticketNo}.pdf`);
 };
 
-const generateGenericCertPDF = (data, certTitle) => {
+const generateGenericCertPDF = async (data, certTitle, assets) => {
   const { request: req, school } = data;
   const st = req.student;
   const adm = st.admission;
@@ -205,11 +264,10 @@ const generateGenericCertPDF = (data, certTitle) => {
   doc.text(lines, 14, y, { lineHeightFactor: 1.8 });
   y += lines.length * 10 + 50;
 
-  doc.text("………………………………….", w - 60, y);
-  y += 7;
+  const resolvedAssets = await resolveDocumentAssets(assets);
+  drawAuthorizationBlock(doc, w, y, resolvedAssets);
+  y += 16;
   doc.setFont(undefined, "italic");
-  doc.text("Signature of the Principal", w - 64, y);
-  y += 7;
   doc.text(`(Date: ${dayjs().format("DD-MM-YYYY")})`, w - 52, y);
 
   doc.save(`${certTitle.replace(/\s/g, "_")}_${st.name}_${req.ticketNo}.pdf`);
@@ -241,6 +299,7 @@ const DocRequestPage = () => {
   const [issueOpen, setIssueOpen] = useState(false);
   const [issueForm] = Form.useForm();
   const [issuing, setIssuing] = useState(false);
+  const [documentAssets, setDocumentAssets] = useState({});
 
   // Permissions
   const canCreate = hasPermission(PERMISSIONS.DOC_REQUEST_CREATE);
@@ -261,7 +320,25 @@ const DocRequestPage = () => {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  const fetchDocumentAssets = async () => {
+    try {
+      const settings = await getAdminSettings();
+      const assets = settings?.documentAssets || {};
+      setDocumentAssets({
+        principalSignature: assets.principalSignature || settings?.principalSignature || "",
+        hrSignature: assets.hrSignature || settings?.hrSignature || "",
+        chairmanSignature: assets.chairmanSignature || settings?.chairmanSignature || "",
+        rubberStamp: assets.rubberStamp || settings?.rubberStamp || "",
+      });
+    } catch {
+      setDocumentAssets({});
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    fetchDocumentAssets();
+  }, []);
 
   // ── student search ─────────────────────────────────────────────────────
   const searchStudents = async (q) => {
@@ -344,12 +421,12 @@ const DocRequestPage = () => {
   // ── PDF ────────────────────────────────────────────────────────────────
   const generatePDF = async (issueData) => {
     const type = issueData.request.type;
-    if (type === "TRANSFER_CERTIFICATE") generateTCPDF(issueData);
-    else if (type === "BONAFIDE_CERTIFICATE") generateBonafidePDF(issueData);
-    else if (type === "CONDUCT_CERTIFICATE") generateGenericCertPDF(issueData, "CONDUCT CERTIFICATE");
-    else if (type === "STUDY_CERTIFICATE") generateGenericCertPDF(issueData, "STUDY CERTIFICATE");
-    else if (type === "FEE_CERTIFICATE") generateGenericCertPDF(issueData, "FEE CERTIFICATE");
-    else generateGenericCertPDF(issueData, "CERTIFICATE");
+    if (type === "TRANSFER_CERTIFICATE") await generateTCPDF(issueData, documentAssets);
+    else if (type === "BONAFIDE_CERTIFICATE") await generateBonafidePDF(issueData, documentAssets);
+    else if (type === "CONDUCT_CERTIFICATE") await generateGenericCertPDF(issueData, "CONDUCT CERTIFICATE", documentAssets);
+    else if (type === "STUDY_CERTIFICATE") await generateGenericCertPDF(issueData, "STUDY CERTIFICATE", documentAssets);
+    else if (type === "FEE_CERTIFICATE") await generateGenericCertPDF(issueData, "FEE CERTIFICATE", documentAssets);
+    else await generateGenericCertPDF(issueData, "CERTIFICATE", documentAssets);
   };
 
   const handlePrintPDF = async (record) => {

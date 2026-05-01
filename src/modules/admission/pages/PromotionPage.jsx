@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Button, message, Table, Row, Col, Input, Modal, Alert, Space } from 'antd';
+import { Form, Button, message, Table, Row, Col, Input, Modal, Alert, Space, Tag, Select } from 'antd';
 import { SwapOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { promoteStudents, demoteStudents, getAdmissionDashboardSummary } from '../admission.service';
+import { getAcademicYears } from '../../fees/fees.service';
 
 const { confirm } = Modal;
 
@@ -21,8 +22,9 @@ const PromotionPage = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [mode, setMode] = useState('promote');
-  const [academicYear, setAcademicYear] = useState('2025-2026');
-  const [newAcademicYear, setNewAcademicYear] = useState('2026-2027');
+  const [academicYear, setAcademicYear] = useState('');
+  const [newAcademicYear, setNewAcademicYear] = useState('');
+  const [availableYears, setAvailableYears] = useState([]);
   const [summary, setSummary] = useState(null);
   const [blockingError, setBlockingError] = useState(null);
 
@@ -32,6 +34,23 @@ const PromotionPage = () => {
       setSummary(data);
     } catch {}
   };
+
+  useEffect(() => {
+    const loadAcademicYears = async () => {
+      try {
+        const years = await getAcademicYears();
+        const normalizedYears = Array.isArray(years) ? years.filter(Boolean) : [];
+        setAvailableYears(normalizedYears);
+        if (!academicYear && normalizedYears.length > 0) {
+          setAcademicYear(normalizedYears[0]);
+        }
+      } catch {
+        setAvailableYears([]);
+      }
+    };
+
+    loadAcademicYears();
+  }, [academicYear]);
 
   useEffect(() => {
     loadSummary();
@@ -124,7 +143,12 @@ const PromotionPage = () => {
               <Row gutter={16}>
                 <Col span={12}>
                   <Form.Item label="Academic Year">
-                    <Input value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} />
+                    <Select
+                      value={academicYear || undefined}
+                      placeholder="Select academic year"
+                      options={availableYears.map((year) => ({ value: year, label: year }))}
+                      onChange={(value) => setAcademicYear(value || '')}
+                    />
                   </Form.Item>
                 </Col>
 
@@ -180,29 +204,53 @@ const PromotionPage = () => {
                   )}
                 </Space>
 
-                {Array.isArray(result.studentsWithPreviousYearPending) && result.studentsWithPreviousYearPending.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
+                <div style={{ marginTop: 16 }}>
+                  {Array.isArray(result.studentsWithPreviousYearPending) && result.studentsWithPreviousYearPending.length > 0 ? (
+                    <>
+                      <Alert
+                        type="warning"
+                        showIcon
+                        message={`${result.studentsWithPreviousYearPending.length} student(s) have unpaid dues from ${academicYear}`}
+                        description="These students were promoted, but they still have pending dues for the previous academic year. Collect previous-year dues and current-year dues as needed."
+                      />
+                      <Table
+                        style={{ marginTop: 12 }}
+                        size="small"
+                        rowKey={(row) => row.studentId}
+                        pagination={{ pageSize: 10 }}
+                        dataSource={result.studentsWithPreviousYearPending}
+                        columns={[
+                          { title: 'Student', dataIndex: 'name', render: (v) => v || '—' },
+                          { title: 'Admission No', dataIndex: 'admissionNo', render: (v) => v || '—' },
+                          { title: 'From Standard', dataIndex: 'currentStandard', render: (v) => v || '—' },
+                          { title: 'Promoted To', dataIndex: 'promotedToStandard', render: (v) => v || '—' },
+                          { title: 'Prev. Year', dataIndex: 'previousAcademicYear' },
+                          {
+                            title: 'Pending Amount',
+                            dataIndex: 'pendingAmount',
+                            render: (v, row) => (
+                              <span>
+                                <span style={{ color: '#cf1322', fontWeight: 600 }}>
+                                  ₹{Number(v || 0).toLocaleString('en-IN')}
+                                </span>
+                                {row.feeNotAssigned && (
+                                  <Tag color="orange" style={{ marginLeft: 6, fontSize: 10 }}>Fee Not Assigned</Tag>
+                                )}
+                              </span>
+                            ),
+                          },
+                        ]}
+                      />
+                    </>
+                  ) : (
                     <Alert
-                      type="warning"
+                      type="success"
                       showIcon
-                      message="Collect previous-year pending fees"
-                      description="These students were promoted, but they still have pending dues for the previous academic year. Collect previous-year dues and current-year dues as needed."
+                      message="No pending dues found"
+                      description={`All promoted students have no unpaid dues for ${academicYear}.`}
                     />
-                    <Table
-                      style={{ marginTop: 12 }}
-                      size="small"
-                      rowKey={(row) => row.studentId}
-                      pagination={{ pageSize: 6 }}
-                      dataSource={result.studentsWithPreviousYearPending}
-                      columns={[
-                        { title: 'Student', dataIndex: 'name' },
-                        { title: 'Admission No', dataIndex: 'admissionNo', render: (value) => value || '-' },
-                        { title: 'From Year', dataIndex: 'previousAcademicYear' },
-                        { title: 'Pending', dataIndex: 'pendingAmount', render: (value) => `₹${Number(value || 0).toLocaleString('en-IN')}` },
-                      ]}
-                    />
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
           </div>

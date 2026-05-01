@@ -16,15 +16,23 @@ import {
 } from "@ant-design/icons";
 import { getFeesDashboard, getDailyCollection, getAcademicYears } from "../fees.service";
 import dayjs from "dayjs";
+import { getAdminSettings } from "../../settings/settings.service";
 
 const FeesDashboardPage = () => {
-  const [academicYear, setAcademicYear] = useState("2025-26");
+  const [academicYear, setAcademicYear] = useState("");
   const [academicYearOptions, setAcademicYearOptions] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [dailyData, setDailyData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [printPayment, setPrintPayment] = useState(null);
+  const [documentAssets, setDocumentAssets] = useState({});
   const printRef = useRef(null);
+
+  const normalizeAssetSrc = (value) => {
+    if (!value) return "";
+    if (value.startsWith("data:image") || value.startsWith("http://") || value.startsWith("https://")) return value;
+    return `/erp/api/${String(value).replace(/^\/+/, "").replace(/\\/g, "/")}`;
+  };
 
   const fetchAcademicYears = async () => {
     try {
@@ -62,6 +70,19 @@ const FeesDashboardPage = () => {
   useEffect(() => {
     fetchAcademicYears();
     fetchDaily();
+    (async () => {
+      try {
+        const settings = await getAdminSettings();
+        const assets = settings?.documentAssets || {};
+        setDocumentAssets({
+          hrSignature: assets.hrSignature || settings?.hrSignature || "",
+          chairmanSignature: assets.chairmanSignature || settings?.chairmanSignature || "",
+          rubberStamp: assets.rubberStamp || settings?.rubberStamp || "",
+        });
+      } catch {
+        setDocumentAssets({});
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -170,6 +191,8 @@ const FeesDashboardPage = () => {
             th { background: #f5f5f5; }
             .footer { margin-top: 24px; display: flex; justify-content: space-between; }
             .sign-line { border-top: 1px solid #333; width: 150px; margin-top: 40px; padding-top: 4px; font-size: 12px; }
+            .sign-img { display:block; width:120px; height:40px; object-fit:contain; margin:0 auto 6px; }
+            .stamp-img { display:block; width:70px; height:70px; object-fit:contain; margin:0 auto 6px; }
             @media print { body { padding: 0; } }
           </style>
         </head>
@@ -409,7 +432,22 @@ const FeesDashboardPage = () => {
                   <div className="sign-line">Student / Parent</div>
                 </div>
                 <div>
-                  <div className="sign-line">Authorized Signatory</div>
+                  {normalizeAssetSrc(documentAssets?.hrSignature) && (
+                    <img src={normalizeAssetSrc(documentAssets.hrSignature)} alt="HR Signature" className="sign-img" />
+                  )}
+                  <div className="sign-line">HR Signature</div>
+                </div>
+                <div>
+                  {normalizeAssetSrc(documentAssets?.rubberStamp) && (
+                    <img src={normalizeAssetSrc(documentAssets.rubberStamp)} alt="Rubber Stamp" className="stamp-img" />
+                  )}
+                  <div className="sign-line">School Seal</div>
+                </div>
+                <div>
+                  {normalizeAssetSrc(documentAssets?.chairmanSignature) && (
+                    <img src={normalizeAssetSrc(documentAssets.chairmanSignature)} alt="Chairman Signature" className="sign-img" />
+                  )}
+                  <div className="sign-line">Chairman Signature</div>
                 </div>
               </div>
             </div>

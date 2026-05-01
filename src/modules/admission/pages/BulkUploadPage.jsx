@@ -1,14 +1,147 @@
 import React, { useState } from 'react';
-import { Button, Upload, Table, message, Alert, Space, Tag } from 'antd';
+import { Upload, Table, message, Space } from 'antd';
 import { DownloadOutlined, CloudUploadOutlined, FileExcelOutlined } from '@ant-design/icons';
 import { bulkUploadCsv } from '../admission.service';
 
 const CSV_TEMPLATE_HEADERS = [
-  'name', 'standard', 'gender', 'dob', 'religion', 'community', 'caste',
-  'motherTongue', 'aadharNo', 'bloodGroup', 'previousSchool', 'transportMode',
-  'rte', 'fatherName', 'fatherPhone', 'motherName', 'motherPhone',
-  'address', 'pin', 'email',
+  'name',
+  'standard',
+  'section',
+  'academicYear',
+  'admissionDate',
+  'admissionFrom',
+  'admissionTo',
+  'gender',
+  'dob',
+  'religion',
+  'community',
+  'communityOther',
+  'caste',
+  'motherTongue',
+  'aadharNo',
+  'bloodGroup',
+  'identityMark1',
+  'identityMark2',
+  'previouslyStudied',
+  'previousSchoolStandard',
+  'transportMode',
+  'vanNeeded',
+  'rteApplied',
+  'fatherName',
+  'fatherPhone',
+  'fatherWhatsAppNo',
+  'fatherOccupation',
+  'fatherAadharNo',
+  'motherName',
+  'motherPhone',
+  'motherWhatsAppNo',
+  'motherOccupation',
+  'motherAadharNo',
+  'familyIncome',
+  'siblingsCount',
+  'preferredPhone',
+  'parentsEmail',
+  'isSingleParent',
+  'guardianRelation',
+  'guardianName',
+  'guardianPhone',
+  'guardianWhatsapp',
+  'guardianAadhar',
+  'guardianOccupation',
+  'sibling1Name',
+  'sibling1School',
+  'sibling1Standard',
+  'sibling2Name',
+  'sibling2School',
+  'sibling2Standard',
+  'doorNo',
+  'street',
+  'landmark',
+  'city',
+  'state',
+  'pin',
+  'examName',
+  'boardExamType',
+  'boardName',
+  'registerNo',
+  'monthYear',
+  'academicStream',
+  'totalMaxMarks',
+  'totalObtainedMarks',
+  'totalPercentage',
+  'subjectsJson',
+  'email',
 ];
+
+const CSV_SAMPLE_ROW = {
+  name: 'John Doe',
+  standard: '10',
+  section: 'A',
+  academicYear: '2026-2027',
+  admissionDate: '2026-05-01',
+  admissionFrom: '',
+  admissionTo: '',
+  gender: 'MALE',
+  dob: '2011-05-01',
+  religion: 'Hindu',
+  community: 'BC',
+  communityOther: '',
+  caste: 'Vellalar',
+  motherTongue: 'Tamil',
+  aadharNo: '123456789012',
+  bloodGroup: 'B+',
+  identityMark1: 'Mole on right cheek',
+  identityMark2: 'Scar on left hand',
+  previouslyStudied: 'Govt Hr Sec School',
+  previousSchoolStandard: '10',
+  transportMode: 'Van',
+  vanNeeded: 'true',
+  rteApplied: 'false',
+  fatherName: 'Father Name',
+  fatherPhone: '9876543210',
+  fatherWhatsAppNo: '9876543210',
+  fatherOccupation: 'Agriculture',
+  fatherAadharNo: '123456789013',
+  motherName: 'Mother Name',
+  motherPhone: '9876543211',
+  motherWhatsAppNo: '9876543211',
+  motherOccupation: 'Home Maker',
+  motherAadharNo: '123456789014',
+  familyIncome: '150000',
+  siblingsCount: '1',
+  preferredPhone: 'father',
+  parentsEmail: 'parents@example.com',
+  isSingleParent: 'false',
+  guardianRelation: '',
+  guardianName: '',
+  guardianPhone: '',
+  guardianWhatsapp: '',
+  guardianAadhar: '',
+  guardianOccupation: '',
+  sibling1Name: 'Sibling One',
+  sibling1School: 'Same School',
+  sibling1Standard: 'LKG',
+  sibling2Name: '',
+  sibling2School: '',
+  sibling2Standard: '',
+  doorNo: '12',
+  street: 'Main Road',
+  landmark: 'Near Bus Stand',
+  city: 'Erode',
+  state: 'Tamil Nadu',
+  pin: '600001',
+  examName: '10th Standard',
+  boardExamType: 'State Board',
+  boardName: 'State Board',
+  registerNo: '2025001234',
+  monthYear: 'March 2025',
+  academicStream: 'BIO_CS',
+  totalMaxMarks: '600',
+  totalObtainedMarks: '513',
+  totalPercentage: '85.5',
+  subjectsJson: '[{"subjectName":"Tamil","maxMarks":150,"obtainedMarks":130},{"subjectName":"English","maxMarks":150,"obtainedMarks":120},{"subjectName":"Mathematics","maxMarks":100,"obtainedMarks":88}]',
+  email: 'john@school.local',
+};
 
 const parseCsv = (text) => {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -43,8 +176,13 @@ const BulkUploadPage = () => {
   const [uploading, setUploading] = useState(false);
 
   const downloadTemplate = () => {
-    const csv = CSV_TEMPLATE_HEADERS.join(',') + '\n' +
-      'John Doe,STD_5,MALE,2015-06-15,Hindu,BC,Vellalar,Tamil,123456789012,B+,Previous School,Local,false,Father Name,9876543210,Mother Name,9876543211,123 Main St,600001,john@school.local\n';
+    const escapeCell = (value) => {
+      const text = String(value ?? '');
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+
+    const sampleLine = CSV_TEMPLATE_HEADERS.map((header) => escapeCell(CSV_SAMPLE_ROW[header] || '')).join(',');
+    const csv = `${CSV_TEMPLATE_HEADERS.join(',')}\n${sampleLine}\n`;
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -119,7 +257,7 @@ const BulkUploadPage = () => {
             Bulk Admission Upload
           </h2>
           <p style={{ color: '#43474d', fontSize: 13, margin: 0, fontFamily: "'Public Sans', sans-serif" }}>
-            Upload a CSV file with student data to create multiple admissions at once.
+            Upload a CSV file with all admission form fields except documents.
           </p>
         </div>
       </div>
@@ -213,10 +351,13 @@ const BulkUploadPage = () => {
         <div style={{ background: '#fff', borderRadius: 14, padding: 24 }}>
           <h4 style={{ fontFamily: "'Manrope', sans-serif", fontSize: 16, fontWeight: 700, color: '#00152a', marginBottom: 12 }}>CSV Format Guide</h4>
           <div style={{ color: '#43474d', fontSize: 13, fontFamily: "'Public Sans', sans-serif", lineHeight: 2 }}>
-            <p>Required columns: <strong>name, standard, gender</strong></p>
-            <p>Standard values: LKG, UKG, STD_1 to STD_12 (or just 1 to 12)</p>
-            <p>Gender values: MALE, FEMALE</p>
-            <p>Date format: YYYY-MM-DD (e.g., 2015-06-15)</p>
+            <p>Required core columns: <strong>name, standard, gender</strong></p>
+            <p>Admission, student, family, address, and academic form fields are supported. Documents are intentionally excluded.</p>
+            <p>Standard values: LKG, UKG, 1 to 12, or STD_1 to STD_12.</p>
+            <p>Gender values: MALE, FEMALE. Boolean values: true or false.</p>
+            <p>Date format: YYYY-MM-DD for dob, admissionDate, admissionFrom, admissionTo.</p>
+            <p>Use <strong>subjectsJson</strong> for subject-wise marks as a JSON array, for example: <strong>{'[{"subjectName":"Tamil","maxMarks":150,"obtainedMarks":130}]'}</strong></p>
+            <p>Academic stream values: BIO_MATHS, CS_MATHS, BIO_CS, COMMERCE, HUMANITIES, OTHER.</p>
             <p>Maximum 500 rows per upload. Admission numbers are auto-generated.</p>
           </div>
         </div>
