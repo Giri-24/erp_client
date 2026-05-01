@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getHRDashboard, getLeaveApplications } from "../hr.service";
+import { getHRDashboard, getLeaveApplications, getPayroll } from "../hr.service";
 import dayjs from "dayjs";
 import { Skeleton, DatePicker, message } from "antd";
 
@@ -12,31 +12,24 @@ const HRDashboardPage = ({ onNavigate }) => {
   const fetchDashboard = async () => {
     setLoading(true);
     try {
-      const [dashRes, leavesRes] = await Promise.all([
+      const [dashRes, leavesRes, payrollRes] = await Promise.all([
         getHRDashboard({ month: selectedMonth.format("YYYY-MM") }),
-        getLeaveApplications({ status: "PENDING", limit: 3 })
+        getLeaveApplications({ status: "PENDING", limit: 3 }),
+        getPayroll({ month: selectedMonth.format("YYYY-MM"), status: "APPROVED" })
       ]);
-      
-      setData(dashRes);
-      // Handle different possible response structures for leaves
-      const leavesData = leavesRes?.data || (Array.isArray(leavesRes) ? leavesRes : []);
-      setPendingLeaves(leavesData.slice(0, 3));
-    } catch (error) {
-      console.error("Dashboard fetch error:", error);
-      // Fallback/Mock data if API fails to ensure UI renders
-      setData({
-        totalStaff: 1248,
-        presentToday: 1120,
-        absentToday: 42,
-        onLeaveToday: 86,
-        lateToday: 12,
-        attendancePercent: 94.8,
-        totalPayroll: 412850,
-        pfContribution: 54200,
-        esiContribution: 12400,
-        devicesOnline: 14,
-        devicesTotal: 15,
+      // Parse payroll data safely
+      const payrollList = Array.isArray(payrollRes?.data) ? payrollRes.data : Array.isArray(payrollRes) ? payrollRes : [];
+      let teachingTotal = 0, adminTotal = 0, opsTotal = 0;
+      payrollList.forEach((p) => {
+        const dept = (p.department || p.staff?.department || "").toLowerCase();
+        const net = Number(p.netSalary) || 0;
+        if (dept.includes("teach")) teachingTotal += net;
+        else if (dept.includes("admin")) adminTotal += net;
+        else if (dept.includes("operation") || dept.includes("logistic")) opsTotal += net;
       });
+      const totalPayroll = teachingTotal + adminTotal + opsTotal;
+      // ...existing code...
+    } catch (error) {
       message.error("Failed to fetch dashboard data. Using offline overview.");
     }
     setLoading(false);
@@ -57,352 +50,294 @@ const HRDashboardPage = ({ onNavigate }) => {
   if (!data) return null;
 
   return (
-    <div className="space-y-8 pb-12 animate-in fade-in duration-700">
-      {/* Header & Date Picker */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-8 space-y-8 duration-700 animate-in fade-in">
+      {/* Header & Date Picker (Added from existing to integrate with new ui seamlessly) */}
+      <div className="flex flex-col justify-between gap-4 mb-4 md:flex-row md:items-center">
         <div>
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">
-            <span className="w-4 h-px bg-on-surface-variant/30"></span>
-            Overview & Metrics
-          </div>
-          <h1 className="text-3xl font-headline font-extrabold text-primary tracking-tight">
-            HR Performance Control
-          </h1>
+          <h1 className="text-xl font-black tracking-tight text-[#00152a] dark:text-white">HR Intelligence Dashboard</h1>
         </div>
-        <div className="flex items-center gap-3">
-          <DatePicker 
-            picker="month" 
-            value={selectedMonth} 
-            onChange={(d) => d && setSelectedMonth(d)} 
-            allowClear={false}
-            className="rounded-xl border-none bg-white shadow-sm px-4 py-2"
-          />
+        <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-2 bg-[#e4e9ed] px-4 py-2 rounded-full cursor-pointer hover:bg-[#dfe3e7] transition-colors">
+            <span className="material-symbols-outlined text-[#00152a] text-[20px]">calendar_today</span>
+            <DatePicker 
+              picker="month" 
+              value={selectedMonth} 
+              onChange={(d) => { if(d) setSelectedMonth(d); }} 
+              allowClear={false}
+              bordered={false}
+              className="text-sm font-bold text-[#00152a] p-0 bg-transparent w-[100px]"
+            />
+          </div>
           <button 
             onClick={fetchDashboard}
-            className="p-2 bg-white rounded-xl shadow-sm hover:bg-surface-container-low transition-colors"
+            className="p-2 text-[#43474d] hover:bg-[#f0f4f8] rounded-full transition-colors bg-white shadow-sm"
           >
-            <span className="material-symbols-outlined text-primary">refresh</span>
+            <span className="material-symbols-outlined">refresh</span>
           </button>
         </div>
       </div>
 
-      {/* Summary Metrics Section */}
-      <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
-        {/* Total Staff Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex flex-col gap-2 relative overflow-hidden group border border-outline-variant/10">
-          <div className="absolute top-0 right-0 w-16 h-16 bg-primary opacity-5 -translate-y-8 translate-x-8 rounded-full transition-transform group-hover:scale-150"></div>
-          <span className="text-on-surface-variant font-label text-[10px] uppercase tracking-widest font-bold">Total Staff</span>
-          <div className="flex items-end justify-between">
-            <h3 className="text-3xl font-headline font-bold text-primary">{data.totalStaff?.toLocaleString()}</h3>
-            <span className="text-primary-container font-extrabold text-[10px] bg-primary-fixed px-2 py-0.5 rounded-full">+4%</span>
-          </div>
+      {/* Insight Chips */}
+      <div className="flex space-x-4">
+        <div className="flex items-center space-x-3 px-6 py-3 bg-white rounded-full shadow-[0_20px_40px_rgba(1,29,53,0.06)] border-l-4 border-primary bg-surface-container-lowest">
+          <span className="material-symbols-outlined text-[#00152a]" style={{ fontVariationSettings: "'FILL' 1" }}>insights</span>
+          <span className="text-sm font-semibold text-[#00152a]">{pendingLeaves.length} Leaves pending approval today</span>
         </div>
-
-        {/* Present Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex flex-col gap-2 border border-outline-variant/10">
-          <span className="text-on-surface-variant font-label text-[10px] uppercase tracking-widest font-bold">Present Today</span>
-          <div className="flex items-end justify-between">
-            <h3 className="text-3xl font-headline font-bold text-primary">{data.presentToday}</h3>
-            <div className="w-10 h-1 bg-tertiary-accent rounded-full mb-2"></div>
-          </div>
+        <div className="flex items-center space-x-3 px-6 py-3 bg-white rounded-full shadow-[0_20px_40px_rgba(1,29,53,0.06)] border-l-4 border-[#44ddc1] bg-surface-container-lowest">
+          <span className="material-symbols-outlined text-[#00a28c]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
+          <span className="text-sm font-semibold text-[#00a28c]">Attendance improved by 2.4% vs Mar 2024</span>
         </div>
+      </div>
 
-        {/* Absent Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex flex-col gap-2 border border-outline-variant/10 border-l-4 border-l-error">
-          <span className="text-error font-label text-[10px] uppercase tracking-widest font-bold">Absent</span>
-          <div className="flex items-end justify-between">
-            <h3 className="text-3xl font-headline font-bold text-primary">{data.absentToday}</h3>
-            <span className="text-error font-bold text-[10px] bg-error-container/30 px-2 py-0.5 rounded-full">High</span>
-          </div>
-        </div>
-
-        {/* On Leave Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex flex-col gap-2 border border-outline-variant/10">
-          <span className="text-on-surface-variant font-label text-[10px] uppercase tracking-widest font-bold">On Leave</span>
-          <div className="flex items-end justify-between">
-            <h3 className="text-3xl font-headline font-bold text-primary">{data.onLeaveToday}</h3>
-            <span className="material-symbols-outlined text-secondary/40">event_busy</span>
-          </div>
-        </div>
-
-        {/* Late Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex flex-col gap-2 border border-outline-variant/10">
-          <span className="text-on-surface-variant font-label text-[10px] uppercase tracking-widest font-bold">Late</span>
-          <div className="flex items-end justify-between">
-            <h3 className="text-3xl font-headline font-bold text-primary">{data.lateToday}</h3>
-            <span className="material-symbols-outlined text-error/30">schedule</span>
-          </div>
-        </div>
-
-        {/* Rate Card */}
-        <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex flex-col gap-2 border border-outline-variant/10">
-          <span className="text-on-surface-variant font-label text-[10px] uppercase tracking-widest font-bold">Attendance Rate</span>
-          <div className="flex items-end justify-between">
-            <h3 className="text-3xl font-headline font-bold text-primary">{data.attendancePercent}%</h3>
-            <span className="material-symbols-outlined text-tertiary-accent" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Main Grid Layout */}
+      {/* Bento Grid */}
       <div className="grid grid-cols-12 gap-8">
-        {/* Pending Leave Requests */}
-        <div className="col-span-12 lg:col-span-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center">
-                <span className="material-symbols-outlined text-orange-500">pending_actions</span>
-              </div>
+        {/* 1. Attendance Trends (Large Card) */}
+        <div className="col-span-12 lg:col-span-8 bg-white rounded-xl p-8 shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex flex-col relative overflow-hidden border border-transparent transition-all bg-surface-container-lowest">
+          <div className="flex items-center justify-between mb-10">
+            <div>
+              <h3 className="text-xl font-bold text-[#00152a]">Attendance Trends</h3>
+              <p className="text-sm text-[#43474d] font-body">Visualized across the last 4 weeks of {selectedMonth.format("MMMM YYYY")}</p>
+            </div>
+            <div className="flex space-x-6 text-right">
               <div>
-                <h2 className="font-headline text-2xl font-bold text-primary tracking-tight">Pending Leave Requests</h2>
-                <p className="text-xs text-on-surface-variant">Review and manage recent staff absence requests</p>
+                <div className="text-2xl font-black text-[#00152a]">{data.attendancePercent || "94.2"}%</div>
+                <div className="text-[0.65rem] uppercase tracking-wider font-bold text-[#43474d]">Avg. Present</div>
               </div>
-            </div>
-            <button 
-              onClick={() => onNavigate?.("hr-leaves")}
-              className="text-sm font-bold text-primary hover:translate-x-1 transition-transform flex items-center gap-1"
-            >
-              View All <span className="material-symbols-outlined text-sm">arrow_forward</span>
-            </button>
-          </div>
-
-          <div className="bg-surface-container-low/50 rounded-2xl overflow-hidden border border-outline-variant/20 shadow-sm">
-            <div className="grid grid-cols-5 p-4 border-b border-outline-variant/10 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant bg-white/40">
-              <div className="col-span-2">Staff Member</div>
-              <div>Leave Type</div>
-              <div>Duration</div>
-              <div className="text-right pr-4">Action</div>
-            </div>
-            <div className="divide-y divide-outline-variant/10 bg-white/20">
-              {pendingLeaves.length > 0 ? pendingLeaves.map((leave, idx) => (
-                <div key={leave.id || idx} className="grid grid-cols-5 p-4 items-center hover:bg-white transition-colors group">
-                  <div className="col-span-2 flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full border-2 border-white shadow-md overflow-hidden bg-surface-container">
-                      {leave.staff?.photo ? (
-                        <img src={leave.staff.photo} alt={leave.staff.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-primary font-bold bg-primary-fixed/30">
-                          {leave.staffName?.charAt(0) || leave.staff?.name?.charAt(0) || "S"}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-headline font-bold text-primary group-hover:text-primary-container transition-colors">
-                        {leave.staffName || leave.staff?.name || "Staff Member"}
-                      </p>
-                      <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-tight">
-                        {leave.staff?.department || leave.department || "—"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                      (leave.leaveType?.name || leave.leaveType) === "Sabbatical" ? "bg-primary-fixed text-primary" : 
-                      (leave.leaveType?.name || leave.leaveType) === "Sick Leave" ? "bg-orange-100 text-orange-700" :
-                      "bg-secondary-container/50 text-secondary"
-                    }`}>
-                      {leave.leaveType?.name || leave.leaveType?.code || "Earned Leave"}
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold text-on-surface">
-                    {leave.days || "3"} Days
-                    <p className="text-[10px] font-medium text-on-surface-variant">Starts {dayjs(leave.fromDate).format("DD MMM")}</p>
-                  </div>
-                  <div className="flex justify-end gap-2 pr-2">
-                    <button className="p-2 text-tertiary-accent hover:bg-tertiary-accent/10 rounded-xl transition-all hover:scale-110 active:scale-95">
-                      <span className="material-symbols-outlined text-md">check_circle</span>
-                    </button>
-                    <button className="p-2 text-error hover:bg-error/10 rounded-xl transition-all hover:scale-110 active:scale-95">
-                      <span className="material-symbols-outlined text-md">cancel</span>
-                    </button>
-                  </div>
-                </div>
-              )) : (
-                <div className="p-12 text-center text-on-surface-variant bg-white/40">
-                  <span className="material-symbols-outlined text-4xl opacity-20 block mb-2">inbox</span>
-                  <p className="text-sm font-medium">No pending requests at the moment</p>
-                </div>
-              )}
+              <div className="h-10 w-[1px] bg-[#c3c6ce]/30"></div>
+              <div>
+                <div className="text-2xl font-black text-[#ba1a1a]">{((100 - (data.attendancePercent || 94.2)).toFixed(1))}%</div>
+                <div className="text-[0.65rem] uppercase tracking-wider font-bold text-[#43474d]">Avg. Absent</div>
+              </div>
             </div>
           </div>
-
-          {/* Financial & Operations Bento */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-            <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] border border-outline-variant/10 space-y-4 hover:border-primary/20 transition-all cursor-pointer group" onClick={() => onNavigate?.("hr-payroll")}>
-              <div className="flex items-center justify-between">
-                <h4 className="font-headline font-bold text-primary">Monthly Payroll</h4>
-                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                  <span className="material-symbols-outlined text-sm">account_balance_wallet</span>
-                </div>
+          {/* Area Chart Visual Representation */}
+          <div className="relative flex-1 w-full h-64 mt-4">
+            <div className="absolute inset-0 flex items-end justify-between px-2">
+              <div className="w-[12%] bg-[#00152a]/10 rounded-t-lg relative group transition-all hover:bg-[#00152a]/20 h-[85%]">
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs font-bold text-[#00152a] opacity-0 group-hover:opacity-100 transition-opacity">92%</div>
+                <div className="absolute bottom-0 w-full bg-[#00152a] h-[80%] rounded-t-lg"></div>
               </div>
-              <div className="space-y-1">
-                <p className="text-4xl font-headline font-extrabold text-primary tracking-tight">₹{data.totalPayroll?.toLocaleString()}</p>
-                <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Est. for {selectedMonth.format("MMMM YYYY")}</p>
+              <div className="w-[12%] bg-[#00152a]/10 rounded-t-lg relative group transition-all hover:bg-[#00152a]/20 h-[92%]">
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs font-bold text-[#00152a] opacity-0 group-hover:opacity-100 transition-opacity">96%</div>
+                <div className="absolute bottom-0 w-full bg-[#00152a] h-[88%] rounded-t-lg"></div>
               </div>
-              <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden">
-                <div className="h-full bg-primary w-3/4 rounded-full"></div>
+              <div className="w-[12%] bg-[#00152a]/10 rounded-t-lg relative group transition-all hover:bg-[#00152a]/20 h-[88%]">
+                <div className="absolute bottom-0 w-full bg-[#00152a] h-[84%] rounded-t-lg"></div>
+              </div>
+              <div className="w-[12%] bg-[#00152a]/10 rounded-t-lg relative group transition-all hover:bg-[#00152a]/20 h-[95%]">
+                <div className="absolute bottom-0 w-full bg-[#00152a] h-[92%] rounded-t-lg"></div>
+              </div>
+              <div className="w-[12%] bg-[#00152a]/10 rounded-t-lg relative group transition-all hover:bg-[#00152a]/20 h-[80%]">
+                <div className="absolute bottom-0 w-full bg-[#00152a] h-[75%] rounded-t-lg"></div>
+              </div>
+              <div className="w-[12%] bg-[#00152a]/10 rounded-t-lg relative group transition-all hover:bg-[#00152a]/20 h-[90%]">
+                <div className="absolute bottom-0 w-full bg-[#00152a] h-[86%] rounded-t-lg"></div>
               </div>
             </div>
+          </div>
+          <div className="flex justify-between px-2 mt-4 text-[0.7rem] font-bold text-[#43474d] uppercase tracking-widest">
+            <span>Week 1</span>
+            <span>Week 2</span>
+            <span>Week 3</span>
+            <span>Week 4</span>
+            <span>Current</span>
+          </div>
+        </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-[0_20px_40px_rgba(1,29,53,0.06)] border border-outline-variant/10 space-y-4 hover:border-tertiary-accent/20 transition-all cursor-pointer group" onClick={() => onNavigate?.("hr-pf-esi")}>
-              <div className="flex items-center justify-between">
-                <h4 className="font-headline font-bold text-primary">PF/ESI Contribution</h4>
-                <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center group-hover:bg-tertiary-accent transition-colors">
-                  <span className="material-symbols-outlined text-sm">analytics</span>
+        {/* 2. Leave Distribution */}
+        <div className="col-span-12 lg:col-span-4 bg-white rounded-xl p-8 shadow-[0_20px_40px_rgba(1,29,53,0.06)] border border-transparent transition-all bg-surface-container-lowest">
+          <h3 className="text-xl font-bold text-[#00152a] mb-6">Leave Distribution</h3>
+          <div className="relative flex items-center justify-center py-8">
+            <div className="w-48 h-48 rounded-full border-[18px] border-[#eaeef2] flex items-center justify-center relative overflow-hidden" style={{ background: "conic-gradient(#00152a 0deg 210deg, #44ddc1 210deg 300deg, #d1e4ff 300deg 360deg)" }}>
+              <div className="flex flex-col items-center justify-center bg-white rounded-full shadow-inner w-28 h-28">
+                <span className="text-3xl font-black text-[#00152a]">{data.totalLeaveDays ?? 0}</span>
+                <span className="text-[0.65rem] uppercase font-bold text-[#43474d]">Total Days</span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 rounded-full bg-[#00152a]"></div>
+                <span className="text-sm font-semibold text-[#171c1f]">Paid Leaves</span>
+              </div>
+              <span className="text-sm font-black text-[#00152a]">{data.paidLeaves ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 rounded-full bg-[#44ddc1]"></div>
+                <span className="text-sm font-semibold text-[#171c1f]">Sick Leaves</span>
+              </div>
+              <span className="text-sm font-black text-[#00152a]">{data.sickLeaves ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 rounded-full bg-[#d1e4ff]"></div>
+                <span className="text-sm font-semibold text-[#171c1f]">Casual Leaves</span>
+              </div>
+              <span className="text-sm font-black text-[#00152a]">{data.casualLeaves ?? 0}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Salary Distribution (Horizontal Bar) */}
+        <div className="col-span-12 lg:col-span-5 bg-white rounded-xl p-8 shadow-[0_20px_40px_rgba(1,29,53,0.06)] border border-transparent transition-all bg-surface-container-lowest">
+          <h3 className="text-xl font-bold text-[#00152a] mb-8">Salary Distribution</h3>
+          <div className="space-y-8">
+            <div>
+              <div className="flex justify-between mb-2 text-sm">
+                <span className="font-bold text-[#171c1f]">Teaching Faculty</span>
+                <span className="font-black text-[#00152a]">₹{data.teachingTotal?.toLocaleString("en-IN") || 0}</span>
+              </div>
+              <div className="w-full bg-[#f0f4f8] h-3 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-[#00152a] to-[#102a43]" style={{ width: `${data.totalPayroll ? (data.teachingTotal / data.totalPayroll) * 100 : 0}%` }}></div>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between mb-2 text-sm">
+                <span className="font-bold text-[#171c1f]">Administration</span>
+                <span className="font-black text-[#00152a]">₹{data.adminTotal?.toLocaleString("en-IN") || 0}</span>
+              </div>
+              <div className="w-full bg-[#f0f4f8] h-3 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-[#00152a] to-[#102a43]" style={{ width: `${data.totalPayroll ? (data.adminTotal / data.totalPayroll) * 100 : 0}%` }}></div>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between mb-2 text-sm">
+                <span className="font-bold text-[#171c1f]">Operations & Logistics</span>
+                <span className="font-black text-[#00152a]">₹{data.opsTotal?.toLocaleString("en-IN") || 0}</span>
+              </div>
+              <div className="w-full bg-[#f0f4f8] h-3 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-[#00152a] to-[#102a43]" style={{ width: `${data.totalPayroll ? (data.opsTotal / data.totalPayroll) * 100 : 0}%` }}></div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-8 pt-8 border-t border-[#c3c6ce]/10">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-body text-[#43474d]">Total Payroll Liability</span>
+              <span className="text-lg font-black text-[#00152a]">₹{(data.totalPayroll / 1000000).toFixed(2)}M</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 4. Statutory Pools (Stacked Bar) */}
+        <div className="col-span-12 lg:col-span-3 bg-white rounded-xl p-8 shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex flex-col justify-between border border-transparent transition-all bg-surface-container-lowest">
+          <div>
+            <h3 className="text-xl font-bold text-[#00152a] mb-2">Statutory Polls</h3>
+            <p className="text-[0.7rem] uppercase tracking-widest font-bold text-[#43474d] mb-8">PF & ESI Contributions</p>
+            <div className="flex flex-col items-center space-y-4">
+              <div className="w-24 h-48 bg-[#f0f4f8] rounded-2xl relative overflow-hidden flex flex-col justify-end">
+                <div className="h-[65%] w-full bg-[#00152a] border-b border-white/20 relative group">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-[#00152a]/90 transition-opacity">
+                    <span className="text-[10px] font-bold text-white">PF</span>
+                  </div>
+                </div>
+                <div className="h-[35%] w-full bg-[#44ddc1] relative group">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-[#44ddc1]/90 transition-opacity">
+                    <span className="text-[10px] font-bold text-[#00201a]">ESI</span>
+                  </div>
                 </div>
               </div>
-              <div className="space-y-1">
-                <p className="text-4xl font-headline font-extrabold text-primary tracking-tight">₹{(data.pfContribution + data.esiContribution)?.toLocaleString()}</p>
-                <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Across all eligible staff</p>
-              </div>
-              <div className="flex gap-2">
-                <span className="px-2 py-0.5 bg-tertiary-accent/20 text-on-tertiary-fixed-variant text-[9px] rounded font-extrabold">COMPLIANT</span>
-                <span className="px-2 py-0.5 bg-surface-container-high text-on-surface-variant text-[9px] rounded font-extrabold tracking-tighter">28 NEW ENROLLS</span>
+              <div className="text-center">
+                <div className="text-3xl font-black text-[#00152a]">₹{((data.pfContribution + data.esiContribution) / 1000000).toFixed(2)}M</div>
+                <div className="flex items-center justify-center text-[#00a28c] text-xs font-bold mt-1">
+                  <span className="material-symbols-outlined text-[16px] mr-1">arrow_upward</span>
+                  <span>1.2% Trend</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Sidebar */}
-        <div className="col-span-12 lg:col-span-4 space-y-8">
-          {/* Quick Operations Panel */}
-          <div className="bg-primary p-7 rounded-2xl text-white shadow-2xl relative overflow-hidden">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-            <div className="flex items-center gap-2 mb-6">
-              <span className="material-symbols-outlined text-tertiary-accent">bolt</span>
-              <h4 className="font-headline font-bold tracking-tight">Quick Operations</h4>
-            </div>
-            <div className="grid grid-cols-1 gap-3 relative z-10">
-              {[
-                { label: "Mark Attendance", icon: "person_add", key: "hr-attendance" },
-                { label: "Sync ESSL Devices", icon: "sync", key: "hr-essl" },
-                { label: "Generate Payroll", icon: "monetization_on", key: "hr-payroll" }
-              ].map((op) => (
-                <button 
-                  key={op.key}
-                  onClick={() => onNavigate?.(op.key)}
-                  className="flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all text-sm font-bold group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-tertiary-accent text-lg">{op.icon}</span>
-                    <span>{op.label}</span>
-                  </div>
-                  <span className="material-symbols-outlined text-sm opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all">arrow_forward</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* System Status Card */}
-          <div className="bg-surface-container-low p-6 rounded-2xl space-y-6 border border-outline-variant/10">
-            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-4">
-              <h4 className="font-headline font-bold text-primary">System Health</h4>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-tertiary-accent animate-pulse"></span>
-                <span className="text-[10px] font-bold text-primary uppercase tracking-tighter">All Nominal</span>
+        {/* 5. Staffing by Department */}
+        <div className="col-span-12 lg:col-span-4 bg-[#00152a] text-white rounded-xl p-8 shadow-[0_20px_40px_rgba(1,29,53,0.06)] relative overflow-hidden transition-opacity">
+          <div className="absolute w-40 h-40 rounded-full -right-10 -top-10 bg-white/5 blur-3xl"></div>
+          <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-[#d1e4ff]/5 rounded-full blur-3xl"></div>
+          <h3 className="mb-8 text-xl font-bold">Staffing Insights</h3>
+          <div className="space-y-6">
+            <div className="group">
+              <div className="flex items-end justify-between mb-2">
+                <span className="text-sm font-semibold opacity-80">Teaching</span>
+                <span className="text-xl font-black">{data.teachingStaff ?? 0}</span>
+              </div>
+              <div className="w-full h-1.5 bg-white/10 rounded-full">
+                <div className="h-full bg-[#d1e4ff] rounded-full" style={{ width: `${data.teachingStaffPercent ?? 0}%` }}></div>
               </div>
             </div>
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white border border-outline-variant/20 shadow-sm flex items-center justify-center">
-                    <span className="material-symbols-outlined text-primary text-xl">devices</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-primary">Biometric Units</p>
-                    <p className="text-[9px] text-on-surface-variant uppercase font-bold tracking-tighter">{data.devicesOnline} Devices Online</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold text-tertiary-accent">{Math.round((data.devicesOnline / (data.devicesTotal || 1)) * 100)}%</p>
-                  <p className="text-[9px] text-on-surface-variant font-bold uppercase">Uptime</p>
-                </div>
+            <div className="group">
+              <div className="flex items-end justify-between mb-2">
+                <span className="text-sm font-semibold opacity-80">Admin</span>
+                <span className="text-xl font-black">{data.adminStaff ?? 0}</span>
               </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white border border-outline-variant/20 shadow-sm flex items-center justify-center">
-                    <span className="material-symbols-outlined text-primary text-xl">cloud_done</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-primary">Database Sync</p>
-                    <p className="text-[9px] text-on-surface-variant uppercase font-bold tracking-tighter">Updated 2m ago</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold text-blue-600">Active</p>
-                  <p className="text-[9px] text-on-surface-variant font-bold uppercase">Status</p>
-                </div>
+              <div className="w-full h-1.5 bg-white/10 rounded-full">
+                <div className="h-full bg-[#d1e4ff] rounded-full" style={{ width: `${data.adminStaffPercent ?? 0}%` }}></div>
+              </div>
+            </div>
+            <div className="group">
+              <div className="flex items-end justify-between mb-2">
+                <span className="text-sm font-semibold opacity-80">Logistics</span>
+                <span className="text-xl font-black">{data.logisticsStaff ?? 0}</span>
+              </div>
+              <div className="w-full h-1.5 bg-white/10 rounded-full">
+                <div className="h-full bg-[#d1e4ff] rounded-full" style={{ width: `${data.logisticsStaffPercent ?? 0}%` }}></div>
               </div>
             </div>
           </div>
-
-          {/* Institutional Alerts */}
-          <div className="space-y-4">
-            <h4 className="font-headline font-bold text-primary text-xs px-1 uppercase tracking-widest">Priority Alerts</h4>
-            <div className="space-y-3">
-              <div className="bg-white border-l-4 border-blue-500 p-4 rounded-r-2xl shadow-sm border border-outline-variant/10 flex items-start gap-3 hover:scale-[1.02] transition-transform cursor-pointer">
-                <span className="material-symbols-outlined text-blue-500 mt-0.5">info</span>
-                <div>
-                  <p className="text-[13px] font-bold text-primary leading-tight">Faculty Review Cycle</p>
-                  <p className="text-[11px] text-on-surface-variant mt-1">Review window opens in 3 days. 48 staff files pending documentation.</p>
-                </div>
+          <div className="p-4 mt-12 border bg-white/10 rounded-xl border-white/5 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <span className="material-symbols-outlined text-[#d1e4ff]">groups</span>
+                <span className="text-xs font-bold tracking-widest uppercase">Total Active Staff</span>
               </div>
-              <div className="bg-white border-l-4 border-error p-4 rounded-r-2xl shadow-sm border border-outline-variant/10 flex items-start gap-3 hover:scale-[1.02] transition-transform cursor-pointer">
-                <span className="material-symbols-outlined text-error mt-0.5">warning</span>
-                <div>
-                  <p className="text-[13px] font-bold text-primary leading-tight">License Expiry</p>
-                  <p className="text-[11px] text-on-surface-variant mt-1">Payroll processing certificate expires in 12 days. Renewal required.</p>
-                </div>
-              </div>
+              <span className="text-xl font-black">{data.totalStaff?.toLocaleString() || "1,248"}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Visual Progress Ribbon */}
-      <section className="relative h-24 mt-4 bg-surface-container-low rounded-3xl overflow-hidden group shadow-inner border border-outline-variant/10">
-        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
-        <svg className="absolute top-0 left-0 w-full h-full opacity-10" preserveAspectRatio="none" viewBox="0 0 1000 100">
-          <path d="M0,50 C150,20 350,80 500,50 C650,20 850,80 1000,50 L1000,100 L0,100 Z" fill="url(#grad-ribbon)"></path>
-          <defs>
-            <linearGradient id="grad-ribbon" x1="0%" x2="100%" y1="0%" y2="0%">
-              <stop offset="0%" style={{ stopColor: "#00152a", stopOpacity: 1 }}></stop>
-              <stop offset="100%" style={{ stopColor: "#44ddc1", stopOpacity: 1 }}></stop>
-            </linearGradient>
-          </defs>
-        </svg>
-        <div className="relative z-10 flex items-center justify-between h-full px-12">
-          <div className="flex items-center gap-12">
+      {/* Footer Details Section (Editorial Style) */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-12 pt-12 pb-24 border-t border-[#c3c6ce]/20">
+        <div className="space-y-4">
+          <h4 className="text-2xl font-black text-[#00152a] leading-tight">Human-Centric Intelligence.</h4>
+          <p className="text-sm text-[#43474d] leading-relaxed">The Architect leverages predictive modeling to identify staff churn risks and optimize payroll efficiency across all institution levels.</p>
+          <div className="flex items-center space-x-2 text-[#00152a] font-black text-sm group select-none">
+            <span>Read Compliance Report</span>
+            <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 col-span-2 gap-4 md:grid-cols-4">
+          <div className="bg-[#f0f4f8] p-6 rounded-2xl flex flex-col justify-between aspect-square">
+            <span className="material-symbols-outlined text-[#00152a] text-3xl">verified_user</span>
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Academic Year</p>
-              <p className="font-headline font-extrabold text-primary">2023 - 2024</p>
-            </div>
-            <div className="h-8 w-px bg-outline-variant/30"></div>
-            <div>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">Active Semester</p>
-              <p className="font-headline font-extrabold text-primary">Fall Quarter II</p>
+              <div className="text-sm font-bold text-[#00152a]">99.8%</div>
+              <div className="text-[10px] text-[#43474d] font-bold uppercase tracking-tighter">PF Accuracy</div>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant">System Time</p>
-              <p className="font-headline font-extrabold text-primary">10:42:15 AM</p>
+          <div className="bg-[#f0f4f8] p-6 rounded-2xl flex flex-col justify-between aspect-square">
+            <span className="material-symbols-outlined text-[#00152a] text-3xl">timer</span>
+            <div>
+              <div className="text-sm font-bold text-[#00152a]">12min</div>
+              <div className="text-[10px] text-[#43474d] font-bold uppercase tracking-tighter">Avg Late Log</div>
             </div>
-            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center shadow-lg cursor-pointer hover:rotate-180 transition-transform duration-700 active:scale-90" onClick={fetchDashboard}>
-              <span className="material-symbols-outlined text-primary">sync</span>
+          </div>
+          <div className="bg-[#f0f4f8] p-6 rounded-2xl flex flex-col justify-between aspect-square">
+            <span className="material-symbols-outlined text-[#00152a] text-3xl">diversity_3</span>
+            <div>
+              <div className="text-sm font-bold text-[#00152a]">12:1</div>
+              <div className="text-[10px] text-[#43474d] font-bold uppercase tracking-tighter">Student-Staff</div>
+            </div>
+          </div>
+          <div className="bg-[#f0f4f8] p-6 rounded-2xl flex flex-col justify-between aspect-square">
+            <span className="material-symbols-outlined text-[#00152a] text-3xl">rocket_launch</span>
+            <div>
+              <div className="text-sm font-bold text-[#00152a]">+8%</div>
+              <div className="text-[10px] text-[#43474d] font-bold uppercase tracking-tighter">Efficiency</div>
             </div>
           </div>
         </div>
       </section>
-
-      {/* FAB (Optional, but included in design) */}
-      <button className="fixed bottom-8 right-8 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50 group">
-        <span className="material-symbols-outlined group-hover:rotate-12 transition-transform" style={{ fontVariationSettings: "'opsz' 40" }}>chat_bubble</span>
-      </button>
     </div>
   );
 };
 
 export default HRDashboardPage;
-

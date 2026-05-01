@@ -230,8 +230,12 @@ const StaffManagementPage = () => {
     form.setFieldsValue({
       ...record,
       doorNo: record.doorno,
+      taluk: record.taluk || record.taluk || record.taluk || "",
+      district: record.district || record.district || "",
       joiningDate: record.joiningDate ? dayjs(record.joiningDate) : null,
       pfJoiningDate: record.pfJoiningDate ? dayjs(record.pfJoiningDate) : null,
+      bankIfsc: record.bankIfsc || "",
+      bankBranch: record.bankBranch || "",
     });
     setModalOpen(true);
   };
@@ -285,6 +289,12 @@ const StaffManagementPage = () => {
         pfJoiningDate: values.pfJoiningDate
           ? values.pfJoiningDate.toISOString()
           : null,
+        taluk: values.taluk || "",
+        district: values.district || "",
+        bankIfsc: values.bankIfsc || "",
+        bankBranch: values.bankBranch || "",
+        taluk: values.taluk || undefined,
+        district: values.district || undefined,
       };
 
       if (editingStaff) {
@@ -607,7 +617,7 @@ const StaffManagementPage = () => {
             className="gradient-btn"
             style={{ height: 48, padding: '0 28px', fontSize: 15 }}
           >
-            Register Personnel
+            Staff Creation
           </Button>
         )}
       </div>
@@ -761,7 +771,7 @@ const StaffManagementPage = () => {
             </div>
             <div>
               <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--primary)', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
-                {editingStaff ? "Calibration Protocol" : "Personnel Onboarding"}
+                {editingStaff ? "Calibration Protocol" : "Staff Creation"}
               </div>
               <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', fontWeight: 600, opacity: 0.6 }}>
                 {editingStaff ? `Updating Master Record for ${editingStaff.name}` : "Establishing new workforce credentials"}
@@ -787,73 +797,80 @@ const StaffManagementPage = () => {
             <Col span={14}>
               <div style={{ background: '#f8fafc', padding: 24, borderRadius: 24, border: '1px solid #edf2f7', marginBottom: 24 }}>
                 <h4 style={{ fontWeight: 800, fontSize: 14, color: 'var(--primary)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <UserOutlined /> CORE IDENTITY
+                  <UserOutlined /> BASIC DETAILS
                 </h4>
                 <Row gutter={16}>
                   <Col span={14}>
-                    <Form.Item name="name" label={<span style={{ fontWeight: 700, fontSize: 12 }}>LEGAL NAME</span>} rules={[{ required: true }]}>
-                      <Input size="large" prefix={<UserOutlined style={{ color: '#94a3b8' }} />} />
+                    <Form.Item name="name" label={<span style={{ fontWeight: 700, fontSize: 12 }}>FULL NAME</span>} rules={[{ required: true }]}> 
+                      <Input size="large" prefix={<UserOutlined style={{ color: '#94a3b8' }} />} id="staff-name" name="name" autoComplete="name" />
                     </Form.Item>
                   </Col>
                   <Col span={10}>
-                    <Form.Item name="employeeId" label={<span style={{ fontWeight: 700, fontSize: 12 }}>SYSTEM ID</span>} rules={[{ required: true }]}>
-                      <Input size="large" disabled={!editingStaff} prefix={<IdcardOutlined style={{ color: '#94a3b8' }} />} />
+                    <Form.Item name="employeeId" label={<span style={{ fontWeight: 700, fontSize: 12 }}>EMPLOYEE ID</span>} rules={[{ required: true }]}>
+                      <Input size="large" disabled={!editingStaff} prefix={<IdcardOutlined style={{ color: '#94a3b8' }} />} id="staff-employeeId" name="employeeId" autoComplete="off" />
                     </Form.Item>
                   </Col>
                 </Row>
                 <Row gutter={16}>
                   <Col span={12}>
-                    <Form.Item name="email" label={<span style={{ fontWeight: 700, fontSize: 12 }}>INSTITUTIONAL EMAIL</span>} rules={[{ required: true, type: "email" }]}>
-                      <Input size="large" prefix={<MailOutlined style={{ color: '#94a3b8' }} />} />
+                    <Form.Item name="email" label={<span style={{ fontWeight: 700, fontSize: 12 }}>WORK EMAIL</span>} rules={[{ required: true, type: "email" }]}> 
+                      <Input size="large" prefix={<MailOutlined style={{ color: '#94a3b8' }} />} id="staff-email" name="email" autoComplete="email" />
                     </Form.Item>
                   </Col>
                   <Col span={12}>
-                    <Form.Item name="phone" label={<span style={{ fontWeight: 700, fontSize: 12 }}>CONTACT RADIUS</span>}>
-                      <Input size="large" prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />} />
+                    <Form.Item name="phone" label={<span style={{ fontWeight: 700, fontSize: 12 }}>CONTACT NUMBER</span>}>
+                      <Input size="large" prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />} id="staff-phone" name="phone" autoComplete="tel" />
                     </Form.Item>
                   </Col>
                 </Row>
                 {!editingStaff ? (
-                  <Form.Item name="password" label={<span style={{ fontWeight: 700, fontSize: 12 }}>ACCESS PASSPHRASE</span>} rules={[{ required: true, min: 6 }]}>
-                    <Input.Password size="large" />
+                  <Form.Item name="password" label={<span style={{ fontWeight: 700, fontSize: 12 }}>PASSWORD</span>} rules={[{ required: true, min: 6 }]}> 
+                    <Input.Password size="large" id="staff-password" name="password" autoComplete="new-password" />
                   </Form.Item>
                 ) : (
-                  <Form.Item name="password" label={<span style={{ fontWeight: 700, fontSize: 12 }}>UPDATE PASSPHRASE (OPTIONAL)</span>} rules={[{ min: 6 }]}>
-                    <Input.Password size="large" />
+                  <Form.Item name="password" label={<span style={{ fontWeight: 700, fontSize: 12 }}>UPDATE PASSWORD (OPTIONAL)</span>} rules={[{ min: 6 }]}> 
+                    <Input.Password size="large" id="staff-password-update" name="password" autoComplete="new-password" />
                   </Form.Item>
                 )}
               </div>
 
                <div style={{ background: '#fff', padding: 24, borderRadius: 24, border: '1px solid #edf2f7' }}>
                 <h4 style={{ fontWeight: 800, fontSize: 14, color: 'var(--primary)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <HomeOutlined /> DOMICILE DATA
+                  <HomeOutlined /> ADDRESS DETAILS
                 </h4>
                 <Row gutter={16}>
                   <Col span={6}>
-                    <Form.Item name="doorNo" label={<span style={{ fontWeight: 700, fontSize: 12 }}>UNITS</span>}>
-                      <Input size="large" />
+                    <Form.Item name="doorNo" label={<span style={{ fontWeight: 700, fontSize: 12 }}>DOOR NO</span>}>
+                      <Input size="large" id="staff-doorNo" name="doorNo" autoComplete="address-line1" />
                     </Form.Item>
                   </Col>
                   <Col span={18}>
-                    <Form.Item name="area" label={<span style={{ fontWeight: 700, fontSize: 12 }}>SUBURB / STREET</span>}>
-                      <Input size="large" />
+                    <Form.Item name="area" label={<span style={{ fontWeight: 700, fontSize: 12 }}>STREET</span>}>
+                      <Input size="large" id="staff-area" name="area" autoComplete="address-line2" />
+                    </Form.Item>
+                  </Col>
+                   </Row>
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Form.Item name="taluk" label={<span style={{ fontWeight: 700, fontSize: 12 }}>TALUK</span>}>
+                      <Input size="large" id="staff-taluk" name="taluk" autoComplete="address-level3" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item name="district" label={<span style={{ fontWeight: 700, fontSize: 12 }}>DISTRICT</span>}>
+                      <Input size="large" id="staff-district" name="district" autoComplete="address-level2" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item name="state" label={<span style={{ fontWeight: 700, fontSize: 12 }}>STATE</span>}>
+                      <Input size="large" id="staff-state" name="state" autoComplete="address-level1" />
                     </Form.Item>
                   </Col>
                 </Row>
                 <Row gutter={16}>
                   <Col span={8}>
-                    <Form.Item name="city" label={<span style={{ fontWeight: 700, fontSize: 12 }}>CITY</span>}>
-                      <Input size="large" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={8}>
-                    <Form.Item name="state" label={<span style={{ fontWeight: 700, fontSize: 12 }}>PROVINCE</span>}>
-                      <Input size="large" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={8}>
-                    <Form.Item name="pincode" label={<span style={{ fontWeight: 700, fontSize: 12 }}>POSTAL CODE</span>}>
-                      <Input size="large" maxLength={6} />
+                    <Form.Item name="pincode" label={<span style={{ fontWeight: 700, fontSize: 12 }}>PIN CODE</span>}>
+                      <Input size="large" maxLength={6} id="staff-pincode" name="pincode" autoComplete="postal-code" />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -863,10 +880,10 @@ const StaffManagementPage = () => {
             <Col span={10}>
               <div style={{ background: '#ffffff', padding: 24, borderRadius: 24, border: '1px solid #edf2f7', height: '100%' }}>
                 <h4 style={{ fontWeight: 800, fontSize: 14, color: 'var(--primary)', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <WalletOutlined /> CAREER ARCHITECTURE
+                  <WalletOutlined /> JOB DETAILS
                 </h4>
-                <Form.Item name="designation" label={<span style={{ fontWeight: 700, fontSize: 12 }}>DESIGNATION ROLE</span>} rules={[{ required: true }]}>
-                  <Select size="large">
+                <Form.Item name="designation" label={<span style={{ fontWeight: 700, fontSize: 12 }}>JOB TITLE</span>} rules={[{ required: true }]}> 
+                  <Select size="large" id="staff-designation" name="designation" autoComplete="off">
                     <Option value="Teacher">Teacher</Option>
                     <Option value="HOD">HOD</Option>
                     <Option value="Principal">Principal</Option>
@@ -881,8 +898,8 @@ const StaffManagementPage = () => {
                     <Option value="Other">Other</Option>
                   </Select>
                 </Form.Item>
-                <Form.Item name="department" label={<span style={{ fontWeight: 700, fontSize: 12 }}>SPECIALIZATION</span>}>
-                  <Select size="large" allowClear>
+                <Form.Item name="department" label={<span style={{ fontWeight: 700, fontSize: 12 }}>DEPARTMENT / SPECIALIZATION</span>}>
+                  <Select size="large" allowClear id="staff-department" name="department" autoComplete="off">
                     <Option value="Mathematics">Mathematics</Option>
                     <Option value="Science">Science</Option>
                     <Option value="English">English</Option>
@@ -894,8 +911,8 @@ const StaffManagementPage = () => {
                     <Option value="Administration">Administration</Option>
                   </Select>
                 </Form.Item>
-                <Form.Item name="category" label={<span style={{ fontWeight: 700, fontSize: 12 }}>LOGISTICS CATEGORY</span>} rules={[{ required: true }]}>
-                  <Select size="large">
+                <Form.Item name="category" label={<span style={{ fontWeight: 700, fontSize: 12 }}>CATEGORY / DEPARTMENT</span>} rules={[{ required: true }]}> 
+                  <Select size="large" id="staff-category" name="category" autoComplete="off">
                     <Option value="TEACHING_REGULAR">Academic Faculty (Regular)</Option>
                     <Option value="TEACHING_TRAINEE">Academic Faculty (Trainee)</Option>
                     <Option value="NON_TEACHING_REGULAR">Operations (Regular)</Option>
@@ -903,27 +920,33 @@ const StaffManagementPage = () => {
                     <Option value="NON_TEACHING_ACTING_DRIVER">Operations (Acting Driver - Day Based)</Option>
                   </Select>
                 </Form.Item>
-                <Form.Item name="salary" label={<span style={{ fontWeight: 700, fontSize: 12 }}>EMOLUMENTS (MONTHLY)</span>}>
-                  <InputNumber min={0} prefix="₹" size="large" style={{ width: '100%' }} />
+                <Form.Item name="salary" label={<span style={{ fontWeight: 700, fontSize: 12 }}>MONTHLY SALARY</span>}>
+                  <InputNumber min={0} prefix="₹" size="large" style={{ width: '100%' }} id="staff-salary" name="salary" autoComplete="off" />
                 </Form.Item>
-                <Form.Item name="joiningDate" label={<span style={{ fontWeight: 700, fontSize: 12 }}>TENURE START</span>}>
-                  <DatePicker size="large" style={{ width: '100%' }} />
+                <Form.Item name="joiningDate" label={<span style={{ fontWeight: 700, fontSize: 12 }}>JOINING DATE</span>}>
+                  <DatePicker size="large" style={{ width: '100%' }} id="staff-joiningDate" name="joiningDate" autoComplete="off" />
                 </Form.Item>
                 
                 <Divider style={{ margin: '24px 0' }} />
-                
-                <h4 style={{ fontWeight: 800, fontSize: 13, color: 'var(--primary)', marginBottom: 16 }}>BANKING RECEPTACLE</h4>
-                <Form.Item name="paymentMode" label={<span style={{ fontWeight: 700, fontSize: 11 }}>REMITTANCE MODE</span>}>
-                  <Select size="middle">
+
+                <h4 style={{ fontWeight: 800, fontSize: 13, color: 'var(--primary)', marginBottom: 16 }}>BANK DETAILS</h4>
+                <Form.Item name="paymentMode" label={<span style={{ fontWeight: 700, fontSize: 11 }}>PAYMENT METHOD</span>}>
+                  <Select size="middle" id="staff-paymentMode" name="paymentMode" autoComplete="off">
                     <Option value="BANK_TRANSFER">Bank Direct</Option>
                     <Option value="CASH">Liquid Cash</Option>
                   </Select>
                 </Form.Item>
-                <Form.Item name="bankName" label={<span style={{ fontWeight: 700, fontSize: 11 }}>INSTITUTION NAME</span>}>
-                  <Input size="middle" prefix={<BankOutlined />} />
+                <Form.Item name="bankName" label={<span style={{ fontWeight: 700, fontSize: 11 }}>BANK NAME</span>}>
+                  <Input size="middle" prefix={<BankOutlined />} id="staff-bankName" name="bankName" autoComplete="organization" />
                 </Form.Item>
-                <Form.Item name="bankAccountNo" label={<span style={{ fontWeight: 700, fontSize: 11 }}>ROUTING / ACCOUNT</span>}>
-                  <Input size="middle" />
+                <Form.Item name="bankBranch" label={<span style={{ fontWeight: 700, fontSize: 11 }}>BRANCH NAME</span>}>
+                  <Input size="middle" id="staff-bankBranch" name="bankBranch" autoComplete="off" />
+                </Form.Item>
+                <Form.Item name="bankIfsc" label={<span style={{ fontWeight: 700, fontSize: 11 }}>IFSC CODE</span>}>
+                  <Input size="middle" id="staff-bankIfsc" name="bankIfsc" autoComplete="off" />
+                </Form.Item>
+                <Form.Item name="bankAccountNo" label={<span style={{ fontWeight: 700, fontSize: 11 }}>ACCOUNT NUMBER</span>}>
+                  <Input size="middle" id="staff-bankAccountNo" name="bankAccountNo" autoComplete="account-number" />
                 </Form.Item>
               </div>
             </Col>
@@ -1025,16 +1048,16 @@ const StaffManagementPage = () => {
                       <span style={{ fontWeight: 900, fontSize: 24, letterSpacing: '-0.02em', color: 'var(--primary)' }}>Personnel Documents</span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-100 rounded-3xl overflow-hidden border border-slate-100 shadow-sm">
+                    <div className="grid grid-cols-1 gap-px overflow-hidden border shadow-sm md:grid-cols-2 bg-slate-100 rounded-3xl border-slate-100">
                       {[
-                        { label: "Institutional Email", value: selectedStaff.email, icon: "mail" },
-                        { label: "Contact Radius", value: selectedStaff.phone || "N/A", icon: "call" },
-                        { label: "Specialization", value: selectedStaff.department || "General", icon: "workspace_premium" },
-                        { label: "Credentials", value: selectedStaff.qualification || "N/A", icon: "history_edu" },
-                        { label: "Tenure Start", value: selectedStaff.joiningDate ? dayjs(selectedStaff.joiningDate).format('DD MMM YYYY') : "N/A", icon: "calendar_today" },
-                        { label: "Remuneration", value: selectedStaff.salary ? `₹${selectedStaff.salary.toLocaleString()}` : "N/A", icon: "payments", isPositive: true },
+                        { label: "Work Email", value: selectedStaff.email, icon: "mail" },
+                        { label: "Contact Number", value: selectedStaff.phone || "N/A", icon: "call" },
+                        { label: "Department", value: selectedStaff.department || "General", icon: "workspace_premium" },
+                        { label: "Password", value: selectedStaff.qualification || "N/A", icon: "history_edu" },
+                        { label: "Joining Date", value: selectedStaff.joiningDate ? dayjs(selectedStaff.joiningDate).format('DD MMM YYYY') : "N/A", icon: "calendar_today" },
+                        { label: "Monthly Salary", value: selectedStaff.salary ? `₹${selectedStaff.salary.toLocaleString()}` : "N/A", icon: "payments", isPositive: true },
                       ].map((item, idx) => (
-                        <div key={idx} className="bg-white p-6 flex flex-col gap-1 transition-all hover:bg-slate-50">
+                        <div key={idx} className="flex flex-col gap-1 p-6 transition-all bg-white hover:bg-slate-50">
                            <div className="flex items-center gap-2 mb-1">
                               <span className="material-symbols-outlined text-[14px] text-slate-400">{item.icon}</span>
                               <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{item.label}</span>
@@ -1044,13 +1067,21 @@ const StaffManagementPage = () => {
                            </div>
                         </div>
                       ))}
-                      <div className="md:col-span-2 bg-white p-6 border-t border-slate-50 transition-all hover:bg-slate-50">
+                      <div className="p-6 transition-all bg-white border-t md:col-span-2 border-slate-50 hover:bg-slate-50">
                          <div className="flex items-center gap-2 mb-1">
                             <span className="material-symbols-outlined text-[14px] text-slate-400">location_on</span>
-                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Primary Domicile</span>
+                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Address</span>
                          </div>
                          <div className="text-[13px] font-black text-slate-900 tracking-tight">
-                            {[selectedStaff.doorno, selectedStaff.area, selectedStaff.city, selectedStaff.state, selectedStaff.pincode].filter(Boolean).join(", ") || "No Address on Record"}
+                           {[
+                            selectedStaff.doorno,
+                            selectedStaff.area,
+                            selectedStaff.city,
+                            selectedStaff.taluk,
+                            selectedStaff.district || selectedStaff.districk,
+                            selectedStaff.state,
+                            selectedStaff.pincode,
+                           ].filter(Boolean).join(", ") || "No Address on Record"}
                          </div>
                       </div>
                     </div>
@@ -1210,28 +1241,28 @@ const StaffManagementPage = () => {
                     boxShadow: 'none'
                   }} bodyStyle={{ padding: 24 }}>
                     <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 24, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <BankOutlined style={{ color: '#0ea5e9' }} /> Financial Clearance
+                      <BankOutlined style={{ color: '#0ea5e9' }} /> Payment Details
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                       <div style={{ background: '#fff', padding: 20, borderRadius: 20, border: '1px solid #edf2f7' }}>
-                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: 1, marginBottom: 4 }}>Account Routing</div>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--primary)', fontFamily: 'monospace' }}>{selectedStaff.bankAccountNo || "UNASSIGNED"}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: 1, marginBottom: 4 }}>Account Number</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--primary)', fontFamily: 'monospace' }}>{selectedStaff.bankAccountNo || "NOT ASSIGNED"}</div>
                       </div>
                       
                       <div style={{ background: '#fff', padding: 20, borderRadius: 20, border: '1px solid #edf2f7' }}>
-                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: 1, marginBottom: 4 }}>Remittance Institution</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: 1, marginBottom: 4 }}>Bank Name</div>
                         <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--primary)' }}>{selectedStaff.bankName || "UNASSIGNED"}</div>
                       </div>
 
                       <div style={{ background: '#fff', padding: 20, borderRadius: 20, border: '1px solid #edf2f7' }}>
-                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: 1, marginBottom: 4 }}>IFSC Credentials</div>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--primary)', letterSpacing: 1 }}>{selectedStaff.bankIfsc || "UNASSIGNED"}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', fontWeight: 800, letterSpacing: 1, marginBottom: 4 }}>IFSC Code</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--primary)', letterSpacing: 1 }}>{selectedStaff.bankIfsc || "NOT ASSIGNED"}</div>
                       </div>
 
                       <div style={{ background: 'var(--primary)', padding: 24, borderRadius: 24, color: '#fff', position: 'relative', overflow: 'hidden' }}>
                         <div style={{ position: 'relative', zIndex: 1 }}>
-                          <div style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase', fontWeight: 800, letterSpacing: 1.5, marginBottom: 8 }}>Remittance Architecture</div>
-                          <div style={{ fontSize: 22, fontWeight: 900 }}>{selectedStaff.paymentMode?.replace(/_/g, ' ') || "CASH DISBURSEMENT"}</div>
+                          <div style={{ fontSize: 11, opacity: 0.6, textTransform: 'uppercase', fontWeight: 800, letterSpacing: 1.5, marginBottom: 8 }}>Payment Method</div>
+                          <div style={{ fontSize: 22, fontWeight: 900 }}>{selectedStaff.paymentMode === "CASH" ? "CASH PAYMENT" : selectedStaff.paymentMode?.replace(/_/g, ' ') || "CASH PAYMENT"}</div>
                         </div>
                         <WalletOutlined style={{ position: 'absolute', bottom: -10, right: -10, fontSize: 80, opacity: 0.1, transform: 'rotate(-15deg)' }} />
                       </div>
