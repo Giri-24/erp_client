@@ -277,14 +277,14 @@ async function generatePDF() {
             <span>You have a saved draft!</span>
             <button
               type="button"
-              className="px-3 py-1 bg-primary text-white text-xs rounded-lg hover:bg-primary-container transition-all"
+              className="px-3 py-1 text-xs text-white transition-all rounded-lg bg-primary hover:bg-primary-container"
               onClick={handleRestoreDraft}
             >
               Restore
             </button>
             <button
               type="button"
-              className="text-error text-xs hover:underline"
+              className="text-xs text-error hover:underline"
               onClick={handleClearDraft}
             >
               Discard
@@ -759,9 +759,9 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
         <div className="space-y-6">
           <div className="mb-4">
             <h3 className="text-xl font-bold text-primary">Student Profile</h3>
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Enter the student's basic identification and demographic details.</p>
-            <div className="mt-4 pt-4 ">
-              <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Admission Details</h4>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Enter the student's basic identification and demographic details.</p>
+            <div className="pt-4 mt-4 ">
+              <h4 className="mb-3 text-sm font-bold tracking-wider uppercase text-secondary">Admission Details</h4>
               <Row gutter={[16, 16]}>
                 <Col span={12}>
                   <Form.Item name="admissionNo" label="Admission No">
@@ -906,7 +906,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Provide information about parents, siblings, and contact preferences.</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Provide information about parents, siblings, and contact preferences.</p>
           </div>
           {/* Single Parent Checkbox */}
           <Row gutter={16} className="mb-4">
@@ -920,7 +920,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
           <Row gutter={16}>
             {/* LEFT — FATHER */}
             <Col span={12}>
-              <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Father Particulars</h4>
+              <h4 className="mb-3 text-sm font-bold tracking-wider uppercase text-secondary">Father Particulars</h4>
               <Form.Item name="fatherName" label="Father Name" rules={isSingleParent ? [] : []}>
                 <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
               </Form.Item>
@@ -954,7 +954,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
 
             {/* RIGHT — MOTHER */}
             <Col span={12}>
-              <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Mother Particulars</h4>
+              <h4 className="mb-3 text-sm font-bold tracking-wider uppercase text-secondary">Mother Particulars</h4>
               <Form.Item name="motherName" label="Mother Name">
                 <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
@@ -998,8 +998,8 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
 
           {/* Guardian details for single parent */}
           {isSingleParent && (
-            <div className="mt-6 pt-4 border-t border-outline-variant">
-              <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Guardian Details</h4>
+            <div className="pt-4 mt-6 border-t border-outline-variant">
+              <h4 className="mb-3 text-sm font-bold tracking-wider uppercase text-secondary">Guardian Details</h4>
               <Row gutter={16}>
                 <Col span={8}>
                   <Form.Item name="guardianRelation" label="Guardian Relation" rules={[{ required: true, message: 'Select guardian relation' }]}>
@@ -1057,8 +1057,8 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
           )}
 
 
-          <div className="mt-8 pt-4 border-t border-outline-variant">
-            <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">Siblings & Preferences</h4>
+          <div className="pt-4 mt-8 border-t border-outline-variant">
+            <h4 className="mb-3 text-sm font-bold tracking-wider uppercase text-secondary">Siblings & Preferences</h4>
             <Row gutter={16}>
              
               <Col span={12}>
@@ -1071,7 +1071,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
             {Array.from({ length: siblingCount }).map((_, index) => (
   <div key={index} className="mt-4">
     
-    <h4 className="text-sm font-semibold mb-2">
+    <h4 className="mb-2 text-sm font-semibold">
       Sibling {index + 1} Details
     </h4>
 
@@ -1203,8 +1203,8 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
             )}
            } */}
 
-            <div className="mt-8 pt-4 border-t border-outline-variant">
-  <h4 className="text-sm font-bold text-secondary mb-3 uppercase tracking-wider">
+            <div className="pt-4 mt-8 border-t border-outline-variant">
+  <h4 className="mb-3 text-sm font-bold tracking-wider uppercase text-secondary">
     Contact Details
   </h4>
 </div>
@@ -1245,7 +1245,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Enter the current contact information for correspondence and transport.</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Enter the current contact information for correspondence and transport.</p>
           </div>
           <Row gutter={16}>
             <Col span={12}>
@@ -1296,7 +1296,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Details of qualifying examinations and subject-wise performance.</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Details of qualifying examinations and subject-wise performance.</p>
           </div>
           <>
             {/* ── Qualifying Exam header ── */}
@@ -1509,7 +1509,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Upload mandatory certificates and student profile photo.</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Upload mandatory certificates and student profile photo.</p>
           </div>
           <>
             {/* ✅ PROFILE PHOTO */}
@@ -1538,10 +1538,10 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     accept="image/*"
   >
     <div className="flex flex-col items-center">
-      <span className="material-symbols-outlined text-2xl">
+      <span className="text-2xl material-symbols-outlined">
         add_a_photo
       </span>
-      <p className="text-xs mt-1">Upload</p>
+      <p className="mt-1 text-xs">Upload</p>
     </div>
   </Upload>
 </Form.Item>
@@ -1559,8 +1559,8 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     >
       <Upload listType="picture-card" maxCount={1}>
         <div className="text-center">
-          <span className="material-symbols-outlined text-2xl">description</span>
-          <p className="text-xs mt-1">Birth Cert</p>
+          <span className="text-2xl material-symbols-outlined">description</span>
+          <p className="mt-1 text-xs">Birth Cert</p>
         </div>
       </Upload>
     </Form.Item>
@@ -1573,8 +1573,8 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     >
       <Upload listType="picture-card" maxCount={1}>
         <div className="text-center">
-          <span className="material-symbols-outlined text-2xl">badge</span>
-          <p className="text-xs mt-1">Community</p>
+          <span className="text-2xl material-symbols-outlined">badge</span>
+          <p className="mt-1 text-xs">Community</p>
         </div>
       </Upload>
     </Form.Item>
@@ -1588,8 +1588,8 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     >
       <Upload listType="picture-card" maxCount={1}>
         <div className="text-center">
-          <span className="material-symbols-outlined text-2xl">credit_card</span>
-          <p className="text-xs mt-1">Aadhaar</p>
+          <span className="text-2xl material-symbols-outlined">credit_card</span>
+          <p className="mt-1 text-xs">Aadhaar</p>
         </div>
       </Upload>
     </Form.Item>
@@ -1603,10 +1603,10 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
 >
   <Upload listType="picture-card" maxCount={1}>
     <div className="text-center">
-      <span className="material-symbols-outlined text-2xl">
+      <span className="text-2xl material-symbols-outlined">
         description
       </span>
-      <p className="text-xs mt-1">Transfer Cert</p>
+      <p className="mt-1 text-xs">Transfer Cert</p>
     </div>
   </Upload>
 </Form.Item>
@@ -1721,27 +1721,27 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   </Button>
 </div>
           <div className="form-section-header">
-            <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Student Admission</h3>
-            <p className="text-slate-500 text-sm font-medium">Verify the integrity of all data vectors before final academic sealing.</p>
+            <h3 className="text-3xl font-black tracking-tighter text-slate-900">Student Admission</h3>
+            <p className="text-sm font-medium text-slate-500">Verify the integrity of all data vectors before final academic sealing.</p>
           </div>
           
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
              {/* Part 1: Persona & Identity */}
-             <div className="xl:col-span-2 space-y-8">
+             <div className="space-y-8 xl:col-span-2">
                 <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm transition-all hover:shadow-md h-full">
-                   <div className="flex justify-between items-start mb-8">
+                   <div className="flex items-start justify-between mb-8">
                       <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                        <span className="w-8 h-8 rounded-xl bg-teal-500/10 flex items-center justify-center">
-                          <UserOutlined className="text-teal-600 text-xs" />
+                        <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-teal-500/10">
+                          <UserOutlined className="text-xs text-teal-600" />
                         </span>
                         Persona Profile
                       </h4>
                       {formData.profilePhoto?.[0] && (
-                        <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-white shadow-xl">
+                        <div className="w-24 h-24 overflow-hidden border-2 border-white shadow-xl rounded-3xl">
                            <img 
                              src={getSafePreviewUrl(formData.profilePhoto?.[0]) || ""}
                              alt="Student" 
-                             className="w-full h-full object-cover"
+                             className="object-cover w-full h-full"
                            />
                         </div>
                       )}
@@ -1766,9 +1766,9 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                       </Descriptions>
                    </div>
 
-                   <div className="mt-8 pt-8 border-t border-slate-50">
+                   <div className="pt-8 mt-8 border-t border-slate-50">
                       <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-3">Residential Vector</h5>
-                      <p className="text-sm font-extrabold text-slate-900 leading-relaxed">
+                      <p className="text-sm font-extrabold leading-relaxed text-slate-900">
                          {[formData.doorNo || formData.line1, formData.street || formData.line2, formData.city, formData.state]
                            .filter(Boolean)
                            .join(", ") || "—"}
@@ -1784,13 +1784,13 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                 </h4>
                 
                 <div className="space-y-6">
-                   <div className="p-5 bg-white/5 rounded-2xl border border-white/10">
+                   <div className="p-5 border bg-white/5 rounded-2xl border-white/10">
                       <div className="text-[9px] font-black uppercase text-teal-400 tracking-widest mb-1">Last Examination</div>
                       <div className="text-xl font-black">{formData.examName}</div>
-                      <div className="text-xs text-white/40 mt-1">{formData.boardExamType} | Reg: {formData.registerNo}</div>
+                      <div className="mt-1 text-xs text-white/40">{formData.boardExamType} | Reg: {formData.registerNo}</div>
                    </div>
 
-                   <div className="p-5 bg-teal-500 rounded-2xl shadow-lg shadow-teal-500/20">
+                   <div className="p-5 bg-teal-500 shadow-lg rounded-2xl shadow-teal-500/20">
                       <div className="text-[9px] font-black uppercase text-white/70 tracking-widest mb-1">Aggregate Performance</div>
                       <div className="text-3xl font-black text-white">{formData.totalPercentage}%</div>
                    </div>
@@ -1798,7 +1798,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                    <div className="space-y-3">
                       <div className="text-[9px] font-black uppercase text-white/40 tracking-widest">Subject Breakdown</div>
                       {formData.subjects?.filter(s => s.subjectName).map((sub, idx) => (
-                        <div key={idx} className="flex justify-between items-center py-2 border-b border-white/5 text-xs">
+                        <div key={idx} className="flex items-center justify-between py-2 text-xs border-b border-white/5">
                            <span className="font-bold">{sub.subjectName}</span>
                            <span className="font-black text-teal-400">{sub.obtainedMarks} / {sub.maxMarks}</span>
                         </div>
@@ -1808,40 +1808,40 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
              </div>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
              {/* Part 3: Family matrix */}
              <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm h-full">
                 <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-8 flex items-center gap-2">
                    <TeamOutlined className="text-blue-600" /> Family Matrix
                 </h4>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="grid grid-cols-1 gap-8 mb-8 md:grid-cols-2">
+                   <div className="p-6 border bg-slate-50 rounded-2xl border-slate-100">
                       <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Paternal</h5>
                      <div className="space-y-1.5">
                          <div className="text-sm font-black text-slate-900">{formData.fatherName}</div>
                          <div className="text-xs font-bold text-slate-500">{formData.fatherOccupation}</div>
-                         <div className="text-xs font-bold text-blue-600 flex items-center gap-1 mt-2">
+                         <div className="flex items-center gap-1 mt-2 text-xs font-bold text-blue-600">
                             <span className="material-symbols-outlined text-[14px]">call</span>
                             {formData.fatherPhone}
                          </div>
-                       <div className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                       <div className="flex items-center gap-1 text-xs font-bold text-emerald-600">
                          <span className="material-symbols-outlined text-[14px]">chat</span>
                          {formData.fatherWhatsAppNo || "-"}
                        </div>
                        <div className="text-xs font-bold text-slate-500">Aadhar: {formData.fatherAadharNo || "-"}</div>
                       </div>
                    </div>
-                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                   <div className="p-6 border bg-slate-50 rounded-2xl border-slate-100">
                       <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Maternal</h5>
                      <div className="space-y-1.5">
                          <div className="text-sm font-black text-slate-900">{formData.motherName}</div>
                          <div className="text-xs font-bold text-slate-500">{formData.motherOccupation}</div>
-                         <div className="text-xs font-bold text-blue-600 flex items-center gap-1 mt-2">
+                         <div className="flex items-center gap-1 mt-2 text-xs font-bold text-blue-600">
                             <span className="material-symbols-outlined text-[14px]">call</span>
                             {formData.motherPhone}
                          </div>
-                       <div className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                       <div className="flex items-center gap-1 text-xs font-bold text-emerald-600">
                          <span className="material-symbols-outlined text-[14px]">chat</span>
                          {formData.motherWhatsAppNo || "-"}
                        </div>
@@ -1851,11 +1851,11 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                 </div>
 
                 {formData.isSingleParent && (
-                   <div className="mb-8 p-6 bg-amber-50 rounded-2xl border border-amber-100">
+                   <div className="p-6 mb-8 border bg-amber-50 rounded-2xl border-amber-100">
                       <h5 className="text-[9px] font-black uppercase text-amber-600 tracking-widest mb-2 flex items-center gap-2">
-                         <span className="material-symbols-outlined text-sm">shield_person</span> Guardian Nexus
+                         <span className="text-sm material-symbols-outlined">shield_person</span> Guardian Nexus
                       </h5>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                     <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
                        <span className="font-extrabold text-slate-900">{formData.guardianName} ({formData.guardianRelation})</span>
                        <span className="font-bold text-slate-500">Phone: {formData.guardianPhone || "-"}</span>
                        <span className="font-bold text-emerald-700">WhatsApp: {formData.guardianWhatsapp || "-"}</span>
@@ -1865,9 +1865,9 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                    </div>
                 )}
 
-                 <div className="mb-8 p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                 <div className="p-4 mb-8 border border-blue-100 bg-blue-50 rounded-2xl">
                   <h5 className="text-[9px] font-black uppercase text-blue-600 tracking-widest mb-2">Contact Preference</h5>
-                  <div className="text-xs text-slate-700 font-bold">Preferred: {preferredContacts.length ? preferredContacts.join(", ") : "-"}</div>
+                  <div className="text-xs font-bold text-slate-700">Preferred: {preferredContacts.length ? preferredContacts.join(", ") : "-"}</div>
                   <div className="mt-2 text-xs text-slate-700">Father WhatsApp: <span className="font-bold">{formData.fatherWhatsAppNo || "-"}</span></div>
                   <div className="text-xs text-slate-700">Mother WhatsApp: <span className="font-bold">{formData.motherWhatsAppNo || "-"}</span></div>
                   {formData.isSingleParent && (
@@ -1884,7 +1884,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                           className="px-5 py-3 bg-slate-50 rounded-xl text-[10px] font-bold text-slate-700 border border-slate-100"
                         >
                           <span className="text-slate-900">{sibling.siblingName}</span>
-                           <span className="text-slate-400 mx-1">-</span>
+                           <span className="mx-1 text-slate-400">-</span>
                           <span>{sibling.schoolName}</span>
                            <div className="mt-1 text-[9px] uppercase tracking-wider text-slate-400">
                             Standard: {sibling.standard}
@@ -1892,7 +1892,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                         </div>
                       ))}
                       {siblingReviewItems.length === 0 && (
-                        <div className="text-xs text-slate-400 italic">No siblings registered in current matrix.</div>
+                        <div className="text-xs italic text-slate-400">No siblings registered in current matrix.</div>
                       )}
                    </div>
                 </div>
@@ -1904,7 +1904,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                    <FileTextOutlined className="text-indigo-600" /> Verification Vault
                 </h4>
                 
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 gap-6 lg:grid-cols-3">
                    {reviewDocuments.map((doc, idx) => {
                      const fileItem = doc.file?.[0];
                      const fileUrl = getSafePreviewUrl(fileItem);
@@ -1922,22 +1922,22 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                        className="relative group aspect-[3/4] rounded-2xl overflow-hidden border-2 transition-all border-teal-500 shadow-lg">
                           {fileUrl ? (
                              isPdf ? (
-                               <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-4">
-                                  <span className="material-symbols-outlined text-teal-400 text-3xl mb-2">picture_as_pdf</span>
+                               <div className="flex flex-col items-center justify-center w-full h-full p-4 bg-slate-900">
+                                  <span className="mb-2 text-3xl text-teal-400 material-symbols-outlined">picture_as_pdf</span>
                                   <span className="text-[8px] font-black text-white uppercase text-center">{doc.label}</span>
                                </div>
                              ) : (
-                               <img src={fileUrl} className="w-full h-full object-cover" alt={doc.label} />
+                               <img src={fileUrl} className="object-cover w-full h-full" alt={doc.label} />
                              )
                           ) : (
-                             <div className="w-full h-full bg-white flex flex-col items-center justify-center p-4">
-                                <span className="material-symbols-outlined text-slate-200 text-2xl mb-2">upload_file</span>
+                             <div className="flex flex-col items-center justify-center w-full h-full p-4 bg-white">
+                                <span className="mb-2 text-2xl material-symbols-outlined text-slate-200">upload_file</span>
                                 <span className="text-[8px] font-black text-slate-400 uppercase text-center">{doc.label}</span>
                              </div>
                           )}
                           <div className="absolute top-2 right-2">
                               <span className="w-5 h-5 rounded-lg flex items-center justify-center text-[10px] bg-teal-500 text-white">
-                                <span className="material-symbols-outlined text-xs">check</span>
+                                <span className="text-xs material-symbols-outlined">check</span>
                              </span>
                           </div>
                        </div>
@@ -1946,15 +1946,15 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                      );
                    })}
                    {reviewDocuments.length === 0 && (
-                    <div className="col-span-full text-xs text-slate-400 italic">
+                    <div className="text-xs italic col-span-full text-slate-400">
                       No uploaded documents available for preview.
                     </div>
                    )}
 
                    {isPreviewOpen && selectedDoc && (
-  <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
 <div className="bg-white p-6 rounded-xl w-[900px] max-w-[95%]">
-      <h2 className="text-lg font-bold mb-4">{selectedDoc.label}</h2>
+      <h2 className="mb-4 text-lg font-bold">{selectedDoc.label}</h2>
 {selectedDoc.isPdf ? (
   <iframe
     src={`${selectedDoc.fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
@@ -1975,7 +1975,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
 )}
                    
                    {/* Verification Tags */}
-                   <div className="col-span-full pt-4 space-y-3">
+                   <div className="pt-4 space-y-3 col-span-full">
                       <div className="flex flex-wrap gap-2">
                          {formData.vanNeeded && (
                            <Tag className="rounded-full px-4 py-1 border-blue-200 bg-blue-50 text-blue-700 font-extrabold text-[9px] uppercase shadow-sm">
@@ -2242,27 +2242,27 @@ const styles = {
       
       <div className="max-w-6xl mx-auto">
         {/* Header Section */}
-        <div className="flex justify-between items-end mb-12">
+        <div className="flex items-end justify-between mb-12">
           <div>
-            <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-tight">
+            <h1 className="text-5xl font-black leading-tight tracking-tighter text-slate-900">
               Academic <span className="text-teal-600">Application</span>
             </h1>
             <p className="text-slate-500 font-bold flex items-center gap-2 mt-3 uppercase tracking-widest text-[10px]">
-              <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
+              <span className="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></span>
 Enroll Admission            </p>
           </div>
           
           <div className="flex gap-4">
             <Button 
-              className="btn-ghost shadow-sm" 
-              icon={<span className="material-symbols-outlined text-sm">auto_fix_high</span>}
+              className="shadow-sm btn-ghost" 
+              icon={<span className="text-sm material-symbols-outlined">auto_fix_high</span>}
               onClick={fillRandomData}
             >
               Fill Mockup
             </Button>
             <Button 
-              className="btn-ghost shadow-sm" 
-              icon={<span className="material-symbols-outlined text-sm">save</span>}
+              className="shadow-sm btn-ghost" 
+              icon={<span className="text-sm material-symbols-outlined">save</span>}
               onClick={handleSaveDraft}
             >
               Save Progress
@@ -2270,7 +2270,7 @@ Enroll Admission            </p>
           </div>
         </div>
 
-        <div className="glass-stepper-card mb-12">
+        <div className="mb-12 glass-stepper-card">
           {/* Custom Step Indicator */}
           <div className="step-indicator-wrapper">
             {steps.map((step, idx) => (
@@ -2310,7 +2310,7 @@ Enroll Admission            </p>
               {steps[current].content}
             </Form>
 
-            <div className="mt-20 pt-10 border-t border-slate-100 flex justify-between items-center">
+            <div className="flex items-center justify-between pt-10 mt-20 border-t border-slate-100">
               <div>
                 {current > 0 && (
                   <button 
@@ -2318,7 +2318,7 @@ Enroll Admission            </p>
                     onClick={prev} 
                     className="nav-btn btn-ghost"
                   >
-                    <span className="material-symbols-outlined text-lg">arrow_back</span>
+                    <span className="text-lg material-symbols-outlined">arrow_back</span>
                     Previous Sector
                   </button>
                 )}
@@ -2332,12 +2332,12 @@ Enroll Admission            </p>
                     className="nav-btn btn-primary"
                   >
                     Advance to {steps[current + 1].title}
-                    <span className="material-symbols-outlined text-lg">arrow_forward</span>
+                    <span className="text-lg material-symbols-outlined">arrow_forward</span>
                   </button>
                 ) : (
                   <button
                     type="button"
-                    className="nav-btn btn-primary bg-teal-600 hover:bg-teal-700"
+                    className="bg-teal-600 nav-btn btn-primary hover:bg-teal-700"
                     onClick={async () => {
                       try {
                         const values = form.getFieldsValue(true);
@@ -2544,7 +2544,7 @@ Enroll Admission            </p>
                     }}
                   >
                     Enroll the  student
-                    <span className="material-symbols-outlined text-lg">verified</span>
+                    <span className="text-lg material-symbols-outlined">verified</span>
                   </button>
                 )}
               </div>
@@ -2554,9 +2554,9 @@ Enroll Admission            </p>
 
         {/* Insight Ticker */}
         <div className="flex justify-center mb-16">
-          <div className="bg-slate-50 px-8 py-4 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-            <div className="w-8 h-8 rounded-xl bg-teal-500/10 flex items-center justify-center">
-              <span className="material-symbols-outlined text-teal-600 text-sm animate-pulse">lightbulb</span>
+          <div className="flex items-center gap-4 px-8 py-4 border shadow-sm bg-slate-50 rounded-3xl border-slate-100">
+            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-teal-500/10">
+              <span className="text-sm text-teal-600 material-symbols-outlined animate-pulse">lightbulb</span>
             </div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex gap-2">
               <span className="text-teal-600">Architect Intel:</span> 
