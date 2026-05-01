@@ -1626,6 +1626,22 @@ const CollectPaymentPage = ({ studentId }) => {
       >
         {printPayment && (
           <div ref={printRef}>
+            <style>{`
+              body{font-family:Arial,sans-serif;margin:0;padding:20px}
+              .receipt{max-width:700px;margin:0 auto;border:2px solid #333;padding:24px}
+              .header{text-align:center;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:16px}
+              .header h2{margin:0 0 4px;font-size:22px}.header p{margin:0;color:#555;font-size:13px}
+              .receipt-no{text-align:right;font-weight:bold;font-size:16px;margin-bottom:12px}
+              table{width:100%;border-collapse:collapse;margin:12px 0}
+              th,td{border:1px solid #ccc;padding:8px 12px;text-align:left;font-size:13px}
+              th{background:#f5f5f5}.total-row td{font-weight:bold;background:#fafafa}
+              .footer{margin-top:24px;display:flex;justify-content:space-between}
+              .footer div{text-align:center}
+              .sign-line{border-top:1px solid #333;width:150px;margin-top:40px;padding-top:4px;font-size:12px}
+              .sign-img{display:block;width:120px;height:40px;object-fit:contain;margin:0 auto 6px}
+              .stamp-img{display:block;width:70px;height:70px;object-fit:contain;margin:0 auto 6px}
+              @media print{body{padding:0}}
+            `}</style>
             <div className="receipt">
               <div className="header"><h2>School ERP</h2><p>Fee Payment Receipt</p></div>
               <div className="receipt-no">Receipt No: {printPayment.receiptNo || "N/A"}</div>
@@ -1698,25 +1714,12 @@ const CollectPaymentPage = ({ studentId }) => {
                 </>
               )}
               {printPayment.remarks && <p style={{ marginTop: 12 }}><strong>Remarks:</strong> {printPayment.remarks}</p>}
-              <div className="footer">
-                <div><div className="sign-line">Student / Parent</div></div>
-                <div>
+              <div className="footer" style={{ justifyContent: "flex-end" }}>
+                <div style={{ textAlign: "right" }}>
                   {normalizeAssetSrc(documentAssets?.hrSignature) && (
-                    <img src={normalizeAssetSrc(documentAssets.hrSignature)} alt="HR Signature" className="sign-img" />
+                    <img src={normalizeAssetSrc(documentAssets.hrSignature)} alt="Cashier Signature" className="sign-img" />
                   )}
-                  <div className="sign-line">HR Signature</div>
-                </div>
-                <div>
-                  {normalizeAssetSrc(documentAssets?.rubberStamp) && (
-                    <img src={normalizeAssetSrc(documentAssets.rubberStamp)} alt="Rubber Stamp" className="stamp-img" />
-                  )}
-                  <div className="sign-line">School Seal</div>
-                </div>
-                <div>
-                  {normalizeAssetSrc(documentAssets?.chairmanSignature) && (
-                    <img src={normalizeAssetSrc(documentAssets.chairmanSignature)} alt="Chairman Signature" className="sign-img" />
-                  )}
-                  <div className="sign-line">Chairman Signature</div>
+                  <div className="sign-line" style={{ marginLeft: "auto" }}>Cashier Signature</div>
                 </div>
               </div>
             </div>
