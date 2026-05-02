@@ -65,7 +65,7 @@ const HRDashboardPage = ({ onNavigate }) => {
               onChange={(d) => { if(d) setSelectedMonth(d); }} 
               allowClear={false}
               bordered={false}
-              className="text-sm font-bold text-[#00152a] p-0 bg-transparent w-[100px]"
+              className="text-sm font-bold text-[#00152a] p-0 bg-transparent w-25"
             />
           </div>
           <button 
@@ -79,11 +79,11 @@ const HRDashboardPage = ({ onNavigate }) => {
 
       {/* Insight Chips */}
       <div className="flex space-x-4">
-        <div className="flex items-center space-x-3 px-6 py-3 bg-white rounded-full shadow-[0_20px_40px_rgba(1,29,53,0.06)] border-l-4 border-primary bg-surface-container-lowest">
+        <div className="flex items-center px-6 py-3 space-x-3 bg-white border-l-4 rounded-full shadow-ambient border-primary">
           <span className="material-symbols-outlined text-[#00152a]" style={{ fontVariationSettings: "'FILL' 1" }}>insights</span>
           <span className="text-sm font-semibold text-[#00152a]">{pendingLeaves.length} Leaves pending approval today</span>
         </div>
-        <div className="flex items-center space-x-3 px-6 py-3 bg-white rounded-full shadow-[0_20px_40px_rgba(1,29,53,0.06)] border-l-4 border-[#44ddc1] bg-surface-container-lowest">
+        <div className="flex items-center space-x-3 px-6 py-3 bg-white rounded-full shadow-ambient border-l-4 border-[#44ddc1]">
           <span className="material-symbols-outlined text-[#00a28c]" style={{ fontVariationSettings: "'FILL' 1" }}>trending_up</span>
           <span className="text-sm font-semibold text-[#00a28c]">Attendance improved by 2.4% vs Mar 2024</span>
         </div>
@@ -92,7 +92,7 @@ const HRDashboardPage = ({ onNavigate }) => {
       {/* Bento Grid */}
       <div className="grid grid-cols-12 gap-8">
         {/* 1. Attendance Trends (Large Card) */}
-        <div className="col-span-12 lg:col-span-8 bg-white rounded-xl p-8 shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex flex-col relative overflow-hidden border border-transparent transition-all bg-surface-container-lowest">
+        <div className="relative flex flex-col col-span-12 p-8 overflow-hidden transition-all bg-white border border-transparent lg:col-span-8 rounded-xl shadow-ambient">
           <div className="flex items-center justify-between mb-10">
             <div>
               <h3 className="text-xl font-bold text-[#00152a]">Attendance Trends</h3>
@@ -103,7 +103,7 @@ const HRDashboardPage = ({ onNavigate }) => {
                 <div className="text-2xl font-black text-[#00152a]">{data.attendancePercent || "94.2"}%</div>
                 <div className="text-[0.65rem] uppercase tracking-wider font-bold text-[#43474d]">Avg. Present</div>
               </div>
-              <div className="h-10 w-[1px] bg-[#c3c6ce]/30"></div>
+              <div className="h-10 w-px bg-[#c3c6ce]/30"></div>
               <div>
                 <div className="text-2xl font-black text-[#ba1a1a]">{((100 - (data.attendancePercent || 94.2)).toFixed(1))}%</div>
                 <div className="text-[0.65rem] uppercase tracking-wider font-bold text-[#43474d]">Avg. Absent</div>
@@ -145,10 +145,10 @@ const HRDashboardPage = ({ onNavigate }) => {
         </div>
 
         {/* 2. Leave Distribution */}
-        <div className="col-span-12 lg:col-span-4 bg-white rounded-xl p-8 shadow-[0_20px_40px_rgba(1,29,53,0.06)] border border-transparent transition-all bg-surface-container-lowest">
+        <div className="col-span-12 p-8 transition-all bg-white border border-transparent lg:col-span-4 rounded-xl shadow-ambient">
           <h3 className="text-xl font-bold text-[#00152a] mb-6">Leave Distribution</h3>
           <div className="relative flex items-center justify-center py-8">
-            <div className="w-48 h-48 rounded-full border-[18px] border-[#eaeef2] flex items-center justify-center relative overflow-hidden" style={{ background: "conic-gradient(#00152a 0deg 210deg, #44ddc1 210deg 300deg, #d1e4ff 300deg 360deg)" }}>
+            <div className="w-48 h-48 rounded-full border-18 border-[#eaeef2] flex items-center justify-center relative overflow-hidden" style={{ background: "conic-gradient(#00152a 0deg 210deg, #44ddc1 210deg 300deg, #d1e4ff 300deg 360deg)" }}>
               <div className="flex flex-col items-center justify-center bg-white rounded-full shadow-inner w-28 h-28">
                 <span className="text-3xl font-black text-[#00152a]">{data.totalLeaveDays ?? 0}</span>
                 <span className="text-[0.65rem] uppercase font-bold text-[#43474d]">Total Days</span>
@@ -181,7 +181,7 @@ const HRDashboardPage = ({ onNavigate }) => {
         </div>
 
         {/* 3. Salary Distribution (Horizontal Bar) */}
-        <div className="col-span-12 lg:col-span-5 bg-white rounded-xl p-8 shadow-[0_20px_40px_rgba(1,29,53,0.06)] border border-transparent transition-all bg-surface-container-lowest">
+        <div className="col-span-12 p-8 transition-all bg-white border border-transparent lg:col-span-5 rounded-xl shadow-ambient">
           <h3 className="text-xl font-bold text-[#00152a] mb-8">Salary Distribution</h3>
           <div className="space-y-8">
             <div>
@@ -190,7 +190,7 @@ const HRDashboardPage = ({ onNavigate }) => {
                 <span className="font-black text-[#00152a]">₹{data.teachingTotal?.toLocaleString("en-IN") || 0}</span>
               </div>
               <div className="w-full bg-[#f0f4f8] h-3 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-[#00152a] to-[#102a43]" style={{ width: `${data.totalPayroll ? (data.teachingTotal / data.totalPayroll) * 100 : 0}%` }}></div>
+                <div className="h-full bg-linear-to-r from-[#00152a] to-[#102a43]" style={{ width: `${data.totalPayroll ? (data.teachingTotal / data.totalPayroll) * 100 : 0}%` }}></div>
               </div>
             </div>
             <div>
@@ -199,7 +199,7 @@ const HRDashboardPage = ({ onNavigate }) => {
                 <span className="font-black text-[#00152a]">₹{data.adminTotal?.toLocaleString("en-IN") || 0}</span>
               </div>
               <div className="w-full bg-[#f0f4f8] h-3 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-[#00152a] to-[#102a43]" style={{ width: `${data.totalPayroll ? (data.adminTotal / data.totalPayroll) * 100 : 0}%` }}></div>
+                <div className="h-full bg-linear-to-r from-[#00152a] to-[#102a43]" style={{ width: `${data.totalPayroll ? (data.adminTotal / data.totalPayroll) * 100 : 0}%` }}></div>
               </div>
             </div>
             <div>
@@ -208,7 +208,7 @@ const HRDashboardPage = ({ onNavigate }) => {
                 <span className="font-black text-[#00152a]">₹{data.opsTotal?.toLocaleString("en-IN") || 0}</span>
               </div>
               <div className="w-full bg-[#f0f4f8] h-3 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-[#00152a] to-[#102a43]" style={{ width: `${data.totalPayroll ? (data.opsTotal / data.totalPayroll) * 100 : 0}%` }}></div>
+                <div className="h-full bg-linear-to-r from-[#00152a] to-[#102a43]" style={{ width: `${data.totalPayroll ? (data.opsTotal / data.totalPayroll) * 100 : 0}%` }}></div>
               </div>
             </div>
           </div>
@@ -221,7 +221,7 @@ const HRDashboardPage = ({ onNavigate }) => {
         </div>
 
         {/* 4. Statutory Pools (Stacked Bar) */}
-        <div className="col-span-12 lg:col-span-3 bg-white rounded-xl p-8 shadow-[0_20px_40px_rgba(1,29,53,0.06)] flex flex-col justify-between border border-transparent transition-all bg-surface-container-lowest">
+        <div className="flex flex-col justify-between col-span-12 p-8 transition-all bg-white border border-transparent lg:col-span-3 rounded-xl shadow-ambient">
           <div>
             <h3 className="text-xl font-bold text-[#00152a] mb-2">Statutory Polls</h3>
             <p className="text-[0.7rem] uppercase tracking-widest font-bold text-[#43474d] mb-8">PF & ESI Contributions</p>
@@ -250,7 +250,7 @@ const HRDashboardPage = ({ onNavigate }) => {
         </div>
 
         {/* 5. Staffing by Department */}
-        <div className="col-span-12 lg:col-span-4 bg-[#00152a] text-white rounded-xl p-8 shadow-[0_20px_40px_rgba(1,29,53,0.06)] relative overflow-hidden transition-opacity">
+        <div className="col-span-12 lg:col-span-4 bg-[#00152a] text-white rounded-xl p-8 shadow-ambient relative overflow-hidden transition-opacity">
           <div className="absolute w-40 h-40 rounded-full -right-10 -top-10 bg-white/5 blur-3xl"></div>
           <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-[#d1e4ff]/5 rounded-full blur-3xl"></div>
           <h3 className="mb-8 text-xl font-bold">Staffing Insights</h3>

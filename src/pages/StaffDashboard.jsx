@@ -46,7 +46,7 @@ const StaffDashboard = ({ onNavigate }) => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <Spin size="large" />
       </div>
     );
@@ -71,23 +71,23 @@ const StaffDashboard = ({ onNavigate }) => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 duration-500 animate-in fade-in">
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-extrabold font-headline text-primary tracking-tight">
+        <h2 className="text-3xl font-extrabold tracking-tight font-headline text-primary">
           Welcome back, {currentUser?.name || "Staff"}
         </h2>
-        <p className="text-on-surface-variant mt-1">
+        <p className="mt-1 text-on-surface-variant">
           {dayjs().format("dddd, MMMM D, YYYY")} — Here's your overview
         </p>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Attendance This Month */}
-        <div className="bg-surface-container-lowest p-5 rounded-xl shadow-ambient-sm relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-20 h-20 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors" />
-          <div className="flex justify-between items-start relative z-10">
+        <div className="relative p-5 overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient-sm group">
+          <div className="absolute w-20 h-20 transition-colors rounded-full -right-4 -top-4 bg-primary/5 blur-2xl group-hover:bg-primary/10" />
+          <div className="relative z-10 flex items-start justify-between">
             <div>
               <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Present This Month</p>
               <h3 className="text-3xl font-extrabold font-headline text-primary">{presentDays}</h3>
@@ -98,9 +98,9 @@ const StaffDashboard = ({ onNavigate }) => {
         </div>
 
         {/* Absent */}
-        <div className="bg-surface-container-lowest p-5 rounded-xl shadow-ambient-sm relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-20 h-20 bg-error/5 rounded-full blur-2xl group-hover:bg-error/10 transition-colors" />
-          <div className="flex justify-between items-start relative z-10">
+        <div className="relative p-5 overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient-sm group">
+          <div className="absolute w-20 h-20 transition-colors rounded-full -right-4 -top-4 bg-error/5 blur-2xl group-hover:bg-error/10" />
+          <div className="relative z-10 flex items-start justify-between">
             <div>
               <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Absent / Late</p>
               <h3 className="text-3xl font-extrabold font-headline text-error">{absentDays + lateDays}</h3>
@@ -111,9 +111,9 @@ const StaffDashboard = ({ onNavigate }) => {
         </div>
 
         {/* Pending Leaves */}
-        <div className="bg-surface-container-lowest p-5 rounded-xl shadow-ambient-sm relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-20 h-20 bg-secondary-fixed-dim/5 rounded-full blur-2xl group-hover:bg-secondary-fixed-dim/10 transition-colors" />
-          <div className="flex justify-between items-start relative z-10">
+        <div className="relative p-5 overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient-sm group">
+          <div className="absolute w-20 h-20 transition-colors rounded-full -right-4 -top-4 bg-secondary-fixed-dim/5 blur-2xl group-hover:bg-secondary-fixed-dim/10" />
+          <div className="relative z-10 flex items-start justify-between">
             <div>
               <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Pending Leaves</p>
               <h3 className="text-3xl font-extrabold font-headline text-primary">
@@ -126,9 +126,9 @@ const StaffDashboard = ({ onNavigate }) => {
         </div>
 
         {/* Doc Requests */}
-        <div className="bg-surface-container-lowest p-5 rounded-xl shadow-ambient-sm relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-20 h-20 bg-tertiary-fixed-dim/5 rounded-full blur-2xl group-hover:bg-tertiary-fixed-dim/10 transition-colors" />
-          <div className="flex justify-between items-start relative z-10">
+        <div className="relative p-5 overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient-sm group">
+          <div className="absolute w-20 h-20 transition-colors rounded-full -right-4 -top-4 bg-tertiary-fixed-dim/5 blur-2xl group-hover:bg-tertiary-fixed-dim/10" />
+          <div className="relative z-10 flex items-start justify-between">
             <div>
               <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Doc Requests</p>
               <h3 className="text-3xl font-extrabold font-headline text-primary">
@@ -143,19 +143,19 @@ const StaffDashboard = ({ onNavigate }) => {
 
       {/* Leave Balance */}
       {Array.isArray(leaveBalance) && leaveBalance.length > 0 && (
-        <div className="bg-surface-container-lowest rounded-xl shadow-ambient-sm p-6">
-          <div className="flex justify-between items-center mb-4">
+        <div className="p-6 bg-surface-container-lowest rounded-xl shadow-ambient-sm">
+          <div className="flex items-center justify-between mb-4">
             <h4 className="text-lg font-bold font-headline text-primary">Leave Balance</h4>
             <button
               onClick={() => onNavigate("hr-leaves")}
-              className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+              className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
             >
-              Apply Leave <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              Apply Leave <span className="text-sm material-symbols-outlined">arrow_forward</span>
             </button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {leaveBalance.map((lb, idx) => (
-              <div key={idx} className="bg-surface-container-low rounded-lg p-4 text-center">
+              <div key={idx} className="p-4 text-center rounded-lg bg-surface-container-low">
                 <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">
                   {lb.leaveType?.name || lb.leaveTypeName || lb.type || "Leave"}
                 </p>
@@ -172,7 +172,7 @@ const StaffDashboard = ({ onNavigate }) => {
       )}
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {[
           { key: "hr-leaves", icon: "event_busy", label: "Apply Leave", color: "bg-primary/10 text-primary" },
           { key: "hr-permission", icon: "timer", label: "Request Permission", color: "bg-secondary-fixed text-on-secondary-fixed-variant" },
@@ -192,10 +192,10 @@ const StaffDashboard = ({ onNavigate }) => {
       </div>
 
       {/* Two Column: Recent Leaves & Permissions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent Leave Applications */}
-        <div className="bg-surface-container-lowest rounded-xl shadow-ambient-sm overflow-hidden">
-          <div className="p-5 border-b border-surface-container-low flex justify-between items-center">
+        <div className="overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient-sm">
+          <div className="flex items-center justify-between p-5 border-b border-surface-container-low">
             <h4 className="text-base font-bold font-headline text-primary">Recent Leaves</h4>
             <button
               onClick={() => onNavigate("hr-leaves")}
@@ -208,9 +208,9 @@ const StaffDashboard = ({ onNavigate }) => {
             {Array.isArray(recentLeaves) && recentLeaves.length > 0 ? (
               <div className="space-y-3">
                 {recentLeaves.slice(0, 5).map((leave, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-surface-container-low rounded-lg">
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-surface-container-low">
                     <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-lg text-primary">event_busy</span>
+                      <span className="text-lg material-symbols-outlined text-primary">event_busy</span>
                       <div>
                         <p className="text-sm font-semibold text-on-surface">
                           {leave.leaveType?.name || leave.leaveTypeName || leave.type || "Leave"}
@@ -232,8 +232,8 @@ const StaffDashboard = ({ onNavigate }) => {
         </div>
 
         {/* Recent Permission Requests */}
-        <div className="bg-surface-container-lowest rounded-xl shadow-ambient-sm overflow-hidden">
-          <div className="p-5 border-b border-surface-container-low flex justify-between items-center">
+        <div className="overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient-sm">
+          <div className="flex items-center justify-between p-5 border-b border-surface-container-low">
             <h4 className="text-base font-bold font-headline text-primary">Recent Permissions</h4>
             <button
               onClick={() => onNavigate("hr-permission")}
@@ -246,9 +246,9 @@ const StaffDashboard = ({ onNavigate }) => {
             {Array.isArray(recentPermissions) && recentPermissions.length > 0 ? (
               <div className="space-y-3">
                 {recentPermissions.slice(0, 5).map((perm, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-surface-container-low rounded-lg">
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-surface-container-low">
                     <div className="flex items-center gap-3">
-                      <span className="material-symbols-outlined text-lg text-primary">timer</span>
+                      <span className="text-lg material-symbols-outlined text-primary">timer</span>
                       <div>
                         <p className="text-sm font-semibold text-on-surface">
                           {perm.reason || "Permission Request"}
@@ -272,8 +272,8 @@ const StaffDashboard = ({ onNavigate }) => {
 
       {/* Document Requests */}
       {Array.isArray(docRequests) && docRequests.length > 0 && (
-        <div className="bg-surface-container-lowest rounded-xl shadow-ambient-sm overflow-hidden">
-          <div className="p-5 border-b border-surface-container-low flex justify-between items-center">
+        <div className="overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient-sm">
+          <div className="flex items-center justify-between p-5 border-b border-surface-container-low">
             <h4 className="text-base font-bold font-headline text-primary">Document Requests</h4>
             <button
               onClick={() => onNavigate("doc-requests")}
@@ -284,9 +284,9 @@ const StaffDashboard = ({ onNavigate }) => {
           </div>
           <div className="p-4 space-y-3">
             {docRequests.slice(0, 5).map((doc, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-surface-container-low rounded-lg">
+              <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-surface-container-low">
                 <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-lg text-primary">description</span>
+                  <span className="text-lg material-symbols-outlined text-primary">description</span>
                   <div>
                     <p className="text-sm font-semibold text-on-surface">
                       {doc.documentType || doc.type || "Document"}
