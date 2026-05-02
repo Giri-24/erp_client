@@ -394,7 +394,7 @@ const Dashboard = () => {
       case "transport-drivers":   return <DriverListingPage />;
       case "transport-buses":     return <BussesPage />;
       case "transport-expense": return <TransportExpensePage />;
-      case "transport-expense-dashboard": return <TransportExpenseDashboardPage />;
+      case "transport-expense-dashboard": return <TransportExpenseDashboardPage onNavigate={(key) => setSelectedKey(key)} />;
       case "transport-acting-driver-salary": return <ActingDriverSalaryPage />;
       case "staff-management":    return <StaffManagementPage />;
       case "hr-dashboard":        return <HRDashboardPage onNavigate={(key) => setSelectedKey(key)} />;

@@ -34,6 +34,7 @@ const RECEIPT_COMPONENT_LABELS = {
   hostelFee: "Hostel Fee",
   otherFee: "Other Fee",
   customItems: "Custom Items",
+  manualDiscount: "Manual Discount",
 };
 
 const formatPaidComponentLabel = (key) => {
@@ -193,6 +194,7 @@ const CollectPaymentPage = ({ studentId }) => {
   const [paymentMode, setPaymentMode] = useState("CASH");
   const [receiptNo, setReceiptNo] = useState("");
   const [amount, setAmount] = useState("");
+  const [manualDiscount, setManualDiscount] = useState("");
   const [amountInputKey, setAmountInputKey] = useState(0);
   const [remarks, setRemarks] = useState("");
   const [termNumber, setTermNumber] = useState(null);
@@ -369,6 +371,12 @@ const CollectPaymentPage = ({ studentId }) => {
   }, [studentFees]);
 
   useEffect(() => {
+    if (Number(manualDiscount || 0) <= 0) {
+      setReceiptComponents((prev) => prev.filter((k) => k !== "manualDiscount"));
+    }
+  }, [manualDiscount]);
+
+  useEffect(() => {
     if (studentId && studentFees.length > 0) {
       const fee = studentFees.find(f => f.student?.id === studentId);
       if (fee) onSelectFee(fee.id);
@@ -392,6 +400,7 @@ const CollectPaymentPage = ({ studentId }) => {
     loadPreviousYearPending(fee?.student?.id);
     loadAllYearsFees(fee?.student?.id);
     setAmountFromSystem("");
+    setManualDiscount("");
     setTermNumber(null);
     setPayingNonTerm(false);
     setPayComponents([]);
@@ -466,6 +475,17 @@ const CollectPaymentPage = ({ studentId }) => {
         };
       } else {
         const actualAmount = Number(amount);
+        const manualDiscountAmount = Math.round(Number(manualDiscount) || 0);
+        if (manualDiscountAmount < 0) {
+          message.error("Manual discount cannot be negative");
+          setLoading(false);
+          return;
+        }
+        if (manualDiscountAmount > actualAmount) {
+          message.error("Manual discount cannot exceed amount");
+          setLoading(false);
+          return;
+        }
         let paidComps = null;
         if (payComponents.length > 0 && termNumber) {
           const enriched = computeTermComponents(selectedFee);
@@ -522,6 +542,7 @@ const CollectPaymentPage = ({ studentId }) => {
         payload = {
           studentFeeId: selectedFee.id,
           amount: Math.round(Number(amount)),
+          manualDiscount: manualDiscountAmount,
           paymentMode,
           receiptNo,
           remarks,
@@ -555,10 +576,13 @@ const CollectPaymentPage = ({ studentId }) => {
         splitPayments: result?.splitPayments || undefined,
         totalCollected: result?.totalCollected || result?.amount,
         status: result?.status || "SUCCESS",
+        manualDiscount: result?.manualDiscount ?? payload.manualDiscount ?? 0,
+        grossSettledAmount: result?.grossSettledAmount ?? undefined,
       });
       setShowSuccessToast(true);
       setTimeout(() => setShowSuccessToast(false), 4000);
       setAmountFromSystem("");
+      setManualDiscount("");
       setRemarks("");
       setTermNumber(null);
       setPayComponents([]);
@@ -620,6 +644,8 @@ const CollectPaymentPage = ({ studentId }) => {
       customItems: selectedFee?.customItems,
       discounts: selectedFee?.discounts,
       receiptComponents: payment?.receiptComponents,
+      manualDiscount: payment?.manualDiscount ?? 0,
+      grossSettledAmount: Number(payment?.amount || 0) + Number(payment?.manualDiscount || 0),
     });
   };
 
@@ -1113,7 +1139,7 @@ const CollectPaymentPage = ({ studentId }) => {
           )}
 
           {/* Receipt No + Amount */}
-          <div className="grid grid-cols-2 gap-5 mb-6">
+          <div className={`grid ${splitMode ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-3"} gap-5 mb-6`}>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Receipt No</label>
               <input
@@ -1139,6 +1165,21 @@ const CollectPaymentPage = ({ studentId }) => {
                     setAmount(sanitized);
                   }}
                   placeholder="Enter amount"
+                  className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                />
+              </div>
+            )}
+
+            {!splitMode && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Manual Discount (₹)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={manualDiscount}
+                  onChange={(e) => setManualDiscount((e.target.value || "").replace(/[^0-9]/g, ""))}
+                  placeholder="0"
                   className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
                 />
               </div>
@@ -1179,11 +1220,11 @@ const CollectPaymentPage = ({ studentId }) => {
           </div>
 
           {/* Receipt components */}
-          {selectedFee && getAvailableReceiptComponentOptions(selectedFee).length > 0 && (
+          {selectedFee && ([...getAvailableReceiptComponentOptions(selectedFee), ...(Number(manualDiscount || 0) > 0 ? ["manualDiscount"] : [])].length > 0) && (
             <div className="mb-6 p-4 bg-surface-container-low rounded-xl border border-outline-variant/20">
               <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider block mb-3">Receipt Components to Include</label>
               <div className="flex flex-wrap gap-3">
-                {getAvailableReceiptComponentOptions(selectedFee).map((key) => (
+                {[...getAvailableReceiptComponentOptions(selectedFee), ...(Number(manualDiscount || 0) > 0 ? ["manualDiscount"] : [])].map((key) => (
                   <label key={key} className="flex items-center gap-2 cursor-pointer group">
                     <input
                       type="checkbox"
@@ -1767,6 +1808,22 @@ const CollectPaymentPage = ({ studentId }) => {
       >
         {printPayment && (
           <div ref={printRef}>
+            <style>{`
+              body{font-family:Arial,sans-serif;margin:0;padding:20px}
+              .receipt{max-width:700px;margin:0 auto;border:2px solid #333;padding:24px}
+              .header{text-align:center;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:16px}
+              .header h2{margin:0 0 4px;font-size:22px}.header p{margin:0;color:#555;font-size:13px}
+              .receipt-no{text-align:right;font-weight:bold;font-size:16px;margin-bottom:12px}
+              table{width:100%;border-collapse:collapse;margin:12px 0}
+              th,td{border:1px solid #ccc;padding:8px 12px;text-align:left;font-size:13px}
+              th{background:#f5f5f5}.total-row td{font-weight:bold;background:#fafafa}
+              .footer{margin-top:24px;display:flex;justify-content:space-between}
+              .footer div{text-align:center}
+              .sign-line{border-top:1px solid #333;width:150px;margin-top:40px;padding-top:4px;font-size:12px}
+              .sign-img{display:block;width:120px;height:40px;object-fit:contain;margin:0 auto 6px}
+              .stamp-img{display:block;width:70px;height:70px;object-fit:contain;margin:0 auto 6px}
+              @media print{body{padding:0}}
+            `}</style>
             <div className="receipt">
               <div className="header"><h2>School ERP</h2><p>Fee Payment Receipt</p></div>
               <div className="receipt-no">Receipt No: {printPayment.receiptNo || "N/A"}</div>
@@ -1778,7 +1835,15 @@ const CollectPaymentPage = ({ studentId }) => {
                   <tr><th>Payment Date</th><td>{new Date(printPayment.paymentDate).toLocaleDateString()}</td></tr>
                   <tr><th>Payment Mode</th><td>{printPayment.paymentMode}</td></tr>
                   {printPayment.termNumber && <tr><th>Term</th><td>Term {printPayment.termNumber}</td></tr>}
-                  <tr><th>Amount Paid</th><td style={{ fontSize: "16px", fontWeight: "bold" }}>₹{Number(printPayment.totalCollected || printPayment.amount || 0).toLocaleString()}</td></tr>
+                  {Number(printPayment.manualDiscount || 0) > 0 ? (
+                    <>
+                      <tr><th>Gross Amount</th><td>₹{Number(printPayment.grossSettledAmount || (Number(printPayment.totalCollected || printPayment.amount || 0) + Number(printPayment.manualDiscount || 0))).toLocaleString()}</td></tr>
+                      <tr><th>Manual Discount</th><td style={{ color: "#c0392b", fontWeight: "bold" }}>− ₹{Number(printPayment.manualDiscount).toLocaleString()}</td></tr>
+                      <tr><th>Net Amount Paid</th><td style={{ fontSize: "16px", fontWeight: "bold" }}>₹{Number(printPayment.totalCollected || printPayment.amount || 0).toLocaleString()}</td></tr>
+                    </>
+                  ) : (
+                    <tr><th>Amount Paid</th><td style={{ fontSize: "16px", fontWeight: "bold" }}>₹{Number(printPayment.totalCollected || printPayment.amount || 0).toLocaleString()}</td></tr>
+                  )}
                 </tbody>
               </table>
               {Array.isArray(printPayment.splitPayments) && printPayment.splitPayments.length > 0 && (
@@ -1834,30 +1899,17 @@ const CollectPaymentPage = ({ studentId }) => {
                   <h4 style={{ marginTop: 16, marginBottom: 8 }}>Fee Summary</h4>
                   <table><tbody>
                     <tr><th width="35%">Total Fee</th><td>₹{printPayment.totalFee?.toLocaleString()}</td></tr>
-                    <tr><th>Net Fee (after discount)</th><td>₹{printPayment.netFee?.toLocaleString()}</td></tr>
+                    <tr><th>Net Fee (after discount)</th><td>₹{Math.max(0, Number(printPayment.netFee || 0) - Number(printPayment.manualDiscount || 0)).toLocaleString()}</td></tr>
                   </tbody></table>
                 </>
               )}
               {printPayment.remarks && <p style={{ marginTop: 12 }}><strong>Remarks:</strong> {printPayment.remarks}</p>}
-              <div className="footer">
-                <div><div className="sign-line">Student / Parent</div></div>
-                <div>
+              <div className="footer" style={{ justifyContent: "flex-end" }}>
+                <div style={{ textAlign: "right" }}>
                   {normalizeAssetSrc(documentAssets?.hrSignature) && (
-                    <img src={normalizeAssetSrc(documentAssets.hrSignature)} alt="HR Signature" className="sign-img" />
+                    <img src={normalizeAssetSrc(documentAssets.hrSignature)} alt="Cashier Signature" className="sign-img" />
                   )}
-                  <div className="sign-line">HR Signature</div>
-                </div>
-                <div>
-                  {normalizeAssetSrc(documentAssets?.rubberStamp) && (
-                    <img src={normalizeAssetSrc(documentAssets.rubberStamp)} alt="Rubber Stamp" className="stamp-img" />
-                  )}
-                  <div className="sign-line">School Seal</div>
-                </div>
-                <div>
-                  {normalizeAssetSrc(documentAssets?.chairmanSignature) && (
-                    <img src={normalizeAssetSrc(documentAssets.chairmanSignature)} alt="Chairman Signature" className="sign-img" />
-                  )}
-                  <div className="sign-line">Chairman Signature</div>
+                  <div className="sign-line" style={{ marginLeft: "auto" }}>Cashier Signature</div>
                 </div>
               </div>
             </div>
