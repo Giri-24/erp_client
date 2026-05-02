@@ -94,18 +94,21 @@ const computeTermComponents = (fee) => {
     );
   };
   const hasComponents = fee.terms.some(
-    (t) => (t.tuitionAmount || 0) > 0 || (t.transportAmount || 0) > 0
+    (t) => (t.tuitionAmount || 0) > 0 || (t.transportAmount || 0) > 0 || (t.bookAmount || 0) > 0
   );
   if (hasComponents) return fee.terms;
   const tuition = splitEvenly(Number(fee.tuitionFee || 0), nTerms);
   const transport = splitEvenly(Number(fee.transportFee || 0), nTerms);
+  const book = splitEvenly(Number(fee.bookFee || 0), nTerms);
+  const hostel = splitEvenly(Number(fee.hostelFee || 0), nTerms);
+  const other = splitEvenly(Number(fee.otherFee || 0), nTerms);
   return fee.terms.map((t, i) => ({
     ...t,
     tuitionAmount: tuition[i],
     transportAmount: transport[i],
-    bookAmount: 0,
-    hostelAmount: 0,
-    otherAmount: 0,
+    bookAmount: book[i],
+    hostelAmount: hostel[i],
+    otherAmount: other[i],
   }));
 };
 
@@ -323,7 +326,10 @@ const CollectPaymentPage = ({ studentId }) => {
     const nTerms = Number(fee.numberOfTerms || 1);
     const tuition = Number(fee.tuitionFee || 0);
     const transport = Number(fee.transportFee || 0);
-    const termBase = tuition + transport;
+    const book = Number(fee.bookFee || 0);
+    const hostel = Number(fee.hostelFee || 0);
+    const other = Number(fee.otherFee || 0);
+    const termBase = tuition + transport + book + hostel + other;
     const splitEvenly = (total, n) => {
       const per = Math.round((total / n) * 100) / 100;
       return Array.from({ length: n }, (_, i) =>
@@ -332,6 +338,9 @@ const CollectPaymentPage = ({ studentId }) => {
     };
     const tuitionSplit = splitEvenly(tuition, nTerms);
     const transportSplit = splitEvenly(transport, nTerms);
+    const bookSplit = splitEvenly(book, nTerms);
+    const hostelSplit = splitEvenly(hostel, nTerms);
+    const otherSplit = splitEvenly(other, nTerms);
     const termAmounts = splitEvenly(termBase, nTerms);
     const paidPerTerm = {};
     (fee.payments || payments || []).forEach((p) => {
@@ -350,9 +359,9 @@ const CollectPaymentPage = ({ studentId }) => {
         status: paid >= amount ? "PAID" : "UNPAID",
         tuitionAmount: tuitionSplit[i],
         transportAmount: transportSplit[i],
-        bookAmount: 0,
-        hostelAmount: 0,
-        otherAmount: 0,
+        bookAmount: bookSplit[i],
+        hostelAmount: hostelSplit[i],
+        otherAmount: otherSplit[i],
       };
     });
     return { ...fee, terms };

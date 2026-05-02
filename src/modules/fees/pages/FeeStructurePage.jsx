@@ -5,6 +5,7 @@ import {
   createFeeStructure,
   updateFeeStructure,
   deleteFeeStructure,
+  getAcademicYears,
 } from "../fees.service";
 import { getAllStoreItems } from "../../pos/pos.service";
 import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
@@ -70,6 +71,7 @@ const FeeStructurePage = () => {
 
   // delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [academicYears, setAcademicYears] = useState([]);
 
   // Ref for form scroll
   const formRef = React.useRef(null);
@@ -78,17 +80,6 @@ const FeeStructurePage = () => {
   const canCreate = hasPermission(PERMISSIONS.FEES_STRUCTURE_CREATE);
   const canUpdate = hasPermission(PERMISSIONS.FEES_STRUCTURE_UPDATE);
   const canDelete = hasPermission(PERMISSIONS.FEES_STRUCTURE_DELETE);
-
-  const academicYears = React.useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    // Generate from 3 years ago to 6 years in future to ensure "next year" always appears
-    for (let i = -3; i <= 6; i++) {
-      const year = currentYear + i;
-      years.push(`${year}-${year + 1}`);
-    }
-    return years;
-  }, []);
 
   // ── data ────────────────────────────────────────────────────────────────
   const fetchData = async () => {
@@ -102,7 +93,10 @@ const FeeStructurePage = () => {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+    getAcademicYears().then((years) => setAcademicYears(years || [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     getAllStoreItems().then((items) => setStoreItems(items || [])).catch(() => {});

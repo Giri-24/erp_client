@@ -349,17 +349,20 @@ const [fees, setFees] = useState([]);
           </div>
         </div>
 
-        <div className="flex gap-4 mt-4 pt-4 border-t border-slate-50">
-          <Input.Search
-  value={areaFilter}
-  onChange={(e) => {
-    setAreaFilter(e.target.value);
-    setPage(1);
-  }}
-  placeholder="Area / Street / Pin"
-  prefix={<EnvironmentOutlined />}
-  enterButton
-/>
+        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-slate-50">
+          <div className="relative w-64">
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-10 flex items-center justify-center text-slate-400">
+              <span className="material-symbols-outlined text-base leading-none">location_on</span>
+            </div>
+
+            <input
+              type="text"
+              value={areaFilter}
+              onChange={(e) => { setAreaFilter(e.target.value); setPage(1); }}
+              placeholder="Area / Street / Pin"
+              className="w-full h-11 filter-input pl-12 pr-4 text-[11px] font-bold leading-none outline-none"
+            />
+          </div>
           
            {(classFilter || sectionFilter || genderFilter || areaFilter || fatherFilter || siblingFilter || searchText) && (
              <button
@@ -498,6 +501,8 @@ const [fees, setFees] = useState([]);
                              >
                                <span className="material-symbols-outlined text-[18px] leading-none">edit_note</span>
                              </button>
+                             {/* demote button  */}
+                              <button onClick={() => handleDemote(s)} className="w-9 h-9 rounded-xl bg-yellow-50 text-yellow-600 flex items-center justify-center hover:bg-yellow-600 hover:text-black transition-all shadow-sm" title="Demote"><span className="material-symbols-outlined text-[18px] leading-none">arrow_downward</span></button>
                              {/* Archive button */}
                              <Popconfirm title="Archive student record?" onConfirm={() => handleArchive(s.id)}>
                                <button
@@ -916,158 +921,268 @@ onClick={() => {
   style={{
     position: "absolute",
     left: "-9999px",
-    width: "794px", // A4 width
-    minHeight: "1123px", // A4 height
+    width: "794px",
+    minHeight: "1123px",
     background: "#fff",
-    padding: "20px",
-    fontFamily: "Arial",
-    fontSize: "13px",
-    color: "#000"
+    fontFamily: "'Arial', sans-serif",
+    fontSize: "11px",
+    color: "#000",
   }}
 >
-  {/* HEADER */}
-  <div style={{ background: "#f59e0b", padding: "15px", position: "relative", textAlign: "center" }}>
-    <img
-      src="/logo.png"
-      alt="logo"
-      style={{ position: "absolute", left: "20px", top: "10px", width: "60px" }}
-    />
-
-    <h2 style={{ margin: 0 }}>MATRIC HR SEC SCHOOL</h2>
-    <p style={{ margin: 0, fontSize: "12px" }}>Excellence in Education - Salem</p>
-
-    <div style={{
-      position: "absolute",
-      right: "20px",
-      top: "10px",
-      border: "1px dashed white",
-      padding: "15px",
-      fontSize: "10px"
-    }}>
-      PASTE PHOTO
-    </div>
-  </div>
-
-  {/* FORM TITLE */}
-  <div style={{
-    textAlign: "center",
-    background: "#f59e0b",
-    color: "#fff",
-    width: "220px",
-    margin: "10px auto",
-    padding: "5px",
-    fontWeight: "bold"
-  }}>
-    ADMISSION FORM
-  </div>
-
-  {/* FIELD ROW FUNCTION */}
-  {[
-    ["Student's Name", detailStudent?.name],
-    ["Father's Name", detailStudent?.family?.fatherName],
-    ["Mother's Name", detailStudent?.family?.motherName],
-  ].map(([label, value], i) => (
-    <div key={i} style={{ display: "flex", marginBottom: "8px" }}>
-      <b style={{ width: "170px" }}>{label} :</b>
-      <div style={{ flex: 1, borderBottom: "1px dotted #999" }}>{value}</div>
-    </div>
-  ))}
-
-  {/* DOB + GENDER */}
-  <div style={{ display: "flex", marginBottom: "10px" }}>
-    <div style={{ width: "50%" }}>
-      <b>Date of Birth :</b> {dayjs(detailStudent?.dob).format("DD/MM/YYYY")}
-    </div>
-    <div style={{ width: "50%", textAlign: "right" }}>
-      <b>Gender :</b> {detailStudent?.gender}
-    </div>
-  </div>
-
-  {/* ADDRESS BOX */}
-  <div style={{ border: "1px dashed #999", padding: "10px", marginTop: "10px" }}>
-    <b style={{ color: "#f59e0b" }}>RESIDENTIAL ADDRESS</b>
-
-    <div style={{ borderBottom: "1px dotted #999", marginTop: "5px" }}>
-      Address Line 1 : {detailStudent?.address?.line1}
-    </div>
-
-    <div style={{ display: "flex", marginTop: "5px" }}>
-      <div style={{ flex: 1, borderBottom: "1px dotted #999" }}>
-        City : {detailStudent?.address?.city}
+  {/* ── HEADER ── */}
+  <div style={{ borderBottom: "3px solid #000", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+      <img src="/logo.png" alt="logo" style={{ width: "56px", height: "56px", objectFit: "contain" }} />
+      <div>
+        <div style={{ fontWeight: "900", fontSize: "17px", letterSpacing: "0.02em", color: "#000" }}>
+          {adminSettings?.schoolName || "MATRIC HR SEC SCHOOL"}
+        </div>
+        <div style={{ fontSize: "10px", color: "#444", marginTop: "2px" }}>
+          {adminSettings?.address || "Excellence in Education"}
+        </div>
       </div>
-
-      <div style={{ flex: 1, borderBottom: "1px dotted #999", textAlign: "right" }}>
-        Pincode : {detailStudent?.address?.pin}
+    </div>
+    <div style={{ textAlign: "right" }}>
+      <div style={{ fontWeight: "900", fontSize: "14px", textTransform: "uppercase", letterSpacing: "0.08em", border: "2px solid #000", padding: "4px 14px", display: "inline-block" }}>
+        Admission Form
+      </div>
+      <div style={{ fontSize: "10px", marginTop: "6px", color: "#444" }}>
+        Adm. No: <strong>{detailStudent?.admission?.admissionNo || "—"}</strong>
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        Date: <strong>{detailStudent?.admission?.admissionDate ? dayjs(detailStudent.admission.admissionDate).format("DD/MM/YYYY") : "—"}</strong>
       </div>
     </div>
   </div>
 
-  {/* RELIGION */}
-  <div style={{ display: "flex", marginTop: "10px" }}>
-    <div style={{ width: "50%" }}>
-      <b>Religion :</b> {detailStudent?.religion}
-    </div>
-    <div style={{ width: "50%", textAlign: "right" }}>
-      <b>Nationality :</b> Indian
-    </div>
-  </div>
-
-  {/* ACADEMIC */}
-  <h4 style={{ marginTop: "15px", color: "#f59e0b" }}>ACADEMIC PERFORMANCE</h4>
-
-  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
-    <thead>
-      <tr style={{ background: "#f3e8d6" }}>
-        <th style={{ border: "1px solid #ccc" }}>Subject</th>
-        <th style={{ border: "1px solid #ccc" }}>Max Marks</th>
-        <th style={{ border: "1px solid #ccc" }}>Marks Obtained</th>
-        <th style={{ border: "1px solid #ccc" }}>Percentage</th>
-      </tr>
-    </thead>
+  {/* ── STEPPER BAR ── */}
+  <table style={{ width: "100%", borderCollapse: "collapse", borderBottom: "2px solid #000" }}>
     <tbody>
-      {detailStudent?.academics?.length > 0 ? (
-        detailStudent.academics.map((sub, i) => (
-          <tr key={i}>
-            <td style={{ border: "1px solid #ccc" }}>{sub.subject}</td>
-            <td style={{ border: "1px solid #ccc" }}>{sub.maxMarks}</td>
-            <td style={{ border: "1px solid #ccc" }}>{sub.marksObtained}</td>
-            <td style={{ border: "1px solid #ccc" }}>{sub.percentage}%</td>
-          </tr>
-        ))
-      ) : (
-        <tr>
-          <td colSpan="4">No Data</td>
-        </tr>
-      )}
+      <tr>
+        {["1. Student", "2. Family", "3. Address", "4. Academic", "5. Documents", "6. Review"].map((step, i) => (
+          <td key={i} style={{
+            textAlign: "center", padding: "6px 4px",
+            background: i % 2 === 0 ? "#000" : "#444",
+            color: "#fff", fontWeight: "800", fontSize: "9px",
+            textTransform: "uppercase", letterSpacing: "0.1em",
+            border: "1px solid #000"
+          }}>{step}</td>
+        ))}
+      </tr>
     </tbody>
   </table>
 
-  {/* CONTACT */}
-  <div style={{ marginTop: "10px" }}>
-    <p><b>Phone Number :</b> {detailStudent?.family?.fatherPhone}</p>
-    <p><b>Email Address :</b> {detailStudent?.family?.parentsEmail}</p>
+  <div style={{ padding: "16px 20px" }}>
 
-    <div style={{ display: "flex" }}>
-      <div style={{ width: "50%" }}>
-        <b>Admission For :</b> {detailStudent?.standard}
+    {/* ── SECTION HELPER ── */}
+    {/* Each section uses a label-value table with alternating row shading */}
+
+    {/* ── STEP 1: STUDENT PROFILE ── */}
+    <div style={{ marginBottom: "14px" }}>
+      <div style={{ background: "#000", color: "#fff", fontWeight: "900", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", padding: "5px 10px" }}>
+        1. Student Profile
       </div>
-      <div style={{ width: "50%", textAlign: "right" }}>
-        <b>Section :</b> {detailStudent?.section}
-      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+        <tbody>
+          {[
+            [["Student Name", detailStudent?.name], ["Admission No", detailStudent?.admission?.admissionNo], ["Academic Year", detailStudent?.admission?.academicYear || detailStudent?.academicYear]],
+            [["Standard", detailStudent?.standard || detailStudent?.admission?.standard], ["Section", detailStudent?.section || "—"], ["Admission Date", detailStudent?.admission?.admissionDate ? dayjs(detailStudent.admission.admissionDate).format("DD/MM/YYYY") : "—"]],
+            [["Gender", detailStudent?.gender], ["Date of Birth", detailStudent?.dob ? dayjs(detailStudent.dob).format("DD/MM/YYYY") : "—"], ["Blood Group", detailStudent?.bloodGroup || "—"]],
+            [["Religion", detailStudent?.religion || "—"], ["Community", detailStudent?.community || "—"], ["Caste", detailStudent?.caste || "—"]],
+            [["Mother Tongue", detailStudent?.motherTongue || "—"], ["Aadhar No", detailStudent?.aadharNo || "—"], ["Transport Mode", detailStudent?.transportMode || "—"]],
+            [["RTE Applied", detailStudent?.rte ? "Yes" : "No"], ["Van Needed", detailStudent?.vanNeeded ? "Yes" : "No"], ["Previous School", detailStudent?.previousSchool || "—"]],
+          ].map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? "#f5f5f5" : "#fff" }}>
+              {row.map(([label, value], ci) => (
+                <React.Fragment key={ci}>
+                  <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontWeight: "700", color: "#333", width: "12%", whiteSpace: "nowrap" }}>{label}</td>
+                  <td style={{ border: "1px solid #ccc", padding: "5px 8px", color: "#000", width: "22%" }}>{value || "—"}</td>
+                </React.Fragment>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
+
+    {/* ── STEP 2: FAMILY ── */}
+    <div style={{ marginBottom: "14px" }}>
+      <div style={{ background: "#000", color: "#fff", fontWeight: "900", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", padding: "5px 10px" }}>
+        2. Family Details
+      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+        <tbody>
+          {[
+            [["Father's Name", detailStudent?.family?.fatherName], ["Father's Phone", detailStudent?.family?.fatherPhone], ["Father's Occupation", detailStudent?.family?.fatherOccupation]],
+            [["Mother's Name", detailStudent?.family?.motherName], ["Mother's Phone", detailStudent?.family?.motherPhone], ["Mother's Occupation", detailStudent?.family?.motherOccupation]],
+            [["Parent's Email", detailStudent?.family?.parentsEmail], ["Annual Income", detailStudent?.family?.familyIncome ? `Rs.${detailStudent.family.familyIncome}` : "—"], ["Hostel Required", detailStudent?.family?.hostelRequired ? "Yes" : "No"]],
+          ].map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? "#f5f5f5" : "#fff" }}>
+              {row.map(([label, value], ci) => (
+                <React.Fragment key={ci}>
+                  <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontWeight: "700", color: "#333", width: "12%", whiteSpace: "nowrap" }}>{label}</td>
+                  <td style={{ border: "1px solid #ccc", padding: "5px 8px", color: "#000", width: "22%" }}>{value || "—"}</td>
+                </React.Fragment>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    {/* ── STEP 3: ADDRESS ── */}
+    <div style={{ marginBottom: "14px" }}>
+      <div style={{ background: "#000", color: "#fff", fontWeight: "900", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", padding: "5px 10px" }}>
+        3. Address
+      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+        <tbody>
+          {[
+            [["Address Line 1", detailStudent?.address?.line1], ["Address Line 2", detailStudent?.address?.line2], ["Address Line 3", detailStudent?.address?.line3]],
+            [["City", detailStudent?.address?.city], ["State", detailStudent?.address?.state], ["Pincode", detailStudent?.address?.pin]],
+            [["Landmark", detailStudent?.address?.landmark], ["Area", detailStudent?.address?.area], ["Nationality", "Indian"]],
+          ].map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? "#f5f5f5" : "#fff" }}>
+              {row.map(([label, value], ci) => (
+                <React.Fragment key={ci}>
+                  <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontWeight: "700", color: "#333", width: "12%", whiteSpace: "nowrap" }}>{label}</td>
+                  <td style={{ border: "1px solid #ccc", padding: "5px 8px", color: "#000", width: "22%" }}>{value || "—"}</td>
+                </React.Fragment>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    {/* ── STEP 4: ACADEMIC HISTORY ── */}
+    <div style={{ marginBottom: "14px" }}>
+      <div style={{ background: "#000", color: "#fff", fontWeight: "900", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", padding: "5px 10px" }}>
+        4. Academic History
+      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+        <thead>
+          <tr style={{ background: "#444", color: "#fff" }}>
+            {["Exam / Board", "Register No", "Month & Year", "Stream", "Max Marks", "Marks Obtained", "Percentage"].map((h, i) => (
+              <th key={i} style={{ border: "1px solid #000", padding: "5px 8px", fontWeight: "800", fontSize: "9px", textTransform: "uppercase", textAlign: "left", letterSpacing: "0.06em" }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {detailStudent?.academics?.length > 0 ? detailStudent.academics.map((ac, i) => (
+            <tr key={i} style={{ background: i % 2 === 0 ? "#f5f5f5" : "#fff" }}>
+              <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontWeight: "700" }}>{ac.examName || "—"}</td>
+              <td style={{ border: "1px solid #ccc", padding: "5px 8px" }}>{ac.registerNo || "—"}</td>
+              <td style={{ border: "1px solid #ccc", padding: "5px 8px" }}>{ac.monthYear || "—"}</td>
+              <td style={{ border: "1px solid #ccc", padding: "5px 8px" }}>{ac.stream || "General"}</td>
+              <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "center" }}>{ac.totalMaxMarks ?? ac.maxMarks ?? "—"}</td>
+              <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "center" }}>{ac.totalObtainedMarks ?? ac.marksObtained ?? "—"}</td>
+              <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "center", fontWeight: "800" }}>{ac.totalPercentage ?? ac.percentage ?? "—"}%</td>
+            </tr>
+          )) : (
+            <tr>
+              <td colSpan="7" style={{ border: "1px solid #ccc", padding: "10px", textAlign: "center", color: "#666" }}>No academic records available</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    {/* ── STEP 5: DOCUMENTS CHECKLIST ── */}
+    <div style={{ marginBottom: "14px" }}>
+      <div style={{ background: "#000", color: "#fff", fontWeight: "900", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", padding: "5px 10px" }}>
+        5. Documents Checklist
+      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+        <thead>
+          <tr style={{ background: "#444", color: "#fff" }}>
+            <th style={{ border: "1px solid #000", padding: "5px 8px", textAlign: "left", fontWeight: "800", fontSize: "9px", textTransform: "uppercase" }}>Document</th>
+            <th style={{ border: "1px solid #000", padding: "5px 8px", textAlign: "center", fontWeight: "800", fontSize: "9px", textTransform: "uppercase", width: "100px" }}>Status</th>
+            <th style={{ border: "1px solid #000", padding: "5px 8px", textAlign: "left", fontWeight: "800", fontSize: "9px", textTransform: "uppercase" }}>Document</th>
+            <th style={{ border: "1px solid #000", padding: "5px 8px", textAlign: "center", fontWeight: "800", fontSize: "9px", textTransform: "uppercase", width: "100px" }}>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            [["Birth Certificate", detailStudent?.documents?.[0]?.birthCert], ["Community Certificate", detailStudent?.documents?.[0]?.communityCert]],
+            [["Student Aadhaar", detailStudent?.documents?.[0]?.aadharStudent], ["Student Photo", detailStudent?.documents?.[0]?.photoPath]],
+            [["TC / Migration", detailStudent?.documents?.[0]?.tcPath], ["Other Document", detailStudent?.documents?.[0]?.otherDoc]],
+          ].map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? "#f5f5f5" : "#fff" }}>
+              {row.map(([label, val], ci) => (
+                <React.Fragment key={ci}>
+                  <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontWeight: "700" }}>{label}</td>
+                  <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "center" }}>
+                    <span style={{
+                      display: "inline-block", padding: "2px 10px", fontWeight: "800", fontSize: "9px",
+                      border: "1px solid #000",
+                      background: val ? "#000" : "#fff",
+                      color: val ? "#fff" : "#000",
+                      textTransform: "uppercase", letterSpacing: "0.05em"
+                    }}>{val ? "Uploaded" : "Missing"}</span>
+                  </td>
+                </React.Fragment>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    {/* ── STEP 6: REVIEW & APPROVAL ── */}
+    <div style={{ marginBottom: "14px" }}>
+      <div style={{ background: "#000", color: "#fff", fontWeight: "900", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.12em", padding: "5px 10px" }}>
+        6. Review &amp; Approval
+      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10px" }}>
+        <tbody>
+          {[
+            [["Approval Status", detailStudent?.admission?.isApproved ? "Approved" : "Pending"], ["Approved By", detailStudent?.admission?.approvedByRole || "—"], ["Approved At", detailStudent?.admission?.approvedAt ? dayjs(detailStudent.admission.approvedAt).format("DD MMM YYYY, HH:mm") : "—"]],
+            [["Register No", detailStudent?.admission?.registerNo || "—"], ["Valid From", detailStudent?.admission?.admissionFrom || "—"], ["Valid To", detailStudent?.admission?.admissionTo || "—"]],
+          ].map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? "#f5f5f5" : "#fff" }}>
+              {row.map(([label, value], ci) => (
+                <React.Fragment key={ci}>
+                  <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontWeight: "700", color: "#333", width: "12%", whiteSpace: "nowrap" }}>{label}</td>
+                  <td style={{ border: "1px solid #ccc", padding: "5px 8px", color: "#000", width: "22%" }}>{value}</td>
+                </React.Fragment>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    {/* ── DECLARATION ── */}
+    <div style={{ border: "1px solid #000", padding: "10px 12px", marginBottom: "18px" }}>
+      <div style={{ fontWeight: "900", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "5px" }}>Declaration</div>
+      <p style={{ margin: 0, fontSize: "10px", color: "#333", lineHeight: "1.7" }}>
+        I hereby declare that all the information provided in this admission form is true and correct to the best of my knowledge.
+        I undertake to abide by the rules and regulations of the institution.
+      </p>
+    </div>
+
+    {/* ── SIGNATURES ── */}
+    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <tbody>
+        <tr>
+          {["Parent / Guardian Signature", "Student Signature", "Principal Signature"].map((label, i) => (
+            <td key={i} style={{ border: "1px solid #000", padding: "32px 12px 8px", textAlign: "center", width: "33%" }}>
+              <div style={{ fontSize: "9px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.1em", color: "#000" }}>{label}</div>
+            </td>
+          ))}
+        </tr>
+      </tbody>
+    </table>
   </div>
 
-  {/* DECLARATION */}
-  <div style={{ textAlign: "center", marginTop: "30px" }}>
-    <b>DECLARATION</b>
-    <p style={{ fontSize: "11px" }}>
-      I hereby declare that I will obey all the rules and regulations of the institution.
-    </p>
-  </div>
-
-  <div style={{ display: "flex", justifyContent: "space-between", marginTop: "50px" }}>
-    <span>Student's Signature</span>
-    <span>Authorized Signature</span>
+  {/* ── FOOTER ── */}
+  <div style={{ borderTop: "2px solid #000", padding: "7px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+    <div style={{ fontSize: "9px", color: "#444" }}>
+      Generated on {dayjs().format("DD MMM YYYY, HH:mm")}
+    </div>
+    <div style={{ fontSize: "9px", color: "#444", fontWeight: "700" }}>
+      {adminSettings?.schoolName || "MATRIC HR SEC SCHOOL"} — Confidential Record
+    </div>
   </div>
 </div>
 
