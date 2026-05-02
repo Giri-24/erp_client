@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Modal, Select, message, Popconfirm } from "antd";
+import { Modal, Select, message, Button ,Popconfirm, Input } from "antd";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import instance from "../utils/axios";
 import dayjs from "dayjs";
 import { linkSiblings, demoteIndividualStudents } from "../modules/admission/admission.service";
 import { getAdminSettings } from "../modules/settings/settings.service";
+import { EnvironmentOutlined, SearchOutlined } from '@ant-design/icons';
+
 import { useNavigate } from "react-router-dom";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -299,61 +301,65 @@ const [fees, setFees] = useState([]);
     search
   </span>
 
-  <input
-    type="text"
-    value={searchText}
-    onChange={(e) => { setSearchText(e.target.value); setPage(1); }}
-    placeholder="Search Student (Name, ID, Guardian)..."
-    className="w-full h-full filter-input pl-10 pr-4 text-sm outline-none"
-  />
+  <Input
+  placeholder="Search Student (Name, ID, Guardian)..."
+  value={searchText}
+  onChange={(e) => {
+    setSearchText(e.target.value);
+    setPage(1);
+  }}
+  prefix={<SearchOutlined />}
+  allowClear
+  size="large"
+/>
 </div>
 
           <div className="flex flex-wrap gap-3">
-            <select
-              value={classFilter}
-              onChange={(e) => { setClassFilter(e.target.value); setPage(1); }}
-              className="filter-input px-4 py-2.5 text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer"
-            >
-              <option value="">All Standard</option>
-              {classOptions.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <Select
+              value={classFilter || undefined}
+              placeholder="All Standard"
+              allowClear
+              onChange={(val) => { setClassFilter(val || ''); setPage(1); }}
+              style={{ minWidth: 140 }}
+              options={[
+                ...classOptions.map((c) => ({ value: c, label: c })),
+              ]}
+            />
 
-            <select
-              value={sectionFilter}
-              onChange={(e) => { setSectionFilter(e.target.value); setPage(1); }}
-              className="filter-input px-4 py-2.5 text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer"
-            >
-              <option value="">Sections</option>
-              {sectionOptions.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <Select
+              value={sectionFilter || undefined}
+              placeholder="Sections"
+              allowClear
+              onChange={(val) => { setSectionFilter(val || ''); setPage(1); }}
+              style={{ minWidth: 120 }}
+              options={sectionOptions.map((c) => ({ value: c, label: c }))}
+            />
 
-            <select
-              value={genderFilter}
-              onChange={(e) => { setGenderFilter(e.target.value); setPage(1); }}
-              className="filter-input px-4 py-2.5 text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer"
-            >
-              <option value="">Gender</option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-            </select>
+            <Select
+              value={genderFilter || undefined}
+              placeholder="Gender"
+              allowClear
+              onChange={(val) => { setGenderFilter(val || ''); setPage(1); }}
+              style={{ minWidth: 120 }}
+              options={[
+                { value: 'male', label: 'Male' },
+                { value: 'female', label: 'Female' },
+              ]}
+            />
           </div>
         </div>
 
         <div className="flex gap-4 mt-4 pt-4 border-t border-slate-50">
-           <div className="relative w-64">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm leading-none">location_on</span>
-              <input
-                type="text"
-                value={areaFilter}
-                onChange={(e) => { setAreaFilter(e.target.value); setPage(1); }}
-                placeholder="Area / Street / Pin"
-                className="w-full filter-input py-2.5 pl-11 pr-4 text-[10px] font-bold outline-none !bg-slate-50/50"
-              />
-           </div>
+          <Input.Search
+  value={areaFilter}
+  onChange={(e) => {
+    setAreaFilter(e.target.value);
+    setPage(1);
+  }}
+  placeholder="Area / Street / Pin"
+  prefix={<EnvironmentOutlined />}
+  enterButton
+/>
           
            {(classFilter || sectionFilter || genderFilter || areaFilter || fatherFilter || siblingFilter || searchText) && (
              <button

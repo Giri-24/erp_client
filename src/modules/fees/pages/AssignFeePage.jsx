@@ -430,20 +430,17 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
 
   // ── fee input helper ──────────────────────────────────────────────────────
   const FeeInput = ({ label, field }) => (
-    <div className="space-y-2">
-      <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">
-        {label}
+    <div className="flex flex-col gap-1.5">
+      <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none">
+        {label} <span className="text-on-surface-variant normal-case">₹</span>
       </label>
-      <div className="relative">
-        <span className="absolute left-4 top-3.5 text-on-surface-variant font-bold text-sm">₹</span>
-        <input
-          type="number"
-          min={0}
-          value={fees[field]}
-          onChange={(e) => setFees((prev) => ({ ...prev, [field]: Number(e.target.value) || 0 }))}
-          className="w-full bg-surface-container-high border-none rounded-xl py-3 pl-8 pr-4 text-on-surface focus:bg-surface-container-highest focus:ring-2 focus:ring-primary/30 transition-all font-bold outline-none"
-        />
-      </div>
+      <input
+        type="number"
+        min={0}
+        value={fees[field]}
+        onChange={(e) => setFees((prev) => ({ ...prev, [field]: Number(e.target.value) || 0 }))}
+        className="w-full bg-surface-container-high border-none rounded-xl h-11 px-4 text-on-surface focus:bg-surface-container-highest focus:ring-2 focus:ring-primary/30 transition-all font-bold outline-none"
+      />
     </div>
   );
 

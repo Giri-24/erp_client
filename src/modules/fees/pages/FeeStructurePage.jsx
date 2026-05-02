@@ -8,6 +8,8 @@ import {
 } from "../fees.service";
 import { getAllStoreItems } from "../../pos/pos.service";
 import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
+import { InputNumber } from "antd";
+
 
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN");
@@ -279,7 +281,7 @@ const FeeStructurePage = () => {
                     <label className="text-[10px] font-bold text-primary uppercase tracking-wider ml-1">
                       Session / Academic Year *
                     </label>
-                    <div className="relative fee-structure-select-container">
+                    <div className="relative">
                       <Select
                         showSearch
                         placeholder="Select or enter year (e.g. 2026-2027)"
@@ -295,33 +297,43 @@ const FeeStructurePage = () => {
                       />
                       <style>{`
                         .academic-year-select .ant-select-selector {
-                          background-color: white !important;
-                          border-radius: 0.75rem !important; /* rounded-xl */
-                          padding-top: 6px !important;
-                          padding-bottom: 6px !important;
-                          padding-left: 12px !important;
-                          padding-right: 12px !important;
+                          background-color: #ffffff !important;
+                          border: none !important;
+                          border-radius: 0.75rem !important;
+                          padding-left: 16px !important;
+                          padding-right: 16px !important;
                           height: 48px !important;
                           display: flex !important;
                           align-items: center !important;
-                          font-size: 14px !important; /* text-sm */
-                          font-weight: 500 !important; /* font-medium */
+                          font-size: 14px !important;
+                          font-weight: 500 !important;
+                          color: #011d35 !important;
+                          box-shadow: none !important;
+                        }
+                        .academic-year-select.ant-select-focused .ant-select-selector {
+                          box-shadow: 0 0 0 2px rgba(1,29,53,0.15) !important;
                         }
                         .academic-year-select .ant-select-selection-placeholder {
-                           line-height: normal !important;
-                           height: auto !important;
-                           display: flex !important;
-                           align-items: center !important;
+                          color: #94a3b8 !important;
+                          line-height: normal !important;
+                          display: flex !important;
+                          align-items: center !important;
                         }
                         .academic-year-select .ant-select-selection-item {
-                           line-height: normal !important;
-                           display: flex !important;
-                           align-items: center !important;
+                          color: #011d35 !important;
+                          font-weight: 500 !important;
+                          line-height: normal !important;
+                          display: flex !important;
+                          align-items: center !important;
+                        }
+                        .academic-year-select .ant-select-arrow {
+                          color: #64748b !important;
                         }
                         .academic-year-select {
                           width: 100% !important;
                         }
                       `}</style>
+                      <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base" style={{zIndex:1}}>expand_more</span>
                     </div>
                   </div>
                 </div>
@@ -346,14 +358,13 @@ const FeeStructurePage = () => {
                         <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">{label}</p>
                         <div className="relative">
                           <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm font-bold">₹</span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={form[key] || ""}
-                            onChange={(e) => setField(key, Number(e.target.value) || 0)}
-                            className="w-full border-none p-0 pl-4 focus:ring-0 text-lg font-bold text-primary bg-transparent outline-none"
-                            placeholder="0"
-                          />
+                          <InputNumber
+  min={0}
+  value={form[key] || 0}
+  onChange={(value) => setField(key, value || 0)}
+  placeholder="0"
+  className="w-full !border-none !bg-transparent text-lg font-bold text-primary focus:!shadow-none"
+/>
                         </div>
                       </div>
                     ))}

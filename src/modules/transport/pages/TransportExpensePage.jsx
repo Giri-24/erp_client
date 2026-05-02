@@ -34,7 +34,6 @@ const MAINTENANCE_OPTIONS = [
   "FC work",
   "Greeze filling",
   "Puncture & Tyre Checking",
-  "Fuel - Via Cash & Card",
   "Other Expense",
 ];
 

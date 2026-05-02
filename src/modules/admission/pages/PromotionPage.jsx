@@ -6,6 +6,13 @@ import { getAcademicYears } from '../../fees/fees.service';
 
 const { confirm } = Modal;
 
+const DEMOTION_ROLLBACK_OPTIONS = {
+  rollbackPromotion: true,
+  restorePreviousStandardData: true,
+  restorePrePromotionFees: true,
+  feeRestoreStrategy: 'PRE_PROMOTION_SNAPSHOT',
+};
+
 const getNextAcademicYear = (academicYear) => {
   const match = String(academicYear || '').match(/(\d{4})\s*[-/]\s*(\d{2,4})/);
   if (!match) return '';
@@ -71,6 +78,20 @@ const PromotionPage = () => {
           <p>Are you sure you want to {isDemotion ? 'demote' : 'promote'} ALL students?</p>
           <p>Academic Year: <strong>{academicYear}</strong></p>
           <Alert type="warning" message="This will update ALL students across all standards." />
+          {isDemotion && (
+            <Alert
+              style={{ marginTop: 8 }}
+              type="info"
+              message="Demotion will revert students to pre-promotion data and restore fees from before promotion."
+            />
+          )}
+          {!isDemotion && (
+            <Alert
+              style={{ marginTop: 8 }}
+              type="info"
+              message="Class 12 students will be archived after completion (no Class 13 promotion)."
+            />
+          )}
           <p style={{ marginTop: 8 }}>
             New Academic Year: <strong>{newAcademicYear}</strong>
           </p>
@@ -83,6 +104,9 @@ const PromotionPage = () => {
           const payload = {
             academicYear,
             newAcademicYear,
+            ...(isDemotion
+              ? DEMOTION_ROLLBACK_OPTIONS
+              : {}),
           };
 
           const res = isDemotion
@@ -91,7 +115,11 @@ const PromotionPage = () => {
 
           setResult(res);
           setBlockingError(null);
-          message.success(`All students ${isDemotion ? 'demoted' : 'promoted'} successfully!`);
+          message.success(
+            isDemotion
+              ? 'All students demoted and restored to pre-promotion data successfully!'
+              : 'All students promoted successfully!'
+          );
           await loadSummary();
         } catch (err) {
           const apiMessage = err?.response?.data?.message || 'Operation failed';
@@ -118,6 +146,9 @@ const PromotionPage = () => {
     <div>
       <h2 style={{ fontWeight: 800 }}>Student Promotion</h2>
       <p>Promote all students to next standard automatically</p>
+      <p style={{ marginTop: -8, color: '#595959' }}>
+        Demotion mode restores students to pre-promotion class data and old fee assignments.
+      </p>
 
       <Row gutter={24}>
         <Col span={14}>
@@ -196,6 +227,15 @@ const PromotionPage = () => {
                 <Space direction="vertical">
                   <strong>Updated Students: {result.updatedCount}</strong>
                   <span>New Academic Year: {result.newAcademicYear}</span>
+                  {typeof result.archivedCount === 'number' && (
+                    <span>Archived (completed Class 12): {result.archivedCount}</span>
+                  )}
+                  {typeof result.revertedCount === 'number' && (
+                    <span>Reverted to previous class data: {result.revertedCount}</span>
+                  )}
+                  {typeof result.restoredFeeCount === 'number' && (
+                    <span>Fee records restored (pre-promotion): {result.restoredFeeCount}</span>
+                  )}
                   {typeof result.autoFeeAssignedCount === 'number' && (
                     <span>Fee assigned automatically: {result.autoFeeAssignedCount}</span>
                   )}

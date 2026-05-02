@@ -203,7 +203,11 @@ const CollectPaymentPage = ({ studentId }) => {
   const [payComponents, setPayComponents] = useState([]);
   const [payingNonTerm, setPayingNonTerm] = useState(false);
   const [extraTermNumbers, setExtraTermNumbers] = useState([]);
-  const [admissionNoSearch, setAdmissionNoSearch] = useState("");
+  const [selectedStandardFilter, setSelectedStandardFilter] = useState("ALL");
+  const [selectedSectionFilter, setSelectedSectionFilter] = useState("ALL");
+  const [previousYearLabel, setPreviousYearLabel] = useState("");
+  const [previousYearPending, setPreviousYearPending] = useState(null);
+  const [allYearsFees, setAllYearsFees] = useState([]);
   const [siblingData, setSiblingData] = useState([]);
   const [documentAssets, setDocumentAssets] = useState({});
 
@@ -216,6 +220,51 @@ const CollectPaymentPage = ({ studentId }) => {
   const setAmountFromSystem = (next) => {
     setAmount(String(next ?? ""));
     setAmountInputKey((k) => k + 1);
+  };
+
+  const getPreviousAcademicYear = (yearLabel) => {
+    const parts = String(yearLabel || "").split("-").map((p) => p.trim());
+    if (parts.length !== 2) return "";
+    const start = Number(parts[0]);
+    const end = Number(parts[1]);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return "";
+    return `${start - 1}-${end - 1}`;
+  };
+
+  const loadPreviousYearPending = async (sid) => {
+    const prevYear = getPreviousAcademicYear(academicYear);
+    setPreviousYearLabel(prevYear);
+    if (!sid || !prevYear) {
+      setPreviousYearPending(null);
+      return;
+    }
+    try {
+      const prevYearFees = await getAllStudentFees(prevYear);
+      const prevFee = (prevYearFees || []).find((f) => f.student?.id === sid);
+      setPreviousYearPending(prevFee ? Number(prevFee.pending || 0) : 0);
+    } catch {
+      setPreviousYearPending(null);
+    }
+  };
+
+  const loadAllYearsFees = async (sid) => {
+    if (!sid || academicYearOptions.length === 0) { setAllYearsFees([]); return; }
+    try {
+      const prevYears = academicYearOptions.filter((y) => y !== academicYear);
+      const results = await Promise.allSettled(
+        prevYears.map(async (yr) => {
+          const fees = await getAllStudentFees(yr);
+          return (fees || []).find((f) => f.student?.id === sid);
+        })
+      );
+      const collected = results
+        .filter((r) => r.status === "fulfilled" && r.value)
+        .map((r) => r.value)
+        .sort((a, b) => String(b.academicYear || "").localeCompare(String(a.academicYear || "")));
+      setAllYearsFees(collected);
+    } catch {
+      setAllYearsFees([]);
+    }
   };
 
   const { hasPermission } = usePermissionHelpers();
@@ -336,23 +385,12 @@ const CollectPaymentPage = ({ studentId }) => {
     }
   };
 
-  const handleAdmissionNoSearch = () => {
-    if (!admissionNoSearch.trim()) return;
-    const fee = studentFees.find(
-      (f) =>
-        f.student?.admission?.admissionNo?.toLowerCase() === admissionNoSearch.trim().toLowerCase()
-    );
-    if (fee) {
-      onSelectFee(fee.id);
-    } else {
-      message.warning("No student found with this admission number in the selected academic year");
-    }
-  };
-
   const onSelectFee = async (feeId) => {
     let fee = studentFees.find((f) => f.id === feeId);
     fee = enrichWithVirtualTerm(fee);
     setSelectedFee(fee);
+    loadPreviousYearPending(fee?.student?.id);
+    loadAllYearsFees(fee?.student?.id);
     setAmountFromSystem("");
     setTermNumber(null);
     setPayingNonTerm(false);
@@ -377,6 +415,17 @@ const CollectPaymentPage = ({ studentId }) => {
       }
     } catch { setPaymentLinks([]); }
   };
+
+  useEffect(() => {
+    if (selectedFee?.student?.id) {
+      loadPreviousYearPending(selectedFee.student.id);
+      loadAllYearsFees(selectedFee.student.id);
+    } else {
+      setPreviousYearPending(null);
+      setPreviousYearLabel(getPreviousAcademicYear(academicYear));
+      setAllYearsFees([]);
+    }
+  }, [academicYear, selectedFee?.student?.id, academicYearOptions]);
 
   useEffect(() => {
     if (splitMode && selectedFee?.terms?.length > 0) {
@@ -648,6 +697,41 @@ const CollectPaymentPage = ({ studentId }) => {
     return "receipt_long";
   };
 
+  const standardFilterOptions = Array.from(
+    new Set(
+      studentFees
+        .map((f) => formatStandardLabel(f.student?.standard))
+        .filter(Boolean)
+    )
+  );
+
+  const sectionFilterOptions = Array.from(
+    new Set(
+      studentFees
+        .filter((f) =>
+          selectedStandardFilter === "ALL"
+            ? true
+            : formatStandardLabel(f.student?.standard) === selectedStandardFilter
+        )
+        .map((f) => String(f.student?.section || "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  const filteredStudentFees = studentFees.filter((f) => {
+    const std = formatStandardLabel(f.student?.standard);
+    const sec = String(f.student?.section || "").trim();
+    const standardMatch = selectedStandardFilter === "ALL" || std === selectedStandardFilter;
+    const sectionMatch = selectedSectionFilter === "ALL" || sec === selectedSectionFilter;
+    return standardMatch && sectionMatch;
+  });
+
+  useEffect(() => {
+    if (selectedSectionFilter !== "ALL" && !sectionFilterOptions.includes(selectedSectionFilter)) {
+      setSelectedSectionFilter("ALL");
+    }
+  }, [selectedSectionFilter, sectionFilterOptions]);
+
   // ── Student selector (shared across tabs) ───────────────────────────────
   const StudentSelector = () => (
     <div className="bg-white rounded-2xl px-7 py-5 shadow-[0_4px_20px_rgba(1,29,53,0.06)] border border-outline-variant/20">
@@ -669,25 +753,42 @@ const CollectPaymentPage = ({ studentId }) => {
           </div>
         </div>
 
-        {/* Admission No */}
+        {/* Standard filter */}
         <div className="space-y-1 min-w-[180px]">
-          <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Admission No</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={admissionNoSearch}
-              onChange={(e) => setAdmissionNoSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdmissionNoSearch()}
-              placeholder="e.g. ADM-001"
-              className="flex-1 bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
-            />
-            <button
-              type="button"
-              onClick={handleAdmissionNoSearch}
-              className="px-3 rounded-xl bg-primary text-white flex items-center justify-center hover:opacity-90 transition-opacity"
+          <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Standard</label>
+          <div className="relative">
+            <select
+              value={selectedStandardFilter}
+              onChange={(e) => {
+                setSelectedStandardFilter(e.target.value);
+                setSelectedSectionFilter("ALL");
+              }}
+              className="w-full bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
             >
-              <span className="material-symbols-outlined text-sm">search</span>
-            </button>
+              <option value="ALL">All Standards</option>
+              {standardFilterOptions.map((std) => (
+                <option key={std} value={std}>{std}</option>
+              ))}
+            </select>
+            <span className="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant pointer-events-none text-base">expand_more</span>
+          </div>
+        </div>
+
+        {/* Section filter */}
+        <div className="space-y-1 min-w-[140px]">
+          <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Section</label>
+          <div className="relative">
+            <select
+              value={selectedSectionFilter}
+              onChange={(e) => setSelectedSectionFilter(e.target.value)}
+              className="w-full bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
+            >
+              <option value="ALL">All Sections</option>
+              {sectionFilterOptions.map((sec) => (
+                <option key={sec} value={sec}>{sec}</option>
+              ))}
+            </select>
+            <span className="material-symbols-outlined absolute right-3 top-2.5 text-on-surface-variant pointer-events-none text-base">expand_more</span>
           </div>
         </div>
 
@@ -696,14 +797,14 @@ const CollectPaymentPage = ({ studentId }) => {
           <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Search Student</label>
           <div className="relative">
             <select
-              value={selectedFee?.id || ""}
+              value={filteredStudentFees.some((f) => f.id === selectedFee?.id) ? selectedFee?.id : ""}
               onChange={(e) => e.target.value && onSelectFee(e.target.value)}
               className="w-full bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
             >
               <option value="">Select student...</option>
-              {studentFees.map((f) => (
+              {filteredStudentFees.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.student?.admission?.admissionNo ? `[${f.student.admission.admissionNo}] ` : ""}{f.student?.name} — {formatStandardLabel(f.student?.standard)} — Pending: {fmt(f.pending)}
+                  {f.student?.name} — {formatStandardLabel(f.student?.standard)}{f.student?.section ? ` - ${f.student.section}` : ""}
                 </option>
               ))}
             </select>
@@ -720,7 +821,7 @@ const CollectPaymentPage = ({ studentId }) => {
             <div>
               <p className="text-sm font-bold text-primary leading-none">{selectedFee.student?.name}</p>
               <p className="text-[10px] text-on-surface-variant mt-0.5">
-                {formatStandardLabel(selectedFee.student?.standard)} · Pending: <span className={`font-bold ${Number(selectedFee.pending) > 0 ? "text-error" : "text-[#2e7d32]"}`}>{fmt(selectedFee.pending)}</span>
+                {formatStandardLabel(selectedFee.student?.standard)}{selectedFee.student?.section ? ` - ${selectedFee.student.section}` : ""} · Prev Year Pending{previousYearLabel ? ` (${previousYearLabel})` : ""}: <span className={`font-bold ${Number(previousYearPending || 0) > 0 ? "text-error" : "text-[#2e7d32]"}`}>{previousYearPending === null ? "--" : fmt(previousYearPending)}</span>
               </p>
             </div>
           </div>
@@ -1170,6 +1271,46 @@ const CollectPaymentPage = ({ studentId }) => {
                   {fmt(selectedFee.pending)}
                 </p>
               </div>
+
+              {/* Previous years fees */}
+              {allYearsFees.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <p className="text-[10px] uppercase tracking-widest text-secondary-fixed mb-3 font-bold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[12px]">history</span>
+                    Previous Years Fees
+                  </p>
+                  <div className="space-y-2">
+                    {allYearsFees.map((pf) => (
+                      <div key={pf.id} className="bg-white/8 rounded-xl px-3 py-2.5 border border-white/10">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[11px] font-bold text-white/90">{pf.academicYear}</span>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            Number(pf.pending || 0) > 0
+                              ? "bg-red-500/30 text-red-200"
+                              : "bg-[#44ddc1]/20 text-[#44ddc1]"
+                          }`}>
+                            {Number(pf.pending || 0) > 0 ? "Due" : "Cleared"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 text-[10px] text-white/70">
+                          <div>
+                            <span className="block text-white/50">Net Fee</span>
+                            <span className="font-bold text-white/90">{fmt(pf.netFee)}</span>
+                          </div>
+                          <div>
+                            <span className="block text-white/50">Paid</span>
+                            <span className="font-bold text-[#44ddc1]">{fmt(pf.totalPaid)}</span>
+                          </div>
+                          <div>
+                            <span className="block text-white/50">Pending</span>
+                            <span className={`font-bold ${Number(pf.pending || 0) > 0 ? "text-red-300" : "text-[#44ddc1]"}`}>{fmt(pf.pending)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-on-primary-container/60 text-sm text-center py-8">

@@ -81,6 +81,8 @@ import TransportManagerDashboard from "./TransportManagerDashboard";
 import TeacherDashboard from "./TeacherDashboard";
 import { getAdminSettings } from "../modules/settings/settings.service";
 import { hasPermission, hasAnyPermission, PERMISSIONS, getCurrentUser } from "../utils/permissions";
+import { Input } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
 
 
 const TRANSPORT_MANAGER_KEYS = new Set([
@@ -530,11 +532,12 @@ const Dashboard = () => {
           <div className="flex items-center gap-4 flex-1">
             <div className="relative w-full max-w-md focus-within:ring-2 focus-within:ring-primary rounded-full transition-all">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
-              <input
-                className="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-0 placeholder:text-on-surface-variant/60"
-                placeholder="Search applicants, ID, or status..."
-                type="text"
-              />
+              <Input
+  placeholder="Search applicants, ID, or status..."
+  prefix={<SearchOutlined />}
+  allowClear
+  className="w-full !bg-surface-container-low !border-none !rounded-full py-2 pr-4 text-sm focus:!shadow-none placeholder:!text-on-surface-variant/60"
+/>
             </div>
           </div>
 
