@@ -393,6 +393,7 @@ export const exportTransportExpenses = async (type = 'all', filters = {}) => {
         return {
           Bus: getBusLabel(expense),
           Date: formatDate(expense?.date),
+          Category: expense?.category || 'FUEL',
           'Fuel Station': expense?.fuelStation || '',
           Litres: Number(expense?.litres || 0),
           'Price / Litre': Number(expense?.pricePerLitre || 0),
@@ -406,6 +407,7 @@ export const exportTransportExpenses = async (type = 'all', filters = {}) => {
         return {
           Bus: getBusLabel(expense),
           Date: formatDate(expense?.date),
+          Category: expense?.category || 'MAINTENANCE',
           Workshop: expense?.workshop || '',
           Description: expense?.description || '',
           'Total Price': Number(expense?.amount || 0),
@@ -416,6 +418,7 @@ export const exportTransportExpenses = async (type = 'all', filters = {}) => {
         return {
           Bus: getBusLabel(expense),
           Date: formatDate(expense?.date),
+          Category: expense?.category || 'PARTS',
           'Part Name': expense?.partName || partMatch?.[1] || '',
           Quantity: expense?.quantity ? Number(expense.quantity) : (partMatch?.[2] || ''),
           'Unit Cost': expense?.unitCost ? Number(expense.unitCost) : (partMatch?.[3] || ''),
@@ -428,6 +431,7 @@ export const exportTransportExpenses = async (type = 'all', filters = {}) => {
         return {
           Bus: getBusLabel(expense),
           Date: formatDate(expense?.date),
+          Category: expense?.category || 'TAX',
           'Tax Type': expense?.taxType || '',
           'Reference No': expense?.referenceNo || (referenceNo === partDescription ? '' : referenceNo),
           'Total Price': Number(expense?.amount || 0),
@@ -446,10 +450,10 @@ export const exportTransportExpenses = async (type = 'all', filters = {}) => {
   const total = rows.reduce((sum, row) => sum + Number(row['Total Price'] || 0), 0);
   const worksheet = XLSX.utils.json_to_sheet(rows);
   const columnWidths = {
-    FUEL: [18, 14, 20, 10, 14, 14, 18, 14],
-    MAINTENANCE: [18, 14, 24, 28, 14],
-    PARTS: [18, 14, 22, 10, 12, 10, 14],
-    TAX: [18, 14, 18, 18, 14],
+    FUEL: [18, 14, 14, 20, 10, 14, 14, 18, 14],
+    MAINTENANCE: [18, 14, 14, 24, 28, 14],
+    PARTS: [18, 14, 14, 22, 10, 12, 10, 14],
+    TAX: [18, 14, 14, 18, 18, 14],
     ALL: [18, 14, 14, 28, 14],
   };
   worksheet['!cols'] = (columnWidths[normalizedType] || columnWidths.ALL).map((wch) => ({ wch }));

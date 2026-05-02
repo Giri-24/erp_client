@@ -7,7 +7,14 @@ import {
 } from "../transport.service";
 import { getAcademicYears, getPaymentStatusReport } from "../../fees/fees.service";
 
-const CATEGORY_TABS = ["FUEL", "MAINTENANCE", "PARTS", "TAX"];
+const CATEGORY_TABS = ["ALL", "FUEL", "MAINTENANCE", "PARTS", "TAX"];
+
+const CATEGORY_BADGE_CLASS = {
+  FUEL: "bg-teal-100 text-teal-700",
+  MAINTENANCE: "bg-blue-100 text-blue-700",
+  PARTS: "bg-indigo-100 text-indigo-700",
+  TAX: "bg-amber-100 text-amber-700",
+};
 
 const formatCurrency = (value) => {
   const amount = Number(value || 0);
@@ -73,18 +80,6 @@ const getBusLabel = (expense) => {
   );
 };
 
-const getBusId = (item) => {
-  return (
-    item?.id ||
-    item?._id ||
-    item?.busId ||
-    item?.bus?.id ||
-    item?.bus?._id ||
-    item?.bus?.busId ||
-    ""
-  );
-};
-
 const getBusOptionLabel = (bus) => {
   return (
     bus?.number ||
@@ -133,7 +128,7 @@ const getTransportCollectedAmount = (payment) => {
       paidComponents.transport ??
       paidComponents.transportFee ??
       paidComponents.transportAmount ??
-      0
+      0,
     );
     if (transportComponent > 0) {
       return transportComponent;
@@ -143,7 +138,7 @@ const getTransportCollectedAmount = (payment) => {
   const directAmount = Number(
     payment?.transportAmount ??
     payment?.transportFee ??
-    0
+    0,
   );
   if (directAmount > 0) {
     return directAmount;
@@ -171,16 +166,18 @@ const getPaymentStudentId = (payment) => {
   );
 };
 
-export default function TransportExpenseDashboardPage() {
+export default function TransportExpenseDashboardPage({ onNavigate }) {
   const [monthlyExpenses, setMonthlyExpenses] = useState([]);
   const [buses, setBuses] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
   const [transportPayments, setTransportPayments] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [activeCategory, setActiveCategory] = useState("FUEL");
+
+  const [activeCategory, setActiveCategory] = useState("ALL");
   const [showPastHistory, setShowPastHistory] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey());
@@ -297,7 +294,7 @@ export default function TransportExpenseDashboardPage() {
     }
   };
 
-  const handleExport = async () => {
+  const handleExportXlsx = async () => {
     try {
       setExporting(true);
       await exportTransportExpenses(activeCategory.toLowerCase(), {
@@ -375,13 +372,13 @@ export default function TransportExpenseDashboardPage() {
 
     const totalIncome = collectedPayments.reduce(
       (sum, payment) => sum + getTransportCollectedAmount(payment),
-      0
+      0,
     );
 
     const distinctStudents = new Set(
       collectedPayments
         .map(getPaymentStudentId)
-        .filter(Boolean)
+        .filter(Boolean),
     );
 
     return {
@@ -409,7 +406,7 @@ export default function TransportExpenseDashboardPage() {
 
   const scopedEntries = useMemo(() => {
     return monthlyExpenses.filter((expense) => {
-      if (expense?.category !== activeCategory) {
+      if (activeCategory !== "ALL" && expense?.category !== activeCategory) {
         return false;
       }
 
@@ -428,7 +425,6 @@ export default function TransportExpenseDashboardPage() {
   const busFilterOptions = useMemo(() => {
     const map = new Map();
 
-    // Primary source: master bus list, same as Add Expense page.
     buses.forEach((bus) => {
       const label = getBusOptionLabel(bus);
       const normalizedLabel = normalizeBusFilterValue(label);
@@ -436,7 +432,6 @@ export default function TransportExpenseDashboardPage() {
       map.set(normalizedLabel, label);
     });
 
-    // Fallback: if an entry exists for a bus that is no longer in master list, keep it filterable.
     scopedEntries.forEach((expense) => {
       const label = getBusLabel(expense);
       const normalizedLabel = normalizeBusFilterValue(label);
@@ -512,19 +507,20 @@ export default function TransportExpenseDashboardPage() {
     const headers = ["Date", "Bus", "Category", "Details", "Amount"];
     const rows = orderedEntries.map((expense) => [
       toCsvDateText(expense?.date),
-        getBusLabel(expense),
-        expense?.category || "",
-        getDetails(expense),
-        Number(expense?.amount || 0).toFixed(2),
-      ]);
+      getBusLabel(expense),
+      expense?.category || "",
+      getDetails(expense),
+      Number(expense?.amount || 0).toFixed(2),
+    ]);
 
     const csvContent = [headers, ...rows]
       .map((row) => row.map(escapeCsv).join(","))
       .join("\n");
 
     const dateSuffix = selectedDate || selectedMonth || currentMonthKey();
+    const categorySuffix = activeCategory.toLowerCase();
     const keywordSuffix = keywordFilter.trim() ? `-${keywordFilter.trim().replace(/\s+/g, "-").slice(0, 20)}` : "";
-    const filename = `transport-expense-${activeCategory.toLowerCase()}-${dateSuffix}${keywordSuffix}.csv`;
+    const filename = `transport-expense-${categorySuffix}-${dateSuffix}${keywordSuffix}.csv`;
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = window.URL.createObjectURL(blob);
@@ -562,250 +558,291 @@ export default function TransportExpenseDashboardPage() {
   }, [transportPayments, monthlyExpenses, isInActiveHistoryWindow]);
 
   const historyLabel = !showPastHistory
-    ? `Showing ${activeCategory} entries for current month (${currentMonthLabel})`
+    ? `Showing ${activeCategory === "ALL" ? "all" : activeCategory.toLowerCase()} entries for current month (${currentMonthLabel})`
     : selectedDate
-      ? `Showing ${activeCategory} entries for ${formatDateHeading(selectedDate)}`
-      : `Showing ${activeCategory} entries for ${selectedMonth}`;
+      ? `Showing ${activeCategory === "ALL" ? "all" : activeCategory.toLowerCase()} entries for ${formatDateHeading(selectedDate)}`
+      : `Showing ${activeCategory === "ALL" ? "all" : activeCategory.toLowerCase()} entries for ${selectedMonth}`;
 
   return (
-    <div className="w-full min-h-screen bg-gray-100 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6">
-          <div className="flex flex-col gap-2">
-            <h2 className="text-2xl font-bold text-gray-900">Transport Expense Dashboard</h2>
-            <p className="text-sm text-gray-500">Monthly tracking with day-wise history and category tabs.</p>
+    <div className="min-h-screen w-full bg-[#f6fafe] p-4 md:p-8">
+      <div className="mx-auto w-full max-w-[1400px] space-y-8">
+        <section className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tight text-[#00152a]">Transport Expense Dashboard</h2>
+            <p className="mt-2 max-w-3xl text-sm md:text-base text-slate-500">
+              Monitor operational expense, transport income, and net performance with daily and monthly history controls.
+            </p>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <p className="text-sm font-medium text-gray-500">Total Expenses ({selectedMonth})</p>
-              <p className="text-3xl font-bold text-[#00152a] mt-1">{formatCurrency(monthlyOverallTotal)}</p>
-              <p className="text-xs text-gray-500 mt-1">Overall monthly total stays constant when switching tabs.</p>
-            </div>
-
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-emerald-700">Transport Income (Academic Year)</p>
-                <select
-                  value={selectedAcademicYear}
-                  onChange={(e) => setSelectedAcademicYear(e.target.value)}
-                  className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-xs bg-white text-emerald-800"
-                >
-                  {(academicYears.length ? academicYears : [selectedAcademicYear]).filter(Boolean).map((year) => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-3xl font-bold text-emerald-900 mt-2">{formatCurrency(academicIncomeSummary.totalIncome)}</p>
-              <p className="text-sm text-emerald-700 mt-1">Collected from {academicIncomeSummary.studentCount} students</p>
-              <p className="text-xs text-emerald-700/80 mt-1">Income includes only received transport fee payments (paidAmount &gt; 0).</p>
-            </div>
-
-            <div className={`rounded-xl border p-4 ${profitSummary.isProfit ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}>
-              <p className={`text-sm font-medium ${profitSummary.isProfit ? "text-green-700" : "text-red-700"}`}>Transport Profit</p>
-              <p className={`text-3xl font-bold mt-2 ${profitSummary.isProfit ? "text-green-900" : "text-red-900"}`}>
-                {formatCurrency(profitSummary.profit)}
-              </p>
-              <p className={`text-sm font-semibold mt-1 ${profitSummary.isProfit ? "text-green-700" : "text-red-700"}`}>
-                {profitSummary.isProfit ? "Profit" : "Loss"}
-              </p>
-              <p className={`text-xs mt-2 ${profitSummary.isProfit ? "text-green-700/90" : "text-red-700/90"}`}>
-                Income: {formatCurrency(profitSummary.income)}
-              </p>
-              <p className={`text-xs ${profitSummary.isProfit ? "text-green-700/90" : "text-red-700/90"}`}>
-                Expense: {formatCurrency(profitSummary.expense)}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {CATEGORY_TABS.map((category) => (
-              <div key={`total-${category}`} className="rounded-xl border border-gray-200 bg-white p-4">
-                <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
-                  {category.charAt(0) + category.slice(1).toLowerCase()} Overall
-                </p>
-                <p className="mt-2 text-xl font-bold text-gray-900">{formatCurrency(moduleTotals[category])}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            {CATEGORY_TABS.map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setActiveCategory(category)}
-                className={`px-5 py-2 rounded-lg font-medium transition ${
-                  activeCategory === category
-                    ? "bg-[#00152a] text-white shadow"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                {category.charAt(0) + category.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
             <button
               type="button"
-              onClick={handleCurrentView}
-              className={`px-4 py-2 rounded-lg font-medium transition ${
-                !showPastHistory
-                  ? "bg-[#00152a] text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+              onClick={() => {
+                if (typeof onNavigate === "function") {
+                  onNavigate("transport-expense");
+                  return;
+                }
+                toast("Open Add Expense from Transport > Add Expense in sidebar");
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black uppercase tracking-widest text-[#00152a] shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
             >
-              Current View
+              <span className="material-symbols-outlined text-base">add_circle</span>
+              Add Expense
             </button>
+
             <button
               type="button"
-              onClick={handlePastHistoryView}
-              className={`px-4 py-2 rounded-lg font-medium transition ${
-                showPastHistory
-                  ? "bg-[#00152a] text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+              onClick={handleExportXlsx}
+              disabled={exporting}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#44ddc1] px-4 py-2.5 text-xs font-black uppercase tracking-widest text-[#00152a] shadow-lg shadow-teal-200/60 hover:brightness-95 disabled:opacity-60"
             >
-              See Past History
+              <span className="material-symbols-outlined text-base">download</span>
+              {exporting ? "Exporting" : "Export CSV"}
             </button>
           </div>
+        </section>
 
-          {showPastHistory && (
-          <div className="grid gap-4 md:grid-cols-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => handleDateChange(e.target.value)}
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a]"
-              />
+        <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <article className="rounded-3xl bg-white p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)] ring-1 ring-slate-100">
+            <div className="mb-4 flex items-start justify-between">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                <span className="material-symbols-outlined">trending_down</span>
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{selectedMonth || currentMonthLabel}</span>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Select Month</label>
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => handleMonthChange(e.target.value)}
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a]"
-              />
-            </div>
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="w-full px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50"
-              >
-                Reset Filter
-              </button>
-            </div>
-            <div className="flex items-end gap-2">
-              <button
-                type="button"
-                onClick={refreshExpenses}
-                disabled={refreshing}
-                className="w-1/2 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-              >
-                {refreshing ? "..." : "Refresh"}
-              </button>
-              <button
-                type="button"
-                onClick={handleExport}
-                disabled={exporting}
-                className="w-1/2 px-4 py-2 rounded-xl bg-[#00152a] text-white hover:bg-[#002a4d] disabled:opacity-60"
-              >
-                {exporting ? "..." : "Export"}
-              </button>
-            </div>
-          </div>
-          )}
-        </div>
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Total Expenses</p>
+            <p className="mt-2 text-3xl font-black text-[#00152a]">{formatCurrency(monthlyOverallTotal)}</p>
+            <p className="mt-2 text-xs text-slate-500">Overall monthly total remains stable while switching category tabs.</p>
+          </article>
 
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Expense History</h3>
-            <p className="text-sm text-gray-500">{historyLabel}</p>
-          </div>
-
-          <div className="mb-4 grid gap-3 md:grid-cols-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bus Filter</label>
+          <article className="rounded-3xl bg-white p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)] ring-1 ring-teal-100">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+                <span className="material-symbols-outlined">account_balance</span>
+              </span>
               <select
-                value={busFilter}
-                onChange={(e) => setBusFilter(e.target.value)}
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a]"
+                value={selectedAcademicYear}
+                onChange={(e) => setSelectedAcademicYear(e.target.value)}
+                className="rounded-lg border border-teal-100 bg-white px-2.5 py-1.5 text-xs font-bold text-teal-700"
               >
-                <option value="ALL">All Buses</option>
-                {busFilterOptions.map((busOption) => (
-                  <option key={busOption.value} value={busOption.value}>{busOption.label}</option>
+                {(academicYears.length ? academicYears : [selectedAcademicYear]).filter(Boolean).map((year) => (
+                  <option key={year} value={year}>{year}</option>
                 ))}
               </select>
             </div>
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Transport Income</p>
+            <p className="mt-2 text-3xl font-black text-[#00152a]">{formatCurrency(academicIncomeSummary.totalIncome)}</p>
+            <p className="mt-2 text-xs text-slate-500">Collected from {academicIncomeSummary.studentCount} students (success receipts only).</p>
+          </article>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-              <input
-                type="text"
-                value={keywordFilter}
-                onChange={(e) => setKeywordFilter(e.target.value)}
-                placeholder="Bus / category / details"
-                className="w-full border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00152a] focus:border-[#00152a]"
-              />
+          <article className={`rounded-3xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.06)] ${profitSummary.isProfit ? "bg-[#00152a] text-white" : "bg-red-700 text-white"}`}>
+            <div className="mb-4 flex items-start justify-between">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-[#44ddc1]">
+                <span className="material-symbols-outlined">insights</span>
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Net {profitSummary.statusLabel}</span>
             </div>
-
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setBusFilter("ALL");
-                  setKeywordFilter("");
-                }}
-                className="w-full px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50"
-              >
-                Clear Filters
-              </button>
+            <p className="text-xs font-bold uppercase tracking-widest text-white/70">Transport Profit</p>
+            <p className="mt-2 text-3xl font-black">{formatCurrency(profitSummary.profit)}</p>
+            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/15 pt-3 text-xs">
+              <div>
+                <p className="font-bold uppercase tracking-widest text-white/70">Income</p>
+                <p className="mt-1 text-sm font-black">{formatCurrency(profitSummary.income)}</p>
+              </div>
+              <div>
+                <p className="font-bold uppercase tracking-widest text-white/70">Expense</p>
+                <p className="mt-1 text-sm font-black">{formatCurrency(profitSummary.expense)}</p>
+              </div>
             </div>
+          </article>
+        </section>
 
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                className="w-full px-4 py-2 rounded-xl bg-[#00152a] text-white hover:bg-[#002a4d]"
-              >
-                Export CSV
-              </button>
+        <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Object.entries(moduleTotals).map(([category, total]) => (
+            <div key={category} className="rounded-2xl bg-white p-4 ring-1 ring-slate-100 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{category}</p>
+              <p className="mt-2 text-xl font-black text-[#00152a]">{formatCurrency(total)}</p>
+            </div>
+          ))}
+        </section>
+
+        <section className="overflow-hidden rounded-3xl bg-white shadow-[0_40px_80px_rgba(1,29,53,0.04)] ring-1 ring-slate-100">
+          <div className="border-b border-slate-100 px-5 py-5 md:px-8 md:py-6">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex flex-wrap gap-2">
+                {CATEGORY_TABS.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setActiveCategory(category)}
+                    className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-widest transition ${
+                      activeCategory === category
+                        ? "bg-[#00152a] text-white shadow"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {category === "ALL" ? "All Expenses" : category}
+                  </button>
+                ))}
+              </div>
+
+              <div className="inline-flex w-full max-w-md rounded-full bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={handleCurrentView}
+                  className={`w-1/2 rounded-full px-4 py-2 text-xs font-black uppercase tracking-widest ${
+                    !showPastHistory ? "bg-white text-[#00152a] shadow-sm" : "text-slate-500"
+                  }`}
+                >
+                  Current View
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePastHistoryView}
+                  className={`w-1/2 rounded-full px-4 py-2 text-xs font-black uppercase tracking-widest ${
+                    showPastHistory ? "bg-white text-[#00152a] shadow-sm" : "text-slate-500"
+                  }`}
+                >
+                  See Past History
+                </button>
+              </div>
             </div>
           </div>
 
-          {loading ? (
-            <div className="py-10 text-center text-gray-500">Loading expenses...</div>
-          ) : orderedEntries.length === 0 ? (
-            <div className="py-10 text-center text-gray-500">No entries found for the selected filters.</div>
-          ) : (
-            <div className="space-y-5">
-              {orderedEntries.map((expense, index) => (
-                <div
-                  key={expense?.id || expense?._id || `${toDateKey(expense?.date)}-${expense?.busId || "bus"}-${index}`}
-                  className="grid grid-cols-1 gap-2 rounded-lg bg-white p-3 border border-gray-100 sm:grid-cols-12"
+          <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-5 md:px-8">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <div>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-slate-400">Select Date</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none ring-[#00152a]/20 focus:ring"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-slate-400">Select Month</label>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => handleMonthChange(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none ring-[#00152a]/20 focus:ring"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-slate-400">Bus Filter</label>
+                <select
+                  value={busFilter}
+                  onChange={(e) => setBusFilter(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none ring-[#00152a]/20 focus:ring"
                 >
-                  <div className="sm:col-span-2 text-sm font-medium text-gray-900">
-                    {formatDateHeading(expense?.date)}
-                  </div>
-                  <div className="sm:col-span-3 text-sm font-medium text-gray-900">
-                    {getBusLabel(expense)}
-                  </div>
-                  <div className="sm:col-span-4 text-sm text-gray-600">
-                    {expense?.category} • {getDetails(expense)}
-                  </div>
-                  <div className="sm:col-span-3 text-sm font-semibold text-right text-gray-900">
-                    {formatCurrency(expense?.amount)}
-                  </div>
-                </div>
-              ))}
+                  <option value="ALL">All Buses</option>
+                  {busFilterOptions.map((busOption) => (
+                    <option key={busOption.value} value={busOption.value}>{busOption.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-slate-400">Category Filter</label>
+                <select
+                  value={activeCategory}
+                  onChange={(e) => setActiveCategory(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none ring-[#00152a]/20 focus:ring"
+                >
+                  {CATEGORY_TABS.map((category) => (
+                    <option key={`flt-${category}`} value={category}>{category === "ALL" ? "All" : category}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-slate-400">Search</label>
+                <input
+                  type="text"
+                  value={keywordFilter}
+                  onChange={(e) => setKeywordFilter(e.target.value)}
+                  placeholder="Bus / details / category"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none ring-[#00152a]/20 focus:ring"
+                />
+              </div>
+
+              <div className="flex items-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="w-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50"
+                >
+                  Reset Date
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBusFilter("ALL");
+                    setKeywordFilter("");
+                  }}
+                  className="w-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+
+          <div className="px-5 py-5 md:px-8">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold text-slate-800">Expense History</p>
+              <p className="text-xs text-slate-500">{historyLabel}</p>
+            </div>
+
+            {loading ? (
+              <div className="py-14 text-center text-slate-500">Loading expenses...</div>
+            ) : orderedEntries.length === 0 ? (
+              <div className="py-14 text-center text-slate-500">No entries found for the selected filters.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[780px] text-left">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      <th className="py-3">Date / Time</th>
+                      <th className="py-3">Category</th>
+                      <th className="py-3">Vehicle Unit</th>
+                      <th className="py-3">Details</th>
+                      <th className="py-3 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {orderedEntries.map((expense, index) => {
+                      const category = String(expense?.category || "").toUpperCase();
+                      const badgeClass = CATEGORY_BADGE_CLASS[category] || "bg-slate-100 text-slate-700";
+                      return (
+                        <tr
+                          key={expense?.id || expense?._id || `${toDateKey(expense?.date)}-${expense?.busId || "bus"}-${index}`}
+                          className="hover:bg-slate-50/80"
+                        >
+                          <td className="py-4">
+                            <p className="text-sm font-black text-[#00152a]">{formatDateHeading(expense?.date)}</p>
+                            <p className="text-xs text-slate-400">{toDateKey(expense?.date)}</p>
+                          </td>
+                          <td className="py-4">
+                            <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest ${badgeClass}`}>
+                              {category || "UNKNOWN"}
+                            </span>
+                          </td>
+                          <td className="py-4 text-sm font-semibold text-[#00152a]">{getBusLabel(expense)}</td>
+                          <td className="py-4 text-sm text-slate-600">{getDetails(expense)}</td>
+                          <td className="py-4 text-right text-sm font-black text-[#00152a]">{formatCurrency(expense?.amount)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -587,7 +587,7 @@ onClick={() => {
                                     <div><span className="font-bold text-xs text-slate-400">Mother Mob.:</span> <span className="font-black text-xs text-slate-900">{s.family?.motherPhone}</span></div>
                                     <div><span className="font-bold text-xs text-slate-400">Primary Email:</span> <span className="font-black text-xs text-slate-900">{s.family?.parentsEmail}</span></div>
                                     <div><span className="font-bold text-xs text-slate-400">Annual Income:</span> <span className="font-black text-xs text-slate-900">₹{s.family?.familyIncome || 0}</span></div>
-                                    <div><span className="font-bold text-xs text-slate-400">Sibling Registry:</span> <span className="font-black text-xs text-slate-900">{s.family?.siblings ? "Active" : "None"}</span></div>
+                                    <div><span className="font-bold text-xs text-slate-400">Sibling Registry:</span> <span className="font-black text-xs text-slate-900">{s.siblings && s.siblings.length > 0 ? `${s.siblings.length} Linked (${s.siblings.map(sib => sib.name).join(', ')})` : "None"}</span></div>
                                     <div><span className="font-bold text-xs text-slate-400">Residential Area:</span> <span className="font-black text-xs text-slate-900">{s.address?.city}</span></div>
                                   </div>
                                 </div>
@@ -863,13 +863,30 @@ onClick={() => {
                             </div>
 
                             <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm">
-                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Sibling Link
-                                
+                               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                  <span className="material-symbols-outlined text-[14px]">supervisor_account</span>
+                                  Sibling Link
                                </div>
-                               <div className="text-lg font-black text-slate-900 flex items-center justify-between">
-                                  {detailStudent.siblingGroupId ? 'Verified Family' : 'Independent'}
-                                  <span className="material-symbols-outlined text-slate-200">family_restroom</span>
-                               </div>
+                               {detailStudent.siblings && detailStudent.siblings.length > 0 ? (
+                                 <div className="space-y-2">
+                                   {detailStudent.siblings.map((sib) => (
+                                     <div key={sib.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                                       <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-[11px] font-black flex-shrink-0">
+                                         {sib.name?.slice(0, 2).toUpperCase()}
+                                       </div>
+                                       <div>
+                                         <div className="text-[12px] font-black text-slate-900 leading-tight">{sib.name}</div>
+                                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{sib.standard} {sib.admission?.admissionNo ? `· ${sib.admission.admissionNo}` : ''}</div>
+                                       </div>
+                                     </div>
+                                   ))}
+                                 </div>
+                               ) : (
+                                 <div className="text-lg font-black text-slate-900 flex items-center justify-between">
+                                   Independent
+                                   <span className="material-symbols-outlined text-slate-200">family_restroom</span>
+                                 </div>
+                               )}
                             </div>
 
                             <div className="mt-12 pt-12 border-t border-slate-200">
