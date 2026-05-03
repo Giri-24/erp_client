@@ -272,17 +272,17 @@ const FeeStructurePage = () => {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-primary uppercase tracking-wider ml-1">
+                    <label className="text-[10px] font-bold bg-white text-primary uppercase tracking-wider ml-1">
                       Session / Academic Year *
                     </label>
-                    <div className="relative">
+                    <div className="relative bg-white">
                       <Select
                         showSearch
                         placeholder="Select or enter year (e.g. 2026-2027)"
                         value={form.academicYear || undefined}
                         onChange={(val) => setField("academicYear", val)}
                         onSearch={(val) => setField("academicYear", val)}
-                        className="w-full academic-year-select"
+                        className="w-full bg-white academic-year-select"
                         bordered={false}
                         options={academicYears.map(year => ({ label: year, value: year }))}
                         filterOption={(input, option) =>
@@ -556,22 +556,24 @@ const FeeStructurePage = () => {
                             className="flex gap-3 items-center bg-white/60 border border-dashed border-outline-variant px-3 py-2.5 rounded-xl"
                           >
                             <div className="flex-1">
-                              <select
-                                value={ki.storeItemId}
-                                onChange={(e) => {
-                                  const selected = storeItems.find((s) => s.id === e.target.value);
-                                  updateKitItem(idx, "storeItemId", e.target.value);
+                              <Select
+                                showSearch
+                                value={ki.storeItemId || undefined}
+                                placeholder="Select POS Item"
+                                onChange={(val) => {
+                                  const selected = storeItems.find((s) => s.id === val);
+                                  updateKitItem(idx, "storeItemId", val || "");
                                   if (selected) updateKitItem(idx, "amount", selected.sellingPrice || 0);
                                 }}
-                                className="w-full bg-transparent border-none text-sm font-medium focus:ring-0 outline-none appearance-none"
-                              >
-                                <option value="">Select POS Item</option>
-                                {storeItems.map((si) => (
-                                  <option key={si.id} value={si.id}>
-                                    {si.name} — {fmt(si.sellingPrice || 0)}
-                                  </option>
-                                ))}
-                              </select>
+                                filterOption={(input, option) =>
+                                  String(option?.label || "").toLowerCase().includes(String(input || "").toLowerCase())
+                                }
+                                options={storeItems.map((si) => ({
+                                  value: si.id,
+                                  label: `${si.name} — ${fmt(si.sellingPrice || 0)}`,
+                                }))}
+                                className="w-full"
+                              />
                             </div>
                             <div className="relative w-16">
                               <input

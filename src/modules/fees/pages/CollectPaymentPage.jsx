@@ -94,22 +94,36 @@ const computeTermComponents = (fee) => {
     );
   };
   const hasComponents = fee.terms.some(
-    (t) => (t.tuitionAmount || 0) > 0 || (t.transportAmount || 0) > 0 || (t.bookAmount || 0) > 0
+    (t) => (t.tuitionAmount || 0) > 0 || (t.transportAmount || 0) > 0
   );
   if (hasComponents) return fee.terms;
   const tuition = splitEvenly(Number(fee.tuitionFee || 0), nTerms);
   const transport = splitEvenly(Number(fee.transportFee || 0), nTerms);
-  const book = splitEvenly(Number(fee.bookFee || 0), nTerms);
-  const hostel = splitEvenly(Number(fee.hostelFee || 0), nTerms);
-  const other = splitEvenly(Number(fee.otherFee || 0), nTerms);
   return fee.terms.map((t, i) => ({
     ...t,
     tuitionAmount: tuition[i],
     transportAmount: transport[i],
-    bookAmount: book[i],
-    hostelAmount: hostel[i],
-    otherAmount: other[i],
+    bookAmount: 0,
+    hostelAmount: 0,
+    otherAmount: 0,
   }));
+};
+
+const getCustomFeeItems = (feeLike) => {
+  const sources = [
+    feeLike?.customItems,
+    feeLike?.assignedStructure?.customItems,
+    feeLike?.feeStructure?.customItems,
+    feeLike?.structure?.customItems,
+  ];
+  const list = sources.find((arr) => Array.isArray(arr) && arr.length > 0) || [];
+  return list
+    .map((ci, idx) => ({
+      id: ci?.id || `${ci?.name || "item"}-${idx}`,
+      name: String(ci?.name || "Custom Fee").trim(),
+      amount: Number(ci?.amount || 0),
+    }))
+    .filter((ci) => ci.name && ci.amount > 0);
 };
 
 const getAvailableReceiptComponentOptions = (fee) => {
@@ -119,7 +133,7 @@ const getAvailableReceiptComponentOptions = (fee) => {
   if (Number(fee.bookFee || 0) > 0) opts.push("bookFee");
   if (Number(fee.hostelFee || 0) > 0) opts.push("hostelFee");
   if (Number(fee.otherFee || 0) > 0) opts.push("otherFee");
-  if ((fee.customItems || []).length > 0) opts.push("customItems");
+  if (getCustomFeeItems(fee).length > 0) opts.push("customItems");
   return opts;
 };
 
@@ -137,7 +151,7 @@ const buildReceiptFeeRows = (payment) => {
   if (selected.includes("otherFee") && Number(payment?.otherFee || 0) > 0)
     rows.push({ key: "otherFee", label: "Other Fee", amount: Number(payment.otherFee) });
   if (selected.includes("customItems"))
-    (payment?.customItems || []).forEach((ci) =>
+    getCustomFeeItems(payment).forEach((ci) =>
       rows.push({ key: `custom-${ci.id || ci.name}`, label: ci.name, amount: Number(ci.amount || 0) })
     );
   return rows;
@@ -207,6 +221,7 @@ const CollectPaymentPage = ({ studentId }) => {
   const [splitPayments, setSplitPayments] = useState([]);
   const [payComponents, setPayComponents] = useState([]);
   const [payingNonTerm, setPayingNonTerm] = useState(false);
+  const [activeNonTermFeeKey, setActiveNonTermFeeKey] = useState(null);
   const [extraTermNumbers, setExtraTermNumbers] = useState([]);
   const [selectedStandardFilter, setSelectedStandardFilter] = useState("ALL");
   const [selectedSectionFilter, setSelectedSectionFilter] = useState("ALL");
@@ -326,10 +341,7 @@ const CollectPaymentPage = ({ studentId }) => {
     const nTerms = Number(fee.numberOfTerms || 1);
     const tuition = Number(fee.tuitionFee || 0);
     const transport = Number(fee.transportFee || 0);
-    const book = Number(fee.bookFee || 0);
-    const hostel = Number(fee.hostelFee || 0);
-    const other = Number(fee.otherFee || 0);
-    const termBase = tuition + transport + book + hostel + other;
+    const termBase = tuition + transport;
     const splitEvenly = (total, n) => {
       const per = Math.round((total / n) * 100) / 100;
       return Array.from({ length: n }, (_, i) =>
@@ -338,9 +350,6 @@ const CollectPaymentPage = ({ studentId }) => {
     };
     const tuitionSplit = splitEvenly(tuition, nTerms);
     const transportSplit = splitEvenly(transport, nTerms);
-    const bookSplit = splitEvenly(book, nTerms);
-    const hostelSplit = splitEvenly(hostel, nTerms);
-    const otherSplit = splitEvenly(other, nTerms);
     const termAmounts = splitEvenly(termBase, nTerms);
     const paidPerTerm = {};
     (fee.payments || payments || []).forEach((p) => {
@@ -359,9 +368,9 @@ const CollectPaymentPage = ({ studentId }) => {
         status: paid >= amount ? "PAID" : "UNPAID",
         tuitionAmount: tuitionSplit[i],
         transportAmount: transportSplit[i],
-        bookAmount: bookSplit[i],
-        hostelAmount: hostelSplit[i],
-        otherAmount: otherSplit[i],
+        bookAmount: 0,
+        hostelAmount: 0,
+        otherAmount: 0,
       };
     });
     return { ...fee, terms };
@@ -412,6 +421,7 @@ const CollectPaymentPage = ({ studentId }) => {
     setManualDiscount("");
     setTermNumber(null);
     setPayingNonTerm(false);
+    setActiveNonTermFeeKey(null);
     setPayComponents([]);
     setExtraTermNumbers([]);
     setReceiptComponents(getAvailableReceiptComponentOptions(fee));
@@ -465,7 +475,7 @@ const CollectPaymentPage = ({ studentId }) => {
     if (!selectedFee) { message.error("Please select a student"); return; }
     if (!splitMode) {
       if (!amount || Number(amount) <= 0) { message.error("Please enter an amount"); return; }
-      if (selectedFee.terms?.length > 0 && !termNumber && !payingNonTerm) { message.error("Please select a term or Non-Term Fees"); return; }
+      if (selectedFee.terms?.length > 0 && !termNumber && !payingNonTerm) { message.error("Please select a term or a fee to collect"); return; }
     }
     setLoading(true);
     try {
@@ -512,9 +522,6 @@ const CollectPaymentPage = ({ studentId }) => {
             const components = [
               { key: "tuition", val: selTerm.tuitionAmount || 0 },
               { key: "transport", val: selTerm.transportAmount || 0 },
-              { key: "book", val: selTerm.bookAmount || 0 },
-              { key: "hostel", val: selTerm.hostelAmount || 0 },
-              { key: "other", val: selTerm.otherAmount || 0 },
             ].map((c) => ({ ...c, paidAmount: componentPaid[c.key] || 0 }));
             const selectedVals = payComponents
               .map((k) => components.find((c) => c.key === k))
@@ -531,6 +538,24 @@ const CollectPaymentPage = ({ studentId }) => {
                 else { const share = Math.round((it.val / totalSelected) * actualAmount); paidComps[it.key] = share; rem -= share; }
               });
             }
+          }
+        }
+
+        if (payingNonTerm && activeNonTermFeeKey) {
+          const compKey = (() => {
+            if (activeNonTermFeeKey === "bookFee") return "book";
+            if (activeNonTermFeeKey === "hostelFee") return "hostel";
+            if (activeNonTermFeeKey === "otherFee") return "other";
+            if (activeNonTermFeeKey.startsWith("custom-")) {
+              const picked = getCustomFeeItems(selectedFee).find(
+                (ci) => `custom-${ci.id || ci.name}` === activeNonTermFeeKey
+              );
+              return picked ? `custom_${picked.name}` : null;
+            }
+            return null;
+          })();
+          if (compKey) {
+            paidComps = { [compKey]: actualAmount };
           }
         }
 
@@ -578,7 +603,7 @@ const CollectPaymentPage = ({ studentId }) => {
         bookFee: selectedFee?.bookFee,
         hostelFee: selectedFee?.hostelFee,
         otherFee: selectedFee?.otherFee,
-        customItems: selectedFee?.customItems,
+        customItems: getCustomFeeItems(selectedFee),
         discounts: selectedFee?.discounts,
         receiptComponents,
         paidComponents: result?.paidComponents || payload.paidComponents,
@@ -596,6 +621,7 @@ const CollectPaymentPage = ({ studentId }) => {
       setTermNumber(null);
       setPayComponents([]);
       setPayingNonTerm(false);
+      setActiveNonTermFeeKey(null);
       setSplitMode(false);
       setSplitPayments([]);
       setExtraTermNumbers([]);
@@ -916,6 +942,7 @@ const CollectPaymentPage = ({ studentId }) => {
                             if (isPaid) return;
                             setTermNumber(t.termNumber);
                             setPayingNonTerm(false);
+                            setActiveNonTermFeeKey(null);
                             setPayComponents([]);
                             setExtraTermNumbers([]);
                             setAmountFromSystem(balance.toString());
@@ -936,39 +963,66 @@ const CollectPaymentPage = ({ studentId }) => {
                       );
                     })}
 
-                    {/* Non-term fees button */}
+                    {/* Non-term fee buttons — one per fee type that exists in the structure */}
                     {(() => {
-                      const nonTermTotal = Number(selectedFee.bookFee || 0) + Number(selectedFee.hostelFee || 0) + Number(selectedFee.otherFee || 0) +
-                        (selectedFee.customItems || []).reduce((s, ci) => s + Number(ci.amount || 0), 0);
-                      if (nonTermTotal <= 0) return null;
-                      const nonTermPaid = payments?.filter((p) => !p.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
-                      const nonTermBal = Math.round(nonTermTotal - nonTermPaid);
-                      const isNonTermPaid = nonTermBal <= 0;
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (isNonTermPaid) return;
-                            setPayingNonTerm(true);
-                            setTermNumber(null);
-                            setPayComponents([]);
-                            setExtraTermNumbers([]);
-                            setAmountFromSystem(nonTermBal.toString());
-                          }}
-                          disabled={isNonTermPaid}
-                          className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 text-left transition-all ${payingNonTerm
-                            ? "border-tertiary bg-tertiary text-white shadow-lg"
-                            : isNonTermPaid
-                              ? "border-[#4caf50]/30 bg-[#e8f5e9]/60 text-[#2e7d32] cursor-not-allowed"
-                              : "border-outline-variant/30 bg-white text-on-surface hover:border-tertiary/40 hover:bg-tertiary/5"
+                      const nonTermCompPaid = {};
+                      payments?.filter((p) => !p.termNumber && p.status === "SUCCESS").forEach((p) => {
+                        if (p.paidComponents && typeof p.paidComponents === "object") {
+                          Object.entries(p.paidComponents).forEach(([k, v]) => {
+                            nonTermCompPaid[k] = (nonTermCompPaid[k] || 0) + Number(v);
+                          });
+                        }
+                      });
+                      const nonTermFees = [
+                        ...(Number(selectedFee.bookFee || 0) > 0 ? [{ key: "bookFee", compKey: "book", label: "Book Fee", amount: Number(selectedFee.bookFee), icon: "menu_book" }] : []),
+                        ...(Number(selectedFee.hostelFee || 0) > 0 ? [{ key: "hostelFee", compKey: "hostel", label: "Hostel Fee", amount: Number(selectedFee.hostelFee), icon: "hotel" }] : []),
+                        ...(Number(selectedFee.otherFee || 0) > 0 ? [{ key: "otherFee", compKey: "other", label: "Other Fee", amount: Number(selectedFee.otherFee), icon: "more_horiz" }] : []),
+                        ...getCustomFeeItems(selectedFee).map((ci) => ({
+                          key: `custom-${ci.id || ci.name}`,
+                          compKey: `custom_${ci.name}`,
+                          label: ci.name,
+                          amount: Number(ci.amount),
+                          icon: "sell",
+                        })),
+                      ];
+                      if (nonTermFees.length === 0) return null;
+                      return nonTermFees.map((fee) => {
+                        const feePaid = nonTermCompPaid[fee.compKey] || 0;
+                        const feeBal = Math.max(0, Math.round(fee.amount - feePaid));
+                        const isFeePaid = feeBal <= 0;
+                        const isActive = activeNonTermFeeKey === fee.key;
+                        return (
+                          <button
+                            key={fee.key}
+                            type="button"
+                            onClick={() => {
+                              if (isFeePaid) return;
+                              setPayingNonTerm(true);
+                              setActiveNonTermFeeKey(fee.key);
+                              setTermNumber(null);
+                              setPayComponents([]);
+                              setExtraTermNumbers([]);
+                              setAmountFromSystem(feeBal.toString());
+                            }}
+                            disabled={isFeePaid}
+                            className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                              isActive
+                                ? "border-tertiary bg-tertiary text-white shadow-lg"
+                                : isFeePaid
+                                  ? "border-[#4caf50]/30 bg-[#e8f5e9]/60 text-[#2e7d32] cursor-not-allowed"
+                                  : "border-outline-variant/30 bg-white text-on-surface hover:border-tertiary/40 hover:bg-tertiary/5"
                             }`}
-                        >
-                          <span className="text-xs font-bold">Other Fees</span>
-                          <span className={`text-[11px] mt-0.5 ${payingNonTerm ? "text-white/80" : isNonTermPaid ? "text-[#2e7d32]" : "text-tertiary"}`}>
-                            {isNonTermPaid ? "✓ Paid" : `Balance: ${fmt(nonTermBal)}`}
-                          </span>
-                        </button>
-                      );
+                          >
+                            <span className="flex items-center gap-1.5 text-xs font-bold">
+                              <span className="material-symbols-outlined text-sm">{fee.icon}</span>
+                              {fee.label}
+                            </span>
+                            <span className={`text-[11px] mt-0.5 ${isActive ? "text-white/80" : isFeePaid ? "text-[#2e7d32]" : "text-tertiary"}`}>
+                              {isFeePaid ? "✓ Paid" : `Balance: ${fmt(feeBal)}`}
+                            </span>
+                          </button>
+                        );
+                      });
                     })()}
                   </div>
 
@@ -991,9 +1045,6 @@ const CollectPaymentPage = ({ studentId }) => {
                     const components = [
                       { key: "tuition", label: "Tuition", val: selTerm.tuitionAmount || 0, icon: "school" },
                       ...(Number(selTerm.transportAmount || 0) > 0 ? [{ key: "transport", label: "Transport", val: selTerm.transportAmount, icon: "directions_bus", highlight: true }] : []),
-                      ...(Number(selTerm.bookAmount || 0) > 0 ? [{ key: "book", label: "Book", val: selTerm.bookAmount, icon: "menu_book" }] : []),
-                      ...(Number(selTerm.hostelAmount || 0) > 0 ? [{ key: "hostel", label: "Hostel", val: selTerm.hostelAmount, icon: "hotel" }] : []),
-                      ...(Number(selTerm.otherAmount || 0) > 0 ? [{ key: "other", label: "Other", val: selTerm.otherAmount, icon: "more_horiz" }] : []),
                     ].map((c) => ({ ...c, paidAmount: componentPaid[c.key] || 0, isFullyPaid: (componentPaid[c.key] || 0) >= c.val }));
                     const unpaidComponents = components.filter((c) => !c.isFullyPaid);
                     const toggleComponent = (key) => {

@@ -8,6 +8,7 @@ import {
 } from "../pos.service";
 import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 import { exportToCSV } from "../exportCsv";
+import StoreItemsPage from "./StoreItemsPage";
 
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
@@ -29,6 +30,7 @@ const PurchasesPage = () => {
   const [prItems, setPrItems] = useState([]); // [{itemId, name, quantity, unitPrice}]
   const [searchItem, setSearchItem] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showStoreItemsInline, setShowStoreItemsInline] = useState(false);
 
   // Supplier modal
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -153,7 +155,13 @@ const PurchasesPage = () => {
 
   const filteredItems = items.filter((i) => {
     if (!searchItem) return true;
-    return i.name.toLowerCase().includes(searchItem.toLowerCase()) || (i.sku || "").toLowerCase().includes(searchItem.toLowerCase());
+    const q = searchItem.toLowerCase();
+    return (
+      (i.name || "").toLowerCase().includes(q) ||
+      (i.sku || "").toLowerCase().includes(q) ||
+      (i.category || "").toLowerCase().includes(q) ||
+      (i.description || "").toLowerCase().includes(q)
+    );
   });
 
   const filteredPurchases = purchases.filter((p) => {
@@ -233,7 +241,30 @@ const PurchasesPage = () => {
 
       {/* ── NEW PURCHASE ── */}
       {tab === "new" && canManage && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="space-y-5">
+          {showStoreItemsInline && (
+            <div className="bg-white rounded-2xl p-4 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-primary text-base flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base">inventory_2</span>
+                  Items & Stores
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowStoreItemsInline(false);
+                    loadData();
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface-variant text-xs font-bold hover:bg-surface-container-highest"
+                >
+                  Close
+                </button>
+              </div>
+              <StoreItemsPage />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Items picker */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
@@ -252,6 +283,14 @@ const PurchasesPage = () => {
                   <input value={searchItem} onChange={(e) => setSearchItem(e.target.value)} placeholder="Search items..."
                     className="w-full bg-surface-container-high rounded-xl py-2.5 pl-10 pr-4 text-sm border-none outline-none focus:ring-2 focus:ring-primary/30" />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStoreItemsInline((prev) => !prev)}
+                  className="bg-secondary-fixed text-on-secondary-fixed-variant px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-all"
+                >
+                  <span className="material-symbols-outlined text-base">add_box</span>
+                  {showStoreItemsInline ? "Hide Items Store" : "Add Items Store"}
+                </button>
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[350px] overflow-y-auto pr-1">
                 {filteredItems.map((item) => (
@@ -320,6 +359,7 @@ const PurchasesPage = () => {
                 {submitting ? "Saving..." : `Record Purchase — ${fmt(prTotal)}`}
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}
