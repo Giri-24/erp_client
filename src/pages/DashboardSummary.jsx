@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Form, message, Spin, Avatar, Select } from "antd";
+import { message, Spin, Avatar, Select } from "antd";
 import {
   getAdmissionDashboardSummary,
   exportAdmissionsCsv,
@@ -24,22 +24,42 @@ const DashboardSummary = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [academicYear, setAcademicYear] = useState("");
   const [availableYears, setAvailableYears] = useState([]);
-  const [seatForm] = Form.useForm();
-  const [siblingForm] = Form.useForm();
+  const [totalApplicantsCount, setTotalApplicantsCount] = useState(0);
+
+  const normalizeYear = (value) => String(value || "").trim();
+
+  const toApplicantAcademicYear = (applicant) =>
+    normalizeYear(applicant?.academicYear || applicant?.admission?.academicYear);
+
+  const getRecentApplicantsForYear = (rows, selectedAcademicYear) => {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!selectedAcademicYear) return list;
+
+    const selected = normalizeYear(selectedAcademicYear);
+    const withAcademicYear = list.filter((applicant) => toApplicantAcademicYear(applicant));
+
+    // If rows don't carry academicYear data, keep the existing recent-applicants behavior.
+    if (!withAcademicYear.length) return list;
+
+    return withAcademicYear.filter((applicant) => toApplicantAcademicYear(applicant) === selected);
+  };
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [summaryData, pendingData] = await Promise.all([
         getAdmissionDashboardSummary(academicYear),
-        getPendingAdmissions()
+        getPendingAdmissions(),
       ]);
+      const recentApplicants = getRecentApplicantsForYear(pendingData, academicYear);
       setSummary(summaryData);
-      setPendingApplicants(pendingData.slice(0, 5)); // Show top 5 recent
-      seatForm.setFieldsValue(summaryData.standardSeats || {});
+      setPendingApplicants(recentApplicants.slice(0, 5)); // Show top 5 recent
+      setTotalApplicantsCount(recentApplicants.length);
     } catch (err) {
       console.error(err);
       message.error("Failed to load dashboard data");
+      setPendingApplicants([]);
+      setTotalApplicantsCount(0);
     }
     setLoading(false);
   };
@@ -90,27 +110,23 @@ const DashboardSummary = ({ onNavigate }) => {
 
   if (!summary) return <div className="text-on-surface-variant">No dashboard data available.</div>;
 
-  const { total, approved, pending } = summary;
+  const { total, approved } = summary;
   const approvalRate = total ? Math.round((approved / total) * 100) : 0;
   const yearComparison = summary.yearComparison || {};
   const admissionProgress = summary.admissionProgress || {};
   const milestoneItems = (summary.upcomingMilestones?.length ? summary.upcomingMilestones : summary.milestones || []).slice(0, 3);
-  const nextMilestone = milestoneItems[0] || null;
   const comparisonText = yearComparison.previousAcademicYear
     ? `vs ${yearComparison.previousAcademicYear}`
     : "vs previous year";
-  const progressText = admissionProgress.totalTarget
-    ? `${admissionProgress.currentCount || 0}/${admissionProgress.totalTarget} target`
-    : `${admissionProgress.currentCount || 0} admissions`;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 duration-500 animate-in fade-in">
       {/* Page Header */}
-      <div className="flex justify-between items-end mb-4">
+      <div className="flex items-end justify-between mb-4">
         <div className="flex items-end gap-6">
           <div>
-            <h2 className="text-3xl font-extrabold font-headline text-primary tracking-tight">Admissions Dashboard</h2>
-            <p className="text-on-surface-variant mt-1">Reviewing Fall {academicYear} academic cycle applications</p>
+            <h2 className="text-3xl font-extrabold tracking-tight font-headline text-primary">Admissions Dashboard</h2>
+            <p className="mt-1 text-on-surface-variant">Reviewing Fall {academicYear} academic cycle applications</p>
           </div>
           <div className="mb-1">
              <Select
@@ -131,7 +147,7 @@ const DashboardSummary = ({ onNavigate }) => {
             onClick={onExportCsv}
             className="px-6 py-2.5 bg-surface-container-high text-primary font-bold rounded-xl flex items-center gap-2 scale-[0.98] active:scale-95 transition-transform hover:bg-surface-variant"
           >
-            <span className="material-symbols-outlined text-lg">file_download</span>
+            <span className="text-lg material-symbols-outlined">file_download</span>
             Export List
           </button>
           <button 
@@ -142,97 +158,44 @@ const DashboardSummary = ({ onNavigate }) => {
            onClick={() => onNavigate("admission")}
             // className="px-6 py-2.5 bg-linear-to-br from-primary to-primary-container text-black font-bold rounded-xl flex items-center gap-2 scale-[0.98] active:scale-95 transition-transform shadow-lg shadow-primary/10 hover:opacity-90"
           >
-            <span className="material-symbols-outlined text-lg">add_circle</span>
+            <span className="text-lg material-symbols-outlined">add_circle</span>
             New Application
           </button>
         </div>
       </div>
 
       {/* Bento Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {/* Total Applicants */}
-        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-ambient-sm relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
-          <div className="flex justify-between items-start relative z-10">
+        <div className="relative p-6 overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient-sm group">
+          <div className="absolute w-24 h-24 transition-colors rounded-full -right-4 -top-4 bg-primary/5 blur-2xl group-hover:bg-primary/10"></div>
+          <div className="relative z-10 flex items-start justify-between">
             <div>
-              <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Total Applicants</p>
-              <h3 className="text-4xl font-extrabold font-headline text-primary">{total.toLocaleString()}</h3>
+              <p className="mb-1 text-xs font-bold tracking-widest uppercase text-on-surface-variant">Total Applicants</p>
+              <h3 className="text-4xl font-extrabold font-headline text-primary">{totalApplicantsCount.toLocaleString()}</h3>
             </div>
-            <span className="p-3 bg-primary-fixed rounded-full text-primary material-symbols-outlined">group</span>
+            <span className="p-3 rounded-full bg-primary-fixed text-primary material-symbols-outlined">group</span>
           </div>
-          <div className="mt-4 flex items-center gap-2">
+          <div className="flex items-center gap-2 mt-4">
             <span className={`font-bold flex items-center text-xs ${yearComparison.trend === "down" ? "text-error" : "text-tertiary-fixed-dim"}`}>
-              <span className="material-symbols-outlined text-sm">{yearComparison.trend === "down" ? "trending_down" : "trending_up"}</span>
+              <span className="text-sm material-symbols-outlined">{yearComparison.trend === "down" ? "trending_down" : "trending_up"}</span>
               {formatSignedPercent(yearComparison.percentageChange)}
             </span>
             <span className="text-on-surface-variant text-[10px]">{comparisonText}</span>
           </div>
         </div>
 
-        {/* Approved */}
-        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-ambient-sm relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-tertiary-fixed-dim/5 rounded-full blur-2xl group-hover:bg-tertiary-fixed-dim/10 transition-colors"></div>
-          <div className="flex justify-between items-start relative z-10">
-            <div>
-              <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Approved</p>
-              <h3 className="text-4xl font-extrabold font-headline text-primary">{approved.toLocaleString()}</h3>
-            </div>
-            <span className="p-3 bg-tertiary-fixed rounded-full text-on-tertiary-fixed-variant material-symbols-outlined">verified</span>
-          </div>
-          <div className="mt-4 flex items-center gap-2">
-            <span className="text-on-surface-variant text-xs font-semibold">{approvalRate}% Approval Rate</span>
-            <div className="flex-1 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
-              <div className="h-full bg-tertiary-fixed-dim rounded-full" style={{ width: `${approvalRate}%` }}></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Pending Review */}
-        <div className="bg-surface-container-lowest p-6 rounded-xl shadow-ambient-sm relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-secondary-fixed-dim/5 rounded-full blur-2xl group-hover:bg-secondary-fixed-dim/10 transition-colors"></div>
-          <div className="flex justify-between items-start relative z-10">
-            <div>
-              <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-1">Pending Review</p>
-              <h3 className="text-4xl font-extrabold font-headline text-primary">{pending.toLocaleString()}</h3>
-            </div>
-            <span className="p-3 bg-secondary-fixed rounded-full text-on-secondary-fixed-variant material-symbols-outlined">pending_actions</span>
-          </div>
-          <div className="mt-4 flex items-center gap-2">
-            <div className="flex -space-x-2">
-              <div className="w-6 h-6 rounded-full bg-surface-container-high border-2 border-white flex items-center justify-center text-[8px] font-bold text-primary">+{nextMilestone?.remainingCount || pending}</div>
-            </div>
-            <span className="text-on-surface-variant text-[10px]">
-              {nextMilestone ? `${nextMilestone.remainingCount} more for ${nextMilestone.threshold}% milestone` : "Require immediate action"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Insight Chips */}
-      <div className="flex flex-wrap gap-3">
-        <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-ambient-sm border border-outline-variant/10 text-xs font-medium">
-          <span className="material-symbols-outlined text-sm text-tertiary-fixed-dim">auto_awesome</span>
-          <span>{progressText} tracked for this cycle</span>
-        </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-ambient-sm border border-outline-variant/10 text-xs font-medium text-error">
-          <span className="material-symbols-outlined text-sm">warning</span>
-          <span>{pending} applications still pending review</span>
-        </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-ambient-sm border border-outline-variant/10 text-xs font-medium">
-          <span className="material-symbols-outlined text-sm text-primary">schedule</span>
-          <span>{nextMilestone ? `${formatMilestoneTitle(nextMilestone)} needs ${nextMilestone.remainingCount} more admissions` : `Progress at ${admissionProgress.progressPercent || 0}%`}</span>
-        </div>
       </div>
 
       {/* Recent Applicants Table */}
-      <div className="bg-surface-container-lowest rounded-xl shadow-ambient overflow-hidden">
-        <div className="p-6 border-b border-surface-container-low flex justify-between items-center">
+      <div className="overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient">
+        <div className="flex items-center justify-between p-6 border-b border-surface-container-low">
           <h4 className="text-xl font-bold font-headline text-primary">Recent Applicants</h4>
           <div className="flex items-center gap-2">
-            <button className="p-2 hover:bg-surface-container-high rounded-lg transition-colors">
+            <button className="p-2 transition-colors rounded-lg hover:bg-surface-container-high">
               <span className="material-symbols-outlined text-on-surface-variant">filter_list</span>
             </button>
-            <button className="p-2 hover:bg-surface-container-high rounded-lg transition-colors">
+            <button className="p-2 transition-colors rounded-lg hover:bg-surface-container-high">
               <span className="material-symbols-outlined text-on-surface-variant">more_vert</span>
             </button>
           </div>
@@ -250,20 +213,36 @@ const DashboardSummary = ({ onNavigate }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container-low">
-              {pendingApplicants.map((applicant) => (
-                <tr key={applicant.studentId} className="hover:bg-surface/60 transition-colors group">
+              {pendingApplicants.map((applicant, idx) => {
+                const fullName =
+                  applicant.name ||
+                  applicant.studentName ||
+                  [applicant.firstName, applicant.lastName].filter(Boolean).join(" ") ||
+                  "Unnamed Applicant";
+                const initials =
+                  fullName
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join("")
+                    .toUpperCase() || "NA";
+                const profileEmail = applicant.email || applicant.users?.email || "";
+
+                return (
+                <tr key={applicant.studentId || applicant.id || idx} className="transition-colors hover:bg-surface/60 group">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">
                       <Avatar 
-                        src={applicant.photo} 
+                        src={applicant.photo || applicant.documents?.[0]?.photoPath} 
                         size={36} 
-                        className="bg-primary-fixed text-primary font-bold"
+                        className="font-bold bg-primary-fixed text-primary"
                       >
-                        {applicant.firstName?.charAt(0)}
+                        {initials}
                       </Avatar>
                       <div>
-                        <p className="font-bold text-sm text-primary">{applicant.firstName} {applicant.lastName}</p>
-                        <p className="text-[10px] text-on-surface-variant">{applicant.email || "No email"}</p>
+                        <p className="text-sm font-bold text-primary">{fullName}</p>
+                        <p className="text-[10px] text-on-surface-variant">{profileEmail}</p>
                       </div>
                     </div>
                   </td>
@@ -286,16 +265,16 @@ const DashboardSummary = ({ onNavigate }) => {
                   <td className="px-6 py-5 text-right">
                     <button 
                       onClick={() => onNavigate("approval")}
-                      className="text-primary hover:bg-primary-fixed p-2 rounded-lg transition-all"
+                      className="p-2 transition-all rounded-lg text-primary hover:bg-primary-fixed"
                     >
-                      <span className="material-symbols-outlined text-lg">visibility</span>
+                      <span className="text-lg material-symbols-outlined">visibility</span>
                     </button>
                   </td>
                 </tr>
-              ))}
+              )})}
               {pendingApplicants.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="px-6 py-10 text-center text-on-surface-variant italic">No recent applicants found</td>
+                  <td colSpan="6" className="px-6 py-10 italic text-center text-on-surface-variant">No recent applicants found</td>
                 </tr>
               )}
             </tbody>
@@ -304,10 +283,10 @@ const DashboardSummary = ({ onNavigate }) => {
       </div>
 
       {/* Bottom Dashboard Modules */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {/* Timeline */}
-        <div className="bg-surface-container-lowest p-8 rounded-xl shadow-ambient relative overflow-hidden">
-          <h4 className="text-lg font-bold font-headline mb-6">Upcoming Milestones</h4>
+        <div className="relative p-8 overflow-hidden bg-surface-container-lowest rounded-xl shadow-ambient">
+          <h4 className="mb-6 text-lg font-bold font-headline">Upcoming Milestones</h4>
           <div className="relative pl-8 space-y-8 before:content-[''] before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gradient-to-b before:from-primary before:via-tertiary-fixed-dim before:to-surface-container-high">
             {milestoneItems.length > 0 ? milestoneItems.map((milestone, index) => {
               const colorClass = index === 0 ? "bg-primary text-primary" : index === 1 ? "bg-tertiary-fixed-dim text-tertiary-fixed-dim" : "bg-surface-container-high text-on-surface-variant";
@@ -315,7 +294,7 @@ const DashboardSummary = ({ onNavigate }) => {
                 <div key={`${milestone.threshold}-${index}`} className={`relative ${milestone.achieved ? "opacity-60" : ""}`}>
                   <div className={`absolute -left-[28px] top-1 w-5 h-5 rounded-full ring-4 ring-white ${colorClass.split(" ")[0]}`}></div>
                   <p className={`text-xs font-bold ${colorClass.split(" ")[1]}`}>{milestone.threshold}% TARGET</p>
-                  <p className="font-bold text-sm">{formatMilestoneTitle(milestone)}</p>
+                  <p className="text-sm font-bold">{formatMilestoneTitle(milestone)}</p>
                   <p className="text-xs text-on-surface-variant">
                     {milestone.currentCount} reached out of {milestone.targetCount}. {milestone.remainingCount > 0 ? `${milestone.remainingCount} more admissions needed.` : "Milestone achieved."}
                   </p>
@@ -325,7 +304,7 @@ const DashboardSummary = ({ onNavigate }) => {
               <div className="relative">
                 <div className="absolute -left-[28px] top-1 w-5 h-5 bg-surface-container-high rounded-full ring-4 ring-white"></div>
                 <p className="text-xs font-bold text-on-surface-variant">ALL CLEAR</p>
-                <p className="font-bold text-sm">No upcoming milestones pending</p>
+                <p className="text-sm font-bold">No upcoming milestones pending</p>
                 <p className="text-xs text-on-surface-variant">Current admission cycle has no pending milestone threshold.</p>
               </div>
             )}
@@ -336,38 +315,38 @@ const DashboardSummary = ({ onNavigate }) => {
         <div className="grid grid-cols-2 gap-4">
           <button 
             onClick={() => onNavigate("bulk-upload")}
-            className="bg-white hover:bg-primary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
+            className="flex flex-col items-center justify-center gap-3 p-6 text-center transition-all bg-white border shadow-sm hover:bg-primary-fixed rounded-xl group border-outline-variant/10"
           >
-            <span className="p-4 bg-primary-fixed group-hover:bg-white rounded-full text-primary transition-colors material-symbols-outlined">mail</span>
-            <span className="font-bold text-sm font-headline">Bulk Upload</span>
+            <span className="p-4 transition-colors rounded-full bg-primary-fixed group-hover:bg-white text-primary material-symbols-outlined">mail</span>
+            <span className="text-sm font-bold font-headline">Bulk Upload</span>
           </button>
           <button 
             onClick={() => onNavigate("approval")}
-            className="bg-white hover:bg-tertiary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
+            className="flex flex-col items-center justify-center gap-3 p-6 text-center transition-all bg-white border shadow-sm hover:bg-tertiary-fixed rounded-xl group border-outline-variant/10"
           >
-            <span className="p-4 bg-tertiary-fixed group-hover:bg-white rounded-full text-on-tertiary-fixed-variant transition-colors material-symbols-outlined">edit_calendar</span>
-            <span className="font-bold text-sm font-headline">Review Apps</span>
+            <span className="p-4 transition-colors rounded-full bg-tertiary-fixed group-hover:bg-white text-on-tertiary-fixed-variant material-symbols-outlined">edit_calendar</span>
+            <span className="text-sm font-bold font-headline">Review Apps</span>
           </button>
           <button 
             onClick={onExportCsv}
-            className="bg-white hover:bg-secondary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
+            className="flex flex-col items-center justify-center gap-3 p-6 text-center transition-all bg-white border shadow-sm hover:bg-secondary-fixed rounded-xl group border-outline-variant/10"
           >
-            <span className="p-4 bg-secondary-fixed group-hover:bg-white rounded-full text-on-secondary-fixed-variant transition-colors material-symbols-outlined">description</span>
-            <span className="font-bold text-sm font-headline">Generate Reports</span>
+            <span className="p-4 transition-colors rounded-full bg-secondary-fixed group-hover:bg-white text-on-secondary-fixed-variant material-symbols-outlined">description</span>
+            <span className="text-sm font-bold font-headline">Generate Reports</span>
           </button>
           <button 
             onClick={() => onNavigate("admin-settings")}
-            className="bg-white hover:bg-surface-container-high p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
+            className="flex flex-col items-center justify-center gap-3 p-6 text-center transition-all bg-white border shadow-sm hover:bg-surface-container-high rounded-xl group border-outline-variant/10"
           >
-            <span className="p-4 bg-surface-container-high group-hover:bg-white rounded-full text-on-surface-variant transition-colors material-symbols-outlined">settings_account_box</span>
-            <span className="font-bold text-sm font-headline">Manage Access</span>
+            <span className="p-4 transition-colors rounded-full bg-surface-container-high group-hover:bg-white text-on-surface-variant material-symbols-outlined">settings_account_box</span>
+            <span className="text-sm font-bold font-headline">Manage Access</span>
           </button>
           <button 
             onClick={() => onNavigate("transport-report")}
-            className="bg-white hover:bg-primary-fixed p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center transition-all group border border-outline-variant/10 shadow-sm"
+            className="flex flex-col items-center justify-center gap-3 p-6 text-center transition-all bg-white border shadow-sm hover:bg-primary-fixed rounded-xl group border-outline-variant/10"
           >
-            <span className="p-4 bg-primary-fixed group-hover:bg-white rounded-full text-primary transition-colors material-symbols-outlined">directions_bus</span>
-            <span className="font-bold text-sm font-headline">Bus Report</span>
+            <span className="p-4 transition-colors rounded-full bg-primary-fixed group-hover:bg-white text-primary material-symbols-outlined">directions_bus</span>
+            <span className="text-sm font-bold font-headline">Bus Report</span>
           </button>
         </div>
       </div>

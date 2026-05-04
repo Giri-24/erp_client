@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Form, message, Select, Modal, InputNumber, Radio } from "antd";
+import { message, Select, Modal, InputNumber, Radio } from "antd";
 import { useMemo } from "react";
 
 import {
@@ -45,8 +45,6 @@ const ToggleSwitch = ({ checked, onChange, disabled }) => (
 
 // ── component ─────────────────────────────────────────────────────────────────
 const AssignFeePage = ({ initialStudentId, onMounted }) => {
-  const [form] = Form.useForm();
-
   const [students, setStudents] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [recentAssignments, setRecentAssignments] = useState([]);

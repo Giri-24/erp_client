@@ -14,7 +14,7 @@ import "jspdf-autotable";
 import {
   getDocRequests, createDocRequest, reviewDocRequest, issueDocRequest,
   getDocIssueData, deleteDocRequest, getDocRequestStats,
-  DOC_REQUEST_TYPES, DOC_STATUS_OPTIONS,
+  DOC_REQUEST_TYPES, DOC_STATUS_OPTIONS, BONAFIDE_SCENARIO_TYPES, getBonafideTemplates,
 } from "../doc-request.service";
 import instance from "../../../utils/axios";
 import { hasPermission, PERMISSIONS } from "../../../utils/permissions";
@@ -40,6 +40,35 @@ const statusColor = (s) =>
 
 const typeLabel = (t) =>
   DOC_REQUEST_TYPES.find((o) => o.value === t)?.label || t;
+
+const scenarioLabel = (s) =>
+  BONAFIDE_SCENARIO_TYPES.find((o) => o.value === s)?.label || s;
+
+const BONAFIDE_TEMPLATE_FALLBACK = {
+  STUDY_PURPOSE: {
+    title: "BONAFIDE CERTIFICATE",
+    bodyTemplate:
+      "This is to certify that {{studentName}}, {{parentRef}}, DOB {{dob}}, Admission No {{admissionNo}}, is/was a bonafide student of this school from {{fromStd}} to {{toStd}} during the academic year {{academicYear}}. This certificate is issued for {{purpose}}.",
+  },
+  PASSPORT_VISA: {
+    title: "BONAFIDE CERTIFICATE - PASSPORT / VISA",
+    bodyTemplate:
+      "This is to certify that {{studentName}}, {{parentRef}}, DOB {{dob}}, Admission No {{admissionNo}}, is/was a bonafide student of this school from {{fromStd}} to {{toStd}} during the academic year {{academicYear}}. This certificate is issued for Passport / Visa processing before {{authority}}.",
+  },
+  SCHOLARSHIP: {
+    title: "BONAFIDE CERTIFICATE - SCHOLARSHIP",
+    bodyTemplate:
+      "This is to certify that {{studentName}}, {{parentRef}}, DOB {{dob}}, Admission No {{admissionNo}}, is/was a bonafide student of this school from {{fromStd}} to {{toStd}} during the academic year {{academicYear}}. This certificate is issued for scholarship submission to {{authority}}.",
+  },
+  EDUCATION_LOAN: {
+    title: "BONAFIDE CERTIFICATE - EDUCATION LOAN",
+    bodyTemplate:
+      "This is to certify that {{studentName}}, {{parentRef}}, DOB {{dob}}, Admission No {{admissionNo}}, is/was a bonafide student of this school from {{fromStd}} to {{toStd}} during the academic year {{academicYear}}. This certificate is issued for education loan processing at {{authority}}.",
+  },
+};
+
+const fillTemplate = (template, vars) =>
+  String(template || "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key) => vars[key] ?? "");
 
 const normalizeAssetSrc = (value) => {
   if (!value) return "";
@@ -121,24 +150,41 @@ const generateBonafidePDF = async (data, assets) => {
   doc.text(`(Reg No: ${school.regNo || "017-M-0068-0518"})`, 14, y);
   y += 20;
 
+  const selectedScenario = req?.bonafideScenario || "STUDY_PURPOSE";
+  const fallbackTemplate = BONAFIDE_TEMPLATE_FALLBACK[selectedScenario] || BONAFIDE_TEMPLATE_FALLBACK.STUDY_PURPOSE;
+  const backendTemplate = data?.bonafideTemplate;
+  const certTitle = backendTemplate?.title || fallbackTemplate.title;
+
   doc.setFontSize(18);
   doc.setFont(undefined, "bold");
-  doc.text("BONAFIDE CERTIFICATE", w / 2, y, { align: "center" });
+  doc.text(certTitle, w / 2, y, { align: "center" });
   doc.setFont(undefined, "normal");
   y += 25;
 
   // Body
   doc.setFontSize(12);
-  const fatherName = fam?.fatherName || "________________";
-  const motherName = fam?.motherName || "________________";
-  const parentRef = fatherName !== "________________" ? `S/O or D/O of ${fatherName}` : `S/O or D/O of ________________`;
+  const fatherName = fam?.fatherName || "";
+  const motherName = fam?.motherName || "";
+  const parentName = fatherName || motherName || "________________";
+  const parentRef = `S/O or D/O of ${parentName}`;
   const dobStr = st.dob ? dayjs(st.dob).format("DD-MM-YYYY") : "________________";
   const admNo = adm?.admissionNo || "________________";
   const fromStd = formatStd(adm?.standard) || "________";
   const toStd = formatStd(st.standard) || "________";
   const acYear = st.academicYear || adm?.academicYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
 
-  const bodyText = `This is to certify that ${st.name} , ${parentRef} ,  DOB ${dobStr} , Admin no ${admNo} was a bonafide student of this school from ${fromStd} to ${toStd} std during the academic years ${acYear}.`;
+  const bodyTemplate = req?.bonafideTemplateText || backendTemplate?.bodyTemplate || fallbackTemplate.bodyTemplate;
+  const bodyText = fillTemplate(bodyTemplate, {
+    studentName: st.name || "________________",
+    parentRef,
+    dob: dobStr,
+    admissionNo: admNo,
+    fromStd,
+    toStd,
+    academicYear: acYear,
+    purpose: req?.bonafidePurpose || req?.reason || "general purpose",
+    authority: req?.bonafideAuthority || "the concerned authority",
+  });
 
   const lines = doc.splitTextToSize(bodyText, w - 28);
   doc.text(lines, 14, y, { lineHeightFactor: 1.8 });
@@ -300,6 +346,8 @@ const DocRequestPage = () => {
   const [issueForm] = Form.useForm();
   const [issuing, setIssuing] = useState(false);
   const [documentAssets, setDocumentAssets] = useState({});
+  const [bonafideTemplates, setBonafideTemplates] = useState([]);
+  const selectedCreateType = Form.useWatch("type", createForm);
 
   // Permissions
   const canCreate = hasPermission(PERMISSIONS.DOC_REQUEST_CREATE);
@@ -335,9 +383,19 @@ const DocRequestPage = () => {
     }
   };
 
+  const fetchBonafideTemplates = async () => {
+    try {
+      const templates = await getBonafideTemplates();
+      setBonafideTemplates(Array.isArray(templates) ? templates : []);
+    } catch {
+      setBonafideTemplates([]);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     fetchDocumentAssets();
+    fetchBonafideTemplates();
   }, []);
 
   // ── student search ─────────────────────────────────────────────────────
@@ -390,6 +448,10 @@ const DocRequestPage = () => {
     issueForm.setFieldsValue({
       conductRemark: record.conductRemark || "Good",
       qualifiedForPromotion: record.qualifiedForPromotion ?? true,
+      bonafideScenario: record.bonafideScenario,
+      bonafidePurpose: record.bonafidePurpose || record.reason,
+      bonafideAuthority: record.bonafideAuthority,
+      bonafideTemplateText: record.bonafideTemplateText,
     });
     setIssueOpen(true);
   };
@@ -711,6 +773,30 @@ const DocRequestPage = () => {
           >
             <Select options={DOC_REQUEST_TYPES} placeholder="Select type" />
           </Form.Item>
+          {selectedCreateType === "BONAFIDE_CERTIFICATE" && (
+            <>
+              <Form.Item
+                name="bonafideScenario"
+                label="Bonafide Scenario"
+                rules={[{ required: true, message: "Select bonafide scenario" }]}
+              >
+                <Select options={BONAFIDE_SCENARIO_TYPES} placeholder="Select scenario" />
+              </Form.Item>
+              <Form.Item
+                name="bonafidePurpose"
+                label="Purpose"
+                rules={[{ required: true, message: "Enter purpose" }]}
+              >
+                <Input placeholder="e.g. College admission, passport renewal" />
+              </Form.Item>
+              <Form.Item name="bonafideAuthority" label="Authority / Institution">
+                <Input placeholder="e.g. Passport Office, ABC Bank, Scholarship Board" />
+              </Form.Item>
+              <Form.Item name="bonafideTemplateText" label="Custom Template Text (optional)">
+                <Input.TextArea rows={3} placeholder="Use placeholders like {{studentName}}, {{admissionNo}}, {{academicYear}}" />
+              </Form.Item>
+            </>
+          )}
           <Form.Item name="reason" label="Reason / Purpose">
             <Input.TextArea rows={3} placeholder="Why is this document needed?" />
           </Form.Item>
@@ -802,6 +888,13 @@ const DocRequestPage = () => {
             <Descriptions.Item label="Document Type" span={2}>
               <Tag>{typeLabel(selected.type)}</Tag>
             </Descriptions.Item>
+            {selected.type === "BONAFIDE_CERTIFICATE" && (
+              <>
+                <Descriptions.Item label="Bonafide Scenario">{scenarioLabel(selected.bonafideScenario) || "—"}</Descriptions.Item>
+                <Descriptions.Item label="Authority">{selected.bonafideAuthority || "—"}</Descriptions.Item>
+                <Descriptions.Item label="Bonafide Purpose" span={2}>{selected.bonafidePurpose || "—"}</Descriptions.Item>
+              </>
+            )}
             <Descriptions.Item label="Reason" span={2}>{selected.reason || "—"}</Descriptions.Item>
             <Descriptions.Item label="Requested By">{selected.requestedBy?.name} ({selected.requestedBy?.role})</Descriptions.Item>
             <Descriptions.Item label="Requested At">{dayjs(selected.requestedAt).format("DD-MMM-YYYY HH:mm")}</Descriptions.Item>
@@ -900,9 +993,41 @@ const DocRequestPage = () => {
             </>
           )}
           {selected?.type !== "TRANSFER_CERTIFICATE" && (
-            <p style={{ color: "#666", fontSize: 13 }}>
-              Click "Issue & Generate PDF" to mark as issued and download the {typeLabel(selected?.type)}.
-            </p>
+            <>
+              {selected?.type === "BONAFIDE_CERTIFICATE" && (
+                <>
+                  <Form.Item
+                    name="bonafideScenario"
+                    label="Bonafide Scenario"
+                    rules={[{ required: true, message: "Select bonafide scenario" }]}
+                  >
+                    <Select
+                      options={BONAFIDE_SCENARIO_TYPES}
+                      placeholder="Select scenario"
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    name="bonafidePurpose"
+                    label="Purpose"
+                    rules={[{ required: true, message: "Enter purpose" }]}
+                  >
+                    <Input placeholder="Purpose shown in certificate" />
+                  </Form.Item>
+                  <Form.Item name="bonafideAuthority" label="Authority / Institution">
+                    <Input placeholder="Authority receiving this bonafide" />
+                  </Form.Item>
+                  <Form.Item name="bonafideTemplateText" label="Custom Template Text (optional)">
+                    <Input.TextArea rows={4} placeholder="Use placeholders like {{studentName}}, {{admissionNo}}, {{academicYear}}" />
+                  </Form.Item>
+                  <div style={{ marginBottom: 8, fontSize: 12, color: "#666" }}>
+                    Available templates from backend: {bonafideTemplates.length || 4}
+                  </div>
+                </>
+              )}
+              <p style={{ color: "#666", fontSize: 13 }}>
+                Click "Issue & Generate PDF" to mark as issued and download the {typeLabel(selected?.type)}.
+              </p>
+            </>
           )}
         </Form>
       </Modal>

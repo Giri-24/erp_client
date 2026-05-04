@@ -9,6 +9,7 @@ import {
   getNextAdmissionNo,
 } from "../modules/admission/admission.service";
 import { getAcademicYears } from "../modules/fees/fees.service";
+import instance from "../utils/axios";
 
 const fmt = (v) => Number(v || 0).toLocaleString("en-IN");
 
@@ -53,6 +54,26 @@ const AdmissionDeskDashboard = ({ onNavigate }) => {
   const [nextAdmNo, setNextAdmNo] = useState("");
   const [academicYear, setAcademicYear] = useState("");
   const [availableYears, setAvailableYears] = useState([]);
+  const [totalApplicationsCount, setTotalApplicationsCount] = useState(0);
+
+  const normalizeYear = (value) => String(value || "").trim();
+
+  const toStudentAcademicYear = (student) =>
+    normalizeYear(student?.academicYear || student?.admission?.academicYear);
+
+  const getStudentsTabTotalCount = (rows, selectedAcademicYear) => {
+    const list = Array.isArray(rows) ? rows : [];
+    const approvedStudents = list.filter((student) => Boolean(student?.admission?.isApproved));
+
+    if (!selectedAcademicYear) return approvedStudents.length;
+
+    const selected = normalizeYear(selectedAcademicYear);
+    const withAcademicYear = approvedStudents.filter((student) => toStudentAcademicYear(student));
+
+    if (!withAcademicYear.length) return approvedStudents.length;
+
+    return withAcademicYear.filter((student) => toStudentAcademicYear(student) === selected).length;
+  };
 
   useEffect(() => {
     loadInitial();
@@ -75,16 +96,23 @@ const AdmissionDeskDashboard = ({ onNavigate }) => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [summaryData, pendingData, admNo] = await Promise.allSettled([
+      const [summaryData, pendingData, admNo, admissionsRes] = await Promise.allSettled([
         getAdmissionDashboardSummary(academicYear),
         getPendingAdmissions(),
         getNextAdmissionNo(),
+        instance.get("/admissions"),
       ]);
       if (summaryData.status === "fulfilled") setSummary(summaryData.value);
       if (pendingData.status === "fulfilled") setPending((pendingData.value || []).slice(0, 10));
       if (admNo.status === "fulfilled") setNextAdmNo(admNo.value?.nextAdmissionNo || "");
+      if (admissionsRes.status === "fulfilled") {
+        setTotalApplicationsCount(getStudentsTabTotalCount(admissionsRes.value?.data, academicYear));
+      } else {
+        setTotalApplicationsCount(0);
+      }
     } catch {
       message.error("Failed to load dashboard data");
+      setTotalApplicationsCount(0);
     }
     setLoading(false);
   };
@@ -97,10 +125,7 @@ const AdmissionDeskDashboard = ({ onNavigate }) => {
     );
   }
 
-  const total = summary?.total || 0;
-  const approved = summary?.approved || 0;
-  const pendingCount = summary?.pending || 0;
-  const approvalRate = total ? Math.round((approved / total) * 100) : 0;
+  const total = totalApplicationsCount;
 
   const statusColor = (status) => {
     const s = (status || "").toUpperCase();
@@ -151,7 +176,7 @@ const AdmissionDeskDashboard = ({ onNavigate }) => {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-5">
         <div className="bg-surface-container-lowest p-5 rounded-xl shadow-ambient-sm relative overflow-hidden group">
           <div className="absolute -right-4 -top-4 w-20 h-20 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors" />
           <div className="flex justify-between items-start relative z-10">
@@ -162,30 +187,6 @@ const AdmissionDeskDashboard = ({ onNavigate }) => {
             <span className="p-2.5 bg-primary-fixed rounded-full text-primary material-symbols-outlined text-xl">person_add</span>
           </div>
           <p className="text-[10px] text-on-surface-variant mt-2">{academicYear} session</p>
-        </div>
-
-        <div className="bg-surface-container-lowest p-5 rounded-xl shadow-ambient-sm relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-20 h-20 bg-[#2e7d32]/5 rounded-full blur-2xl group-hover:bg-[#2e7d32]/10 transition-colors" />
-          <div className="flex justify-between items-start relative z-10">
-            <div>
-              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Approved</p>
-              <h3 className="text-3xl font-extrabold font-headline text-[#2e7d32]">{fmt(approved)}</h3>
-            </div>
-            <span className="p-2.5 bg-[#e8f5e9] rounded-full text-[#2e7d32] material-symbols-outlined text-xl">check_circle</span>
-          </div>
-          <p className="text-[10px] text-on-surface-variant mt-2">{approvalRate}% approval rate</p>
-        </div>
-
-        <div className="bg-surface-container-lowest p-5 rounded-xl shadow-ambient-sm relative overflow-hidden group">
-          <div className="absolute -right-4 -top-4 w-20 h-20 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-colors" />
-          <div className="flex justify-between items-start relative z-10">
-            <div>
-              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Pending Review</p>
-              <h3 className="text-3xl font-extrabold font-headline text-amber-600">{fmt(pendingCount)}</h3>
-            </div>
-            <span className="p-2.5 bg-amber-50 rounded-full text-amber-600 material-symbols-outlined text-xl">pending_actions</span>
-          </div>
-          <p className="text-[10px] text-on-surface-variant mt-2">Awaiting principal approval</p>
         </div>
 
         <div className="bg-surface-container-lowest p-5 rounded-xl shadow-ambient-sm relative overflow-hidden group">

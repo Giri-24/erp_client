@@ -14,6 +14,41 @@ import { getAcademicYears, getAcademicYear as fetchCurrentYear } from "../module
 import { getAdminSettings } from "../modules/settings/settings.service";
 import { PERMISSIONS, usePermissionHelpers } from "../utils/permissions";
 
+const normalizeStudentPhotoSrc = (value) => {
+  if (!value) return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (raw.startsWith("data:image") || raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  if (raw.startsWith("/erp/api/")) return raw;
+  return `/erp/api/${raw.replace(/^\/+/, "").replace(/\\/g, "/")}`;
+};
+
+const extractStudentPhotoPath = (record) => {
+  const doc = record?.documents?.[0] || {};
+  return doc.photoPath || doc.profilePhotoPath || doc.profilePhoto || "";
+};
+
+const getInitials = (name) =>
+  String(name || "")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2) || "NA";
+
+const StudentAvatar = ({ name, photoPath, imageClassName, fallbackClassName }) => {
+  const [failed, setFailed] = useState(false);
+  const src = normalizeStudentPhotoSrc(photoPath);
+  const initials = getInitials(name);
+
+  if (!src || failed) {
+    return <div className={fallbackClassName}>{initials}</div>;
+  }
+
+  return <img src={src} className={imageClassName} alt={name || "Student"} onError={() => setFailed(true)} />;
+};
+
 const StatCard = ({ title, value, icon, color, trend }) => (
   <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm transition-all hover:shadow-md hover:-translate-y-1 group">
     <div className="flex justify-between items-start mb-4">
@@ -711,7 +746,7 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
       </div>
     );
 
-    let photoPath = record.documents?.[0]?.photoPath;
+    const photoPath = extractStudentPhotoPath(record);
 
     return (
       <div className="p-8 bg-slate-50/50 rounded-3xl border border-slate-100 m-4">
@@ -719,17 +754,12 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
           {/* Student Profile Overview */}
           <div className="lg:col-span-3 flex flex-col items-center text-center">
             <div className="relative mb-6">
-              {photoPath ? (
-                <img 
-                  src={`/erp/api/${photoPath.replace(/\\/g, '/')}`} 
-                  className="w-40 h-40 rounded-[40px] object-cover border-4 border-white shadow-2xl" 
-                  alt={record.name}
-                />
-              ) : (
-                <div className="w-40 h-40 rounded-[40px] bg-slate-200 text-slate-400 flex items-center justify-center text-5xl font-black border-4 border-white shadow-xl">
-                  {record.name?.charAt(0)}
-                </div>
-              )}
+              <StudentAvatar
+                name={record.name}
+                photoPath={photoPath}
+                imageClassName="w-40 h-40 rounded-[40px] object-cover border-4 border-white shadow-2xl"
+                fallbackClassName="w-40 h-40 rounded-[40px] bg-slate-200 text-slate-400 flex items-center justify-center text-5xl font-black border-4 border-white shadow-xl"
+              />
               <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg">
                 Roll #{record.admission?.admissionNo}
               </div>
@@ -807,18 +837,16 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
       width: 280,
       onHeaderCell: () => ({ onClick: () => handleSort("name") }),
       render: (text, record) => {
-        const initials = text.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
-        let photoPath = record.documents?.[0]?.photoPath;
+        const photoPath = extractStudentPhotoPath(record);
         return (
           <div className="flex items-center gap-4">
             <div className="flex-shrink-0">
-               {photoPath ? (
-                 <img src={`/erp/api/${photoPath.replace(/\\/g, '/')}`} className="w-10 h-10 rounded-xl object-cover avatar-ring" alt="" />
-               ) : (
-                 <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center font-black text-[10px] avatar-ring">
-                   {initials}
-                 </div>
-               )}
+              <StudentAvatar
+                name={text}
+                photoPath={photoPath}
+                imageClassName="w-10 h-10 rounded-xl object-cover avatar-ring"
+                fallbackClassName="w-10 h-10 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center font-black text-[10px] avatar-ring"
+              />
             </div>
             <div>
               <div className="text-[13px] font-black text-slate-900 tracking-tight leading-none mb-1">{text}</div>
@@ -1022,8 +1050,10 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
           <span className="text-[11px] font-black uppercase tracking-[0.35em] text-slate-500">Filters</span>
 
           <div className="min-w-[220px] flex-1">
-            <label className="sr-only">Search Student</label>
+            <label className="sr-only" htmlFor="admission-filter-search">Search Student</label>
             <Input
+              id="admission-filter-search"
+              name="admissionFilterSearch"
               placeholder="Search Student"
               value={searchText}
               onChange={(e) => handleSearch(e.target.value)}
@@ -1101,8 +1131,10 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
           </div>
 
           <div className="min-w-[180px] max-w-[220px]">
-            <label className="sr-only">Area / Street / PIN</label>
+            <label className="sr-only" htmlFor="admission-filter-area">Area / Street / PIN</label>
             <Input
+              id="admission-filter-area"
+              name="admissionFilterArea"
               allowClear
               placeholder="Area / Street / PIN"
               value={filterArea}
@@ -1113,8 +1145,10 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
           </div>
 
           <div className="min-w-[180px] max-w-[220px]">
-            <label className="sr-only">Parent / Guardian</label>
+            <label className="sr-only" htmlFor="admission-filter-parent">Parent / Guardian</label>
             <Input
+              id="admission-filter-parent"
+              name="admissionFilterParent"
               allowClear
               placeholder="Parent / Guardian"
               value={filterFatherName}
@@ -1408,6 +1442,8 @@ const AdmissionView = ({ onEdit, mode = "all" }) => {
         okText="Save"
       >
         <Input.TextArea
+          id="admission-mark-pending-reason"
+          name="admissionMarkPendingReason"
           rows={4}
           placeholder="Why is this admission being marked pending?"
           value={approvalReason}

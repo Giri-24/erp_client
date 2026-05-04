@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Form, Input, InputNumber, message, Popconfirm } from "antd";
+import { Modal, Input, InputNumber, message, Popconfirm } from "antd";
 import {
   getAllTransportRoutes,
   createTransportRoute,
@@ -30,7 +30,6 @@ const RouteManagementPage = () => {
   const [showTip, setShowTip] = useState(true);
 
   // inline form state
-  const [form] = Form.useForm();
   const [stops, setStops] = useState([]);
 
   // inline create form state (left panel)

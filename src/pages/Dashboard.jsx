@@ -568,7 +568,7 @@ const Dashboard = () => {
         </header>
 
         <main className="mt-16 p-8 flex-1">
-          <div className="max-w-7xl mx-auto">
+          <div className={selectedKey === "hr-dashboard" ? "" : "max-w-7xl mx-auto"}>
             {renderContent()}
           </div>
         </main>

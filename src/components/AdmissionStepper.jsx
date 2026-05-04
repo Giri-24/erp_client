@@ -537,7 +537,8 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
         caste: editData.caste,
         motherTongue: editData.motherTongue,
         aadharNo: editData.aadharNo,
-        communityOther: editData.community === "OTHERS" ? editData.communityOther : undefined,
+        customCommunity: editData.community === "OTHERS" ? (editData.customCommunity || editData.communityOther) : undefined,
+        communityOther: editData.community === "OTHERS" ? (editData.customCommunity || editData.communityOther) : undefined,
         bloodGroup: editData.bloodGroup,
         identityMark1: editData.identification1,
         identityMark2: editData.identification2,
@@ -1677,7 +1678,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="text-on-surface-variant text-sm border-b border-outline-variant pb-2">Upload certificates and student profile photo (optional).</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Upload certificates and student profile photo (optional).</p>
           </div>
           <>
             {/* ✅ PROFILE PHOTO */}
@@ -2666,6 +2667,7 @@ Enroll Admission            </p>
                          }
 
                         if (editData) {
+                          console.log("Updating admission with data:", { id: editData.id, formDataToSend });
                           await updateAdmission(editData.id, formDataToSend);
                           localStorage.removeItem("admission_draft");
                           message.success("Admission updated successfully!", 4);

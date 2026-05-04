@@ -229,6 +229,11 @@ export const getLeaveApplications = async (params) => {
   return res.data;
 };
 
+export const getStaffList = async () => {
+  const res = await axios.get('/hr/staff-list');
+  return res.data;
+};
+
 export const getMyLeaves = async (params) => {
   const res = await axios.get('/hr/leave/applications', { params });
   return res.data;
@@ -395,6 +400,12 @@ export const generateESIReport = async (params) => {
     employerESI: row.employerEsiContribution || 0,
     totalESI: (row.esiDeduction || 0) + (row.employerEsiContribution || 0),
   }));
+};
+
+export const getStatutoryReportRaw = async (month) => {
+  if (!month) return [];
+  const res = await axios.get(`/hr/statutory/report/${month}`);
+  return toArray(res.data);
 };
 
 // ─── PAYROLL / LOP CALCULATION ──────────────

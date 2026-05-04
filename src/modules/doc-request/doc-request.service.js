@@ -9,6 +9,13 @@ export const DOC_REQUEST_TYPES = [
   { value: 'OTHER', label: 'Other' },
 ];
 
+export const BONAFIDE_SCENARIO_TYPES = [
+  { value: 'STUDY_PURPOSE', label: 'General Study Purpose' },
+  { value: 'PASSPORT_VISA', label: 'Passport / Visa' },
+  { value: 'SCHOLARSHIP', label: 'Scholarship Application' },
+  { value: 'EDUCATION_LOAN', label: 'Education Loan' },
+];
+
 export const DOC_STATUS_OPTIONS = [
   { value: 'REQUESTED', label: 'Requested', color: 'blue' },
   { value: 'IN_REVIEW', label: 'In Review', color: 'orange' },
@@ -29,6 +36,11 @@ export const getDocRequest = async (id) => {
 
 export const getDocRequestStats = async () => {
   const res = await axios.get('/doc-requests/stats');
+  return res.data;
+};
+
+export const getBonafideTemplates = async () => {
+  const res = await axios.get('/doc-requests/bonafide/templates');
   return res.data;
 };
 

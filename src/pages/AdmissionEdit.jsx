@@ -16,6 +16,14 @@ const AdmissionEdit = () => {
       const data = res.data;
       form.setFieldsValue({
         ...data,
+        fatherName: data.family?.fatherName || data.fatherName,
+        motherName: data.family?.motherName || data.motherName,
+        doorNo: data.address?.doorNo || data.address?.line1 || data.doorNo || data.line1,
+        street: data.address?.street || data.address?.village || data.address?.line2 || data.street || data.line2,
+        taluk: data.address?.taluk || data.address?.landmark || data.taluk || data.landmark,
+        district: data.address?.district || data.address?.city || data.district || data.city,
+        state: data.address?.state || data.state,
+        pin: data.address?.pin || data.pin,
         dob: data.dob ? dayjs(data.dob) : null,
         admissionDate: data.admissionDate ? dayjs(data.admissionDate) : null,
       });
@@ -31,6 +39,18 @@ const AdmissionEdit = () => {
         admissionDate: values.admissionDate
           ? values.admissionDate.format("YYYY-MM-DD")
           : undefined,
+        line1: values.doorNo,
+        line2: values.street,
+        landmark: values.taluk,
+        city: values.district,
+        address: {
+          line1: values.doorNo,
+          line2: values.street,
+          landmark: values.taluk,
+          city: values.district,
+          state: values.state,
+          pin: values.pin,
+        },
       };
 
       await axios.put(`/admission/${admissionNo}`, payload);
@@ -93,6 +113,37 @@ const AdmissionEdit = () => {
 
           <Form.Item name="motherName" label="Mother Name" rules={[{ required: true }]}>
             <Input />
+          </Form.Item>
+
+          <Form.Item name="doorNo" label="Door No / House No" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="street" label="Street / Village" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="taluk" label="Taluk">
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="district" label="District" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item name="state" label="State" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+
+          <Form.Item
+            name="pin"
+            label="Pincode"
+            rules={[
+              { required: true },
+              { pattern: /^\d{6}$/, message: "Pincode must be 6 digits" },
+            ]}
+          >
+            <Input maxLength={6} />
           </Form.Item>
 
           <Form.Item name="admissionDate" label="Admission Date" rules={[{ required: true }]}>
