@@ -1,156 +1,349 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, message, Select, Space, Table, Tag } from 'antd';
-import { createExamTimetable, getExamHalls, getExams, getExamSubjects, getExamTimetable } from '../exam.service';
+import React, { useMemo, useState } from 'react';
+import dayjs from 'dayjs';
+import {
+  Button,
+  Card,
+  DatePicker,
+  Dropdown,
+  message,
+  Select,
+  Space,
+  Switch,
+  Tabs,
+} from 'antd';
+import {
+  DownloadOutlined,
+  EditOutlined,
+  PrinterOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons';
+import TimetableGrid from '../components/TimetableGrid';
+import EditTimetableModal from '../components/EditTimetableModal';
+import TeacherView from '../components/TeacherView';
 
-const STANDARD_OPTIONS = [
+const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+const CLASS_OPTIONS = [
   'LKG', 'UKG', 'STD_1', 'STD_2', 'STD_3', 'STD_4', 'STD_5',
   'STD_6', 'STD_7', 'STD_8', 'STD_9', 'STD_10', 'STD_11', 'STD_12',
-].map((v) => ({ label: v, value: v }));
+].map((value) => ({ label: value, value }));
 
-const STREAM_OPTIONS = [
-  { label: 'BIO_MATHS', value: 'BIO_MATHS' },
-  { label: 'CS_MATHS', value: 'CS_MATHS' },
-  { label: 'BIO_CS', value: 'BIO_CS' },
-  { label: 'COMMERCE', value: 'COMMERCE' },
+const SECTION_OPTIONS = ['A', 'B', 'C', 'D'].map((value) => ({ label: value, value }));
+
+const EXAM_TYPE_OPTIONS = [
+  { label: '25', value: 25 },
+  { label: '50', value: 50 },
+  { label: '100', value: 100 },
 ];
 
-const toIso = (date, time) => {
-  if (!date || !time) return undefined;
-  return new Date(`${date}T${time}:00`).toISOString();
+const SUBJECT_MASTER = [
+  { id: 'SUB1', name: 'Mathematics' },
+  { id: 'SUB2', name: 'Science' },
+  { id: 'SUB3', name: 'English' },
+  { id: 'SUB4', name: 'Social Science' },
+  { id: 'SUB5', name: 'Computer Science' },
+  { id: 'SUB6', name: 'Tamil' },
+  { id: 'SUB7', name: 'Hindi' },
+];
+
+const TEACHER_MASTER = [
+  { id: 'T1', name: 'Ms. Priya', subjectIds: ['SUB1', 'SUB5'] },
+  { id: 'T2', name: 'Mr. Karthik', subjectIds: ['SUB2'] },
+  { id: 'T3', name: 'Ms. Lavanya', subjectIds: ['SUB3'] },
+  { id: 'T4', name: 'Mr. Arun', subjectIds: ['SUB4'] },
+  { id: 'T5', name: 'Ms. Nithya', subjectIds: ['SUB6', 'SUB7'] },
+  { id: 'T6', name: 'Mr. Vijay', subjectIds: ['SUB1', 'SUB2'] },
+];
+
+const DAY_COUNT_BY_EXAM_TYPE = {
+  25: 3,
+  50: 5,
+  100: 7,
+};
+
+const formatDayLabel = (date) => `${date.format('ddd')} ${date.format('DD MMM')}`;
+
+const createDaysFromStart = (startDate, examType) => {
+  if (!startDate) return [];
+  const dayCount = DAY_COUNT_BY_EXAM_TYPE[examType] || 5;
+  return Array.from({ length: dayCount }, (_, index) => {
+    const date = dayjs(startDate).add(index, 'day');
+    const key = date.format('YYYY-MM-DD');
+    return {
+      key,
+      label: formatDayLabel(date),
+      date,
+    };
+  });
+};
+
+const createInitialRows = (days, subjects, teachers) =>
+  PERIODS.map((period) => {
+    const slots = {};
+
+    days.forEach((day, dayIndex) => {
+      const subject = subjects[(period + dayIndex - 1) % subjects.length] || subjects[0];
+      const candidateTeachers = teachers.filter((teacher) => teacher.subjectIds.includes(subject.id));
+      const teacher = candidateTeachers[(period + dayIndex - 1) % candidateTeachers.length] || teachers[0];
+
+      slots[day.key] = {
+        subjectId: subject?.id,
+        teacherId: teacher?.id,
+        type: period <= 2 ? 'REVISION' : 'EXAM',
+      };
+    });
+
+    return { period, slots };
+  });
+
+const createTeacherBusyMap = (days) => {
+  const busyMap = {};
+  days.forEach((day, dayIndex) => {
+    PERIODS.forEach((period) => {
+      const key = `${day.key}-${period}`;
+      if ((dayIndex + period) % 4 === 0) busyMap[key] = ['T2'];
+      if ((dayIndex + period) % 5 === 0) busyMap[key] = [...(busyMap[key] || []), 'T4'];
+    });
+  });
+  return busyMap;
 };
 
 export default function ExamTimetablePage() {
-  const [form] = Form.useForm();
-  const [exams, setExams] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [halls, setHalls] = useState([]);
-  const [examId, setExamId] = useState();
+  const [timetableData, setTimetableData] = useState([]);
+  const [subjects] = useState(SUBJECT_MASTER);
+  const [teachers] = useState(TEACHER_MASTER);
+  const [selectedClass, setSelectedClass] = useState('STD_10');
+  const [selectedSection, setSelectedSection] = useState('A');
+  const [examType, setExamType] = useState(50);
+  const [startDate, setStartDate] = useState(dayjs());
   const [loading, setLoading] = useState(false);
-  const [tableLoading, setTableLoading] = useState(false);
-  const [rows, setRows] = useState([]);
+  const [editMode, setEditMode] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState();
+  const [days, setDays] = useState([]);
+  const [teacherBusyMap, setTeacherBusyMap] = useState({});
+  const [modalState, setModalState] = useState({
+    open: false,
+    period: null,
+    dayKey: null,
+    slot: null,
+  });
 
-  const loadExams = async () => {
-    try {
-      const examRows = await getExams();
-      setExams(examRows || []);
-      if (!examId && examRows?.length) setExamId(examRows[0].id);
-    } catch {
-      message.error('Failed to load exams');
+  const subjectMap = useMemo(
+    () => new Map(subjects.map((subject) => [subject.id, subject])),
+    [subjects],
+  );
+
+  const teacherMap = useMemo(
+    () => new Map(teachers.map((teacher) => [teacher.id, teacher])),
+    [teachers],
+  );
+
+  const onGenerate = async () => {
+    if (!selectedClass || !selectedSection || !examType || !startDate) {
+      message.warning('Please select class, section, exam type and start date');
+      return;
     }
+
+    setLoading(true);
+    setTimeout(() => {
+      const generatedDays = createDaysFromStart(startDate, examType);
+      const generatedRows = createInitialRows(generatedDays, subjects, teachers);
+      setDays(generatedDays);
+      setTimetableData(generatedRows);
+      setTeacherBusyMap(createTeacherBusyMap(generatedDays));
+      setLoading(false);
+      message.success('Timetable generated');
+    }, 700);
   };
 
-  const loadPrerequisites = async (id) => {
-    if (!id) return;
-    try {
-      const [subjectRows, hallRows, tableRows] = await Promise.all([
-        getExamSubjects(id),
-        getExamHalls(),
-        getExamTimetable(id),
-      ]);
-      setSubjects(subjectRows || []);
-      setHalls(hallRows || []);
-      setRows(tableRows || []);
-    } catch {
-      message.error('Failed to load timetable data');
-    }
+  const onEditCell = (period, dayKey, slot) => {
+    if (!editMode) return;
+    setModalState({ open: true, period, dayKey, slot });
   };
 
-  useEffect(() => { loadExams(); }, []);
-  useEffect(() => { loadPrerequisites(examId); }, [examId]);
+  const onSaveCell = (values) => {
+    const { period, dayKey } = modalState;
+    if (!period || !dayKey) return;
 
-  const onSubmit = async () => {
-    if (!examId) return message.warning('Select exam first');
-    try {
-      const values = await form.validateFields();
-      setLoading(true);
-      await createExamTimetable({
-        examId,
-        subjectId: values.subjectId,
-        standard: values.standard,
-        section: values.section || undefined,
-        stream: values.stream || undefined,
-        examDate: toIso(values.examDate, '00:00'),
-        startsAt: toIso(values.examDate, values.startsAt),
-        endsAt: toIso(values.examDate, values.endsAt),
-        session: values.session,
-        hallIds: values.hallIds,
-      });
-      message.success('Timetable entry created');
-      form.resetFields();
-      await loadPrerequisites(examId);
-    } catch (e) {
-      message.error(e?.response?.data?.message || 'Unable to create timetable entry');
+    const selectedTeacherRow = teacherMap.get(values.teacherId);
+    const isMappingValid = selectedTeacherRow?.subjectIds?.includes(values.subjectId);
+    if (!isMappingValid) {
+      message.warning('Invalid subject-teacher mapping');
     }
-    setLoading(false);
+
+    const busyKey = `${dayKey}-${period}`;
+    if ((teacherBusyMap[busyKey] || []).includes(values.teacherId)) {
+      message.warning('Teacher already assigned in another class at this time');
+    }
+
+    setTimetableData((prevRows) =>
+      prevRows.map((row) => {
+        if (row.period !== period) return row;
+        return {
+          ...row,
+          slots: {
+            ...row.slots,
+            [dayKey]: {
+              subjectId: values.subjectId,
+              teacherId: values.teacherId,
+              type: values.type,
+            },
+          },
+        };
+      }),
+    );
+
+    setModalState({ open: false, period: null, dayKey: null, slot: null });
+  };
+
+  const onReset = () => {
+    setTimetableData([]);
+    setDays([]);
+    setSelectedTeacher(undefined);
+    setModalState({ open: false, period: null, dayKey: null, slot: null });
+    message.success('Timetable reset');
+  };
+
+  const onSaveChanges = () => {
+    message.success('Changes saved');
+  };
+
+  const exportExcel = () => {
+    if (!days.length || !timetableData.length) {
+      message.warning('Generate timetable first');
+      return;
+    }
+
+    const header = ['Period', ...days.map((day) => day.label)];
+    const rows = timetableData.map((row) => [
+      row.period,
+      ...days.map((day) => {
+        const slot = row.slots?.[day.key];
+        if (!slot) return '-';
+        const subject = subjectMap.get(slot.subjectId)?.name || '-';
+        const teacher = teacherMap.get(slot.teacherId)?.name || '-';
+        const type = slot.type === 'EXAM' ? 'Exam' : 'Revision';
+        return `${subject} / ${teacher} / ${type}`;
+      }),
+    ]);
+
+    const csv = [header, ...rows]
+      .map((line) => line.map((item) => `"${String(item).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'exam-timetable.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const exportPdf = () => {
+    message.info('Use browser print dialog to save as PDF');
+    window.print();
+  };
+
+  const printTimetable = () => {
+    window.print();
   };
 
   return (
     <div className="space-y-4">
-      <Card
-        title="Exam Timetable Creation"
-        extra={
-          <Select
-            style={{ width: 320 }}
-            value={examId}
-            onChange={setExamId}
-            options={exams.map((e) => ({ label: `${e.name} (${e.code})`, value: e.id }))}
-            placeholder="Select Exam"
-          />
-        }
-      >
-        <Form form={form} layout="vertical">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <Form.Item name="subjectId" label="Subject" rules={[{ required: true }]}>
-              <Select
-                showSearch
-                options={subjects.map((s) => ({ label: `${s.code} - ${s.name}`, value: s.id }))}
-              />
-            </Form.Item>
-            <Form.Item name="standard" label="Standard" rules={[{ required: true }]}>
-              <Select options={STANDARD_OPTIONS} />
-            </Form.Item>
-            <Form.Item name="section" label="Section">
-              <Input placeholder="A" />
-            </Form.Item>
-            <Form.Item name="stream" label="Stream">
-              <Select allowClear options={STREAM_OPTIONS} />
-            </Form.Item>
-            <Form.Item name="examDate" label="Exam Date" rules={[{ required: true }]}>
-              <Input type="date" />
-            </Form.Item>
-            <Form.Item name="startsAt" label="Start Time" rules={[{ required: true }]}>
-              <Input type="time" />
-            </Form.Item>
-            <Form.Item name="endsAt" label="End Time" rules={[{ required: true }]}>
-              <Input type="time" />
-            </Form.Item>
-            <Form.Item name="session" label="Session" rules={[{ required: true }]}>
-              <Select options={[{ label: 'FN', value: 'FN' }, { label: 'AN', value: 'AN' }]} />
-            </Form.Item>
-            <Form.Item name="hallIds" label="Halls" rules={[{ required: true }]} className="md:col-span-2">
-              <Select mode="multiple" options={halls.map((h) => ({ label: `${h.name} (Cap ${h.capacity})`, value: h.id }))} />
-            </Form.Item>
+      <Card title="Exam Timetable">
+        <div className="flex flex-wrap items-end justify-end gap-3">
+          <div className="min-w-[220px]">
+            <div className="mb-1 text-xs text-on-surface-variant">Class</div>
+            <Select className="w-full" value={selectedClass} onChange={setSelectedClass} options={CLASS_OPTIONS} />
           </div>
-          <Button type="primary" loading={loading} onClick={onSubmit}>Create Timetable Slot</Button>
-        </Form>
+          <div className="min-w-[220px]">
+            <div className="mb-1 text-xs text-on-surface-variant">Section</div>
+            <Select className="w-full" value={selectedSection} onChange={setSelectedSection} options={SECTION_OPTIONS} />
+          </div>
+          <div className="min-w-[220px]">
+            <div className="mb-1 text-xs text-on-surface-variant">Exam Type</div>
+            <Select className="w-full" value={examType} onChange={setExamType} options={EXAM_TYPE_OPTIONS} />
+          </div>
+          <div className="min-w-[220px]">
+            <div className="mb-1 text-xs text-on-surface-variant">Start Date</div>
+            <DatePicker value={startDate} onChange={setStartDate} className="w-full" />
+          </div>
+          <Button type="primary" loading={loading} onClick={onGenerate}>
+            Generate
+          </Button>
+        </div>
       </Card>
 
-      <Card title="Timetable Entries">
-        <Table
-          rowKey="id"
-          loading={tableLoading}
-          dataSource={rows}
-          pagination={{ pageSize: 10 }}
-          columns={[
-            { title: 'Date', dataIndex: 'examDate', render: (v) => new Date(v).toLocaleDateString() },
-            { title: 'Subject', key: 'subject', render: (_, r) => `${r.subject?.code || '-'} - ${r.subject?.name || '-'}` },
-            { title: 'Class', key: 'class', render: (_, r) => `${r.standard}${r.section ? `-${r.section}` : ''}` },
-            { title: 'Time', key: 'time', render: (_, r) => `${new Date(r.startsAt).toLocaleTimeString()} - ${new Date(r.endsAt).toLocaleTimeString()}` },
-            { title: 'Session', dataIndex: 'session', render: (v) => <Tag>{v}</Tag> },
-            { title: 'Halls', key: 'halls', render: (_, r) => (r.halls || []).map((x) => x.hall?.name).filter(Boolean).join(', ') || '-' },
+      <Card>
+        <Tabs
+          defaultActiveKey="timetable"
+          items={[
+            {
+              key: 'timetable',
+              label: 'Timetable',
+              children: (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Space wrap>
+                      <span className="text-sm text-on-surface-variant">Edit Mode</span>
+                      <Switch checked={editMode} onChange={setEditMode} />
+                    </Space>
+                    <Space wrap>
+                      <Button icon={<EditOutlined />} onClick={onSaveChanges}>Save Changes</Button>
+                      <Button icon={<ReloadOutlined />} onClick={onReset}>Reset</Button>
+                      <Dropdown
+                        menu={{
+                          items: [
+                            { key: 'pdf', label: 'Export PDF', onClick: exportPdf },
+                            { key: 'excel', label: 'Export Excel', onClick: exportExcel },
+                          ],
+                        }}
+                      >
+                        <Button icon={<DownloadOutlined />}>Export</Button>
+                      </Dropdown>
+                      <Button icon={<PrinterOutlined />} onClick={printTimetable}>Print</Button>
+                    </Space>
+                  </div>
+
+                  <TimetableGrid
+                    days={days}
+                    timetableData={timetableData}
+                    subjects={subjects}
+                    teachers={teachers}
+                    editable={editMode}
+                    onCellClick={onEditCell}
+                  />
+                </div>
+              ),
+            },
+            {
+              key: 'teacher-view',
+              label: 'Teacher View',
+              children: (
+                <TeacherView
+                  teachers={teachers}
+                  days={days}
+                  timetableData={timetableData}
+                  selectedTeacher={selectedTeacher}
+                  onSelectTeacher={setSelectedTeacher}
+                  selectedClass={selectedClass}
+                  selectedSection={selectedSection}
+                  subjects={subjects}
+                />
+              ),
+            },
           ]}
         />
       </Card>
+
+      <EditTimetableModal
+        open={modalState.open}
+        onCancel={() => setModalState({ open: false, period: null, dayKey: null, slot: null })}
+        onSave={onSaveCell}
+        subjects={subjects}
+        teachers={teachers}
+        value={modalState.slot}
+      />
     </div>
   );
 }
