@@ -23,7 +23,6 @@ const CSV_TEMPLATE_HEADERS = [
   'previouslyStudied',
   'previousSchoolStandard',
   'transportMode',
-  'vanNeeded',
   'rteApplied',
   'fatherName',
   'fatherPhone',
@@ -39,6 +38,7 @@ const CSV_TEMPLATE_HEADERS = [
   'siblingsCount',
   'preferredPhone',
   'parentsEmail',
+  'isSingleParent',
   'guardianRelation',
   'guardianName',
   'guardianPhone',
@@ -67,7 +67,7 @@ const CSV_TEMPLATE_HEADERS = [
   'totalObtainedMarks',
   'totalPercentage',
   'subjectsJson',
-  'email',
+  'academicStreamCustom',
 ];
 
 const CSV_SAMPLE_ROW = {
@@ -83,25 +83,24 @@ const CSV_SAMPLE_ROW = {
   communityOther: '',
   caste: 'Vellalar',
   motherTongue: 'Tamil',
-  aadharNo: '123456789012',
+  aadharNo: '\t123456789012',
   bloodGroup: 'B+',
   identityMark1: 'Mole on right cheek',
   identityMark2: 'Scar on left hand',
   previouslyStudied: 'Govt Hr Sec School',
   previousSchoolStandard: '10',
   transportMode: 'Van',
-  vanNeeded: 'true',
   rteApplied: 'false',
   fatherName: 'Father Name',
-  fatherPhone: '9876543210',
-  fatherWhatsAppNo: '9876543210',
+  fatherPhone: '\t9876543210',
+  fatherWhatsAppNo: '\t9876543210',
   fatherOccupation: 'Agriculture',
-  fatherAadharNo: '123456789013',
+  fatherAadharNo: '\t123456789013',
   motherName: 'Mother Name',
-  motherPhone: '9876543211',
-  motherWhatsAppNo: '9876543211',
+  motherPhone: '\t9876543211',
+  motherWhatsAppNo: '\t9876543211',
   motherOccupation: 'Home Maker',
-  motherAadharNo: '123456789014',
+  motherAadharNo: '\t123456789014',
   familyIncome: '150000',
   siblingsCount: '1',
   preferredPhone: 'father',
@@ -124,18 +123,18 @@ const CSV_SAMPLE_ROW = {
   landmark: 'Near Bus Stand',
   city: 'Erode',
   state: 'Tamil Nadu',
-  pin: '600001',
+  pin: '\t600001',
   examName: '10th Standard',
   boardExamType: 'State Board',
   boardName: 'State Board',
-  registerNo: '2025001234',
+  registerNo: '\t2025001234',
   monthYear: 'March 2025',
   academicStream: 'BIO_CS',
   totalMaxMarks: '600',
   totalObtainedMarks: '513',
   totalPercentage: '85.5',
   subjectsJson: '[{"subjectName":"Tamil","maxMarks":150,"obtainedMarks":130},{"subjectName":"English","maxMarks":150,"obtainedMarks":120},{"subjectName":"Mathematics","maxMarks":100,"obtainedMarks":88}]',
-  email: 'john@school.local',
+  academicStreamCustom: '',
 };
 
 const parseCsv = (text) => {
@@ -353,6 +352,7 @@ const BulkUploadPage = () => {
             <p>Date format: YYYY-MM-DD for dob and admissionDate.</p>
             <p>Use <strong>subjectsJson</strong> for subject-wise marks as a JSON array, for example: <strong>{'[{"subjectName":"Tamil","maxMarks":150,"obtainedMarks":130}]'}</strong></p>
             <p>Academic stream values: BIO_MATHS, CS_MATHS, BIO_CS, COMMERCE, HUMANITIES, OTHER.</p>
+            <p>Transport mode values: Self, Van, Bus.</p>
             <p>Maximum 500 rows per upload. Admission numbers are auto-generated.</p>
           </div>
         </div>
