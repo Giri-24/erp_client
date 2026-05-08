@@ -19,6 +19,7 @@ import {
   Divider,
   Radio,
   Modal,
+  Alert,
 } from "antd";
 import {
   UserOutlined,
@@ -203,6 +204,11 @@ const scholarStyles = `
     background: #e2e8f0;
     color: #00152a;
   }
+
+  .admission-form .ant-upload-list-picture-card .ant-upload-list-item-done {
+    border: 2px solid #16a34a !important;
+    box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.2);
+  }
 `;
 
 const normalizeStandardValue = (value) => {
@@ -275,6 +281,40 @@ const STREAM_LABELS = {
   OTHER: "Other",
 };
 
+const BACKEND_STREAM_VALUES = new Set([
+  "BIO_MATHS",
+  "CS_MATHS",
+  "BIO_CS",
+  "COMMERCE",
+]);
+
+const getReadableStream = (stream, customStream) => {
+  if (stream === "OTHER") return customStream || "Other";
+  return STREAM_LABELS[stream] || stream || "-";
+};
+
+const normalizeAcademicStreamPayload = (stream) => (
+  BACKEND_STREAM_VALUES.has(stream) ? stream : undefined
+);
+
+const extractMissingFieldMessage = (err) => {
+  const data = err?.response?.data;
+  const missing = data?.missingFields || data?.fields || data?.errors;
+  if (Array.isArray(missing) && missing.length) {
+    return `Missing required fields: ${missing.join(", ")}`;
+  }
+
+  if (typeof data?.message === "string" && data.message.trim()) {
+    return data.message;
+  }
+
+  if (Array.isArray(data?.message) && data.message.length) {
+    return data.message.join(", ");
+  }
+
+  return "Error creating admission. Please review required fields and try again.";
+};
+
 const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
   const [current, setCurrent] = useState(0);
   const [form] = Form.useForm();
@@ -292,7 +332,18 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
   const [draftExists, setDraftExists] = useState(false);
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    const scrollNow = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    scrollNow();
+    window.requestAnimationFrame(scrollNow);
   };
 
   const getLatestAcademicYearFromApi = (years) => {
@@ -338,27 +389,34 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
 async function generatePDF() {
   try {
-    const input = document.getElementById("pdfContent");
-    if (!input) return;
+    const pageOne = document.getElementById("pdfPage1");
+    const pageTwo = document.getElementById("pdfPage2");
+    if (!pageOne || !pageTwo) return;
 
-    const canvas = await html2canvas(input, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#ffffff" });
-    const imgData = canvas.toDataURL("image/png");
+    const renderPage = async (element) => {
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+      });
+      return canvas.toDataURL("image/png");
+    };
 
-    const imgWidth = 210;
-    const pageHeight = 297;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let heightLeft = imgHeight;
+    const firstPageImage = await renderPage(pageOne);
+    const secondPageImage = await renderPage(pageTwo);
 
     const pdf = new jsPDF("p", "mm", "a4");
-    let position = 0;
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-    while (heightLeft >= 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
+    const pageWidth = 210;
+    const pageHeight = 297;
+
+    const drawFullPage = (imgData) => {
+      pdf.addImage(imgData, "PNG", 0, 0, pageWidth, pageHeight);
+    };
+
+    drawFullPage(firstPageImage);
+    pdf.addPage();
+    drawFullPage(secondPageImage);
 
     pdf.save(`Admission_${formData.admissionNo || "draft"}.pdf`);
   } catch (err) {
@@ -503,12 +561,16 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
       const transferCertFile = doc.transferCertPath
         ? [{ uid: "-1", name: "Transfer Certificate", status: "done", url: toApiAssetUrl(doc.transferCertPath) }]
         : [];
+      const entranceExamFile = doc.entranceExamPath
+        ? [{ uid: "-1", name: "Entrance Exam", status: "done", url: toApiAssetUrl(doc.entranceExamPath) }]
+        : [];
 
       const documentsChecked = [
         (doc.birthCert || birthCertFile.length > 0) && "birthCert",
         (doc.communityCert || communityCertFile.length > 0) && "communityCert",
         (doc.aadharStudent || aadharStudentFile.length > 0) && "aadharStudent",
         (doc.transferCert || transferCertFile.length > 0) && "transferCert",
+        (doc.entranceExam || entranceExamFile.length > 0) && "entranceExam",
       ].filter(Boolean);
 
       const resolvedPreviousSchool =
@@ -569,7 +631,8 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
         street: editData.address?.line2,
         landmark: editData.address?.landmark,
         city: editData.address?.city,
-        state: editData.address?.state || "Tamil Nadu",
+        state: editData.address?.state && editData.address.state !== "Tamil Nadu" ? "OTHERS" : (editData.address?.state || "Tamil Nadu"),
+        stateOther: editData.address?.state && editData.address.state !== "Tamil Nadu" ? editData.address.state : undefined,
         pin: editData.address?.pin,
         admissionNo: editData.admission?.admissionNo,
         admissionFrom: editData.admission?.admissionFrom ? dayjs(editData.admission.admissionFrom) : null,
@@ -579,6 +642,7 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
         boardExamType: primaryAcademic.boardName && primaryAcademic.boardName !== 'State Board' ? 'Other' : 'State Board',
         boardName: primaryAcademic.boardName && primaryAcademic.boardName !== 'State Board' ? primaryAcademic.boardName : undefined,
         academicStream: primaryAcademic.stream || editData.academicStream,
+        academicStreamCustom: primaryAcademic.streamCustom || editData.academicStreamCustom,
         registerNo: primaryAcademic.registerNo,
         monthYear: primaryAcademic.monthYear,
         totalPercentage: primaryAcademic.totalPercentage,
@@ -607,6 +671,7 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
         communityCertFile,
         aadharStudentFile,
         transferCertFile,
+        entranceExamFile,
         documentsChecked,
       };
 
@@ -621,6 +686,7 @@ const [isPreviewOpen, setIsPreviewOpen] = useState(false);
       if (doc.aadharFatherHardCopy) hardCopySelection.push("aadharFather");
       if (doc.aadharMotherHardCopy) hardCopySelection.push("aadharMother");
       if (doc.transferCertHardCopy) hardCopySelection.push("transferCert");
+      if (doc.entranceExamHardCopy) hardCopySelection.push("entranceExam");
       flatData.hardCopyDocs = hardCopySelection;
       flatData.photosReceived = doc.photosReceived || false;
 
@@ -726,8 +792,12 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     pattern: /^\d{10}$/,
   };
   const optionalAadharRule = {
-    message: "Aadhar number must be 12 digits",
-    pattern: /^\d{12}$/,
+    validator: (_, value) => {
+      if (!value) return Promise.resolve();
+      return /^\d{12}$/.test(String(value).trim())
+        ? Promise.resolve()
+        : Promise.reject(new Error("Aadhar number must be 12 digits"));
+    },
   };
   const pinRule = {
     required: true,
@@ -739,6 +809,8 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   const watchedSubjects = Form.useWatch("subjects", form) || [];
   const isSingleParent = Form.useWatch("isSingleParent", form);
   const boardExamType = Form.useWatch("boardExamType", form);
+  const selectedState = Form.useWatch("state", form);
+  const selectedAcademicStream = Form.useWatch("academicStream", form);
   const siblingReviewItems = (() => {
     const configuredCount = Number(formData?.siblingsCount) || 0;
     const discoveredCount = Object.keys(formData || {}).reduce((max, key) => {
@@ -777,7 +849,20 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     { label: "Community Certificate", file: formData.communityCertFile, key: "communityCert" },
     { label: "Aadhar", file: formData.aadharStudentFile, key: "aadharStudent" },
     { label: "Transfer Certificate", file: formData.transferCertFile, key: "transferCert" },
+    { label: "Entrance Exam", file: formData.entranceExamFile, key: "entranceExam" },
   ].filter((doc) => doc.file?.[0]);
+
+  const recommendedDocuments = [
+    { label: "Birth Certificate", file: formData.birthCertFile },
+    { label: "Community Certificate", file: formData.communityCertFile },
+    { label: "Aadhar", file: formData.aadharStudentFile },
+    { label: "Transfer Certificate", file: formData.transferCertFile },
+    { label: "Entrance Exam", file: formData.entranceExamFile },
+  ];
+
+  const missingRecommendedDocuments = recommendedDocuments
+    .filter((doc) => !doc.file?.[0])
+    .map((doc) => doc.label);
 
   const getSafePreviewUrl = (fileItem) => {
     if (!fileItem) return null;
@@ -834,6 +919,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
           (doc.communityCert || doc.communityCertPath) && "communityCert",
           (doc.aadharStudent || doc.aadharStudentPath) && "aadharStudent",
           (doc.transferCert || doc.transferCertPath) && "transferCert",
+          (doc.entranceExam || doc.entranceExamPath) && "entranceExam",
         ].filter(Boolean),
         profilePhotoChecked: !!existingPhotoPath,
       });
@@ -908,17 +994,12 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                 </Col>
                 <Col span={12}>
                   <Form.Item name="admissionDate" label="Admission Date" rules={[requiredRule]}>
-                    {/* day/month/year */}
-                    <DatePicker style={{ width: "100%" }} format="DD/MM/YYYY" />
+                    <DatePicker style={{ width: "100%" }} format="DD-MM-YYYY" />
                   </Form.Item>
                 </Col>
                  <Col span={12}>
               <Form.Item name="academicYear" label="Academic Year">
-                <Select
-                  placeholder="Academic year from API"
-                  options={availableYears.map((year) => ({ value: year, label: year }))}
-                  disabled
-                />
+                <Input disabled placeholder="Auto-assigned from active academic year" />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -1026,11 +1107,12 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
             <Col span={12}><Form.Item name="bloodGroup" label="Blood Group" ><Input /></Form.Item></Col>
             <Col span={12}><Form.Item name="identityMark1" label="Identity Mark 1" rules={[requiredRule]}><Input /></Form.Item></Col>
             <Col span={12}><Form.Item name="identityMark2" label="Identity Mark 2" rules={[requiredRule]}><Input /></Form.Item></Col>
-            <Col span={12}><Form.Item name="previouslyStudied" label="Previously Studied" ><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item name="previouslyStudied" label="Previously Studied" ><Input placeholder="Optional" /></Form.Item></Col>
             <Col span={12}><Form.Item name="previousSchoolStandard" label="Previous School Standard" >
               
                 <Select
-                  placeholder="Select standard"
+              placeholder="Optional"
+              allowClear
                   options={[
                     { value: 'LKG', label: 'LKG' },
                     { value: 'UKG', label: 'UKG' },
@@ -1433,9 +1515,20 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
 
             <Col span={12}>
               <Form.Item name="state" label="State" initialValue="Tamil Nadu" rules={[requiredRule]}>
-                <Input />
+                <Select>
+                  <Select.Option value="Tamil Nadu">Tamil Nadu</Select.Option>
+                  <Select.Option value="OTHERS">Others</Select.Option>
+                </Select>
               </Form.Item>
             </Col>
+
+            {selectedState === "OTHERS" && (
+              <Col span={12}>
+                <Form.Item name="stateOther" label="Specify State" rules={[requiredRule]}>
+                  <Input placeholder="Enter state name" />
+                </Form.Item>
+              </Col>
+            )}
 
             <Col span={12}>
               <Form.Item name="pin" label="Pincode" rules={[pinRule]}>
@@ -1463,7 +1556,11 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
             <Row gutter={16}>
               <Col span={6}>
                 <Form.Item name="examName" label="Name of Examination" >
-                  <Input placeholder="10th / 11th / Entrance" />
+                  <Select placeholder="10th/11th/Entrance" allowClear={false}>
+                    <Select.Option value="10th">10th</Select.Option>
+                    <Select.Option value="11th">11th</Select.Option>
+                    <Select.Option value="Entrance">Entrance</Select.Option>
+                  </Select>
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -1483,7 +1580,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
               )}
               <Col span={6}>
                 <Form.Item name="monthYear" label="Date of Appearance">
-                  <Input placeholder="e.g. 24/5/2025" />
+                  <Input placeholder="March 2025 or 01/03/25" />
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -1493,7 +1590,21 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
               </Col>
               <Col span={12}>
                 <Form.Item name="academicStream" label="Academic Stream / Group">
-                  <Select placeholder="Select group">
+                  <Select
+                    placeholder="Select group"
+                    dropdownRender={(menu) => (
+                      <>
+                        {menu}
+                        {selectedAcademicStream === "OTHER" && (
+                          <div style={{ padding: 8, borderTop: "1px solid #f0f0f0" }}>
+                            <Form.Item name="academicStreamCustom" noStyle rules={[requiredRule]}>
+                              <Input placeholder="Type custom stream/course here" />
+                            </Form.Item>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  >
                     {/* pure biology */}
                     <Select.Option value="BIO_MATHS">Physics, Chemistry,Maths, Biology</Select.Option>
                     <Select.Option value="CS_MATHS">Physics, Chemistry, Maths, Computer Science</Select.Option>
@@ -1610,7 +1721,21 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                 <Row gutter={16}>
                   <Col span={14}>
                     <Form.Item name="academicStream" label="Academic Stream / Group" rules={[requiredRule]}>
-                      <Select placeholder="Select stream">
+                      <Select
+                        placeholder="Select stream"
+                        dropdownRender={(menu) => (
+                          <>
+                            {menu}
+                            {selectedAcademicStream === "OTHER" && (
+                              <div style={{ padding: 8, borderTop: "1px solid #f0f0f0" }}>
+                                <Form.Item name="academicStreamCustom" noStyle rules={[requiredRule]}>
+                                  <Input placeholder="Type custom stream/course here" />
+                                </Form.Item>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      >
 
                         <Select.Option value="BIO_MATHS">Physics, Chemistry, Biology, Mathematics</Select.Option>
                         <Select.Option value="CS_MATHS">Physics, Chemistry, Computer Science, Mathematics</Select.Option>
@@ -1638,7 +1763,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                           {form.getFieldValue('academicStream') === 'CS_MATHS' && 'Physics, Chemistry, Computer Science, Mathematics'}
                           {form.getFieldValue('academicStream') === 'BIO_CS' && 'Physics, Chemistry, Biology, Computer Science'}
                           {form.getFieldValue('academicStream') === 'HUMANITIES' && 'History, Geography, Political Science, Economics'}
-                          {form.getFieldValue('academicStream') === 'OTHER' && 'Other'}
+                          {form.getFieldValue('academicStream') === 'OTHER' && (form.getFieldValue('academicStreamCustom') || 'Other')}
                           {form.getFieldValue('academicStream') === 'COMMERCE' && 'Commerce, Economics, Accountancy, Computer Application'}
                           {!form.getFieldValue('academicStream') && <em>—</em>}
                         </td>
@@ -1657,7 +1782,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                           {form.getFieldValue('academicStream') === 'BIO_CS' && 'Physics, Chemistry, Biology, Computer Science'}
                           {form.getFieldValue('academicStream') === 'COMMERCE' && 'Commerce, Economics, Accountancy, Computer Application'}
                           {form.getFieldValue('academicStream') === 'HUMANITIES' && 'History, Geography, Political Science, Economics'}
-                          {form.getFieldValue('academicStream') === 'OTHER' && 'Other'}
+                          {form.getFieldValue('academicStream') === 'OTHER' && (form.getFieldValue('academicStreamCustom') || 'Other')}
                           {!form.getFieldValue('academicStream') && <em>Select a stream above</em>}
                         </td>
                       </tr>
@@ -1697,6 +1822,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     maxCount={1}
     accept="image/*"
     beforeUpload={() => false}
+    showUploadList={{ showPreviewIcon: false }}
   >
     <div className="flex flex-col items-center">
       <span className="text-2xl material-symbols-outlined">
@@ -1717,7 +1843,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       valuePropName="fileList"
       getValueFromEvent={(e) => e?.fileList}
     >
-      <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf">
+      <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
         <div className="text-center">
           <span className="text-2xl material-symbols-outlined">description</span>
           <p className="mt-1 text-xs">Birth Cert</p>
@@ -1731,7 +1857,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       valuePropName="fileList"
       getValueFromEvent={(e) => e?.fileList}
     >
-      <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf">
+      <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
         <div className="text-center">
           <span className="text-2xl material-symbols-outlined">badge</span>
           <p className="mt-1 text-xs">Community</p>
@@ -1745,7 +1871,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       valuePropName="fileList"
       getValueFromEvent={(e) => e?.fileList}
     >
-      <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf">
+      <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
         <div className="text-center">
           <span className="text-2xl material-symbols-outlined">credit_card</span>
           <p className="mt-1 text-xs">Aadhaar</p>
@@ -1759,12 +1885,25 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   valuePropName="fileList"
   getValueFromEvent={(e) => e?.fileList}
 >
-  <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf">
+  <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
     <div className="text-center">
       <span className="text-2xl material-symbols-outlined">
         description
       </span>
       <p className="mt-1 text-xs">Transfer Cert</p>
+    </div>
+  </Upload>
+</Form.Item>
+
+<Form.Item
+  name="entranceExamFile"
+  valuePropName="fileList"
+  getValueFromEvent={(e) => e?.fileList}
+>
+  <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
+    <div className="text-center">
+      <span className="text-2xl material-symbols-outlined">fact_check</span>
+      <p className="mt-1 text-xs">Entrance Exam</p>
     </div>
   </Upload>
 </Form.Item>
@@ -1785,6 +1924,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       { value: "aadharFather", label: "Aadhar (Father)" },
       { value: "aadharMother", label: "Aadhar (Mother)" },
       { value: "transferCert", label: "Transfer Certificate" },
+      { value: "entranceExam", label: "Entrance Exam" },
       { value: "3 Photos received", label: "3 Hard Copy photos" },
     ]}
   />
@@ -1805,7 +1945,16 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
         <div id="reviewStepContent" className="space-y-10">
           
            {/* Download PDF Button */}
-<div className="flex justify-end mb-4">
+<div className="flex items-center justify-end gap-3 mb-4">
+  <Button
+    onClick={() => {
+      syncFormData();
+      message.success("Review refreshed", 2);
+      scrollToTop();
+    }}
+  >
+    Refresh Review
+  </Button>
   <Button
     icon={<DownloadOutlined />}
     type="primary"
@@ -1814,6 +1963,14 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     Download PDF
   </Button>
 </div>
+          {missingRecommendedDocuments.length > 0 && (
+            <Alert
+              type="info"
+              showIcon
+              message="Optional documents are pending"
+              description={`Pending: ${missingRecommendedDocuments.join(", ")}. You can still enroll now and upload later.`}
+            />
+          )}
           <div className="form-section-header">
             <h3 className="text-3xl font-black tracking-tighter text-slate-900">Student Admission</h3>
             <p className="text-sm font-medium text-slate-500">Verify the integrity of all data vectors before final academic sealing.</p>
@@ -1848,11 +2005,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                          <Descriptions.Item label="Academic Year">{formData.academicYear}</Descriptions.Item>
                          {formData.academicStream && (
                            <Descriptions.Item label="Stream / Group">{
-                             formData.academicStream === 'BIO_MATHS' ? 'Physics, Chemistry, Biology, Mathematics' :
-                             formData.academicStream === 'CS_MATHS' ? 'Physics, Chemistry, Computer Science, Mathematics' :
-                             formData.academicStream === 'BIO_CS' ? 'Physics, Chemistry, Biology, Computer Science' :
-                             formData.academicStream === 'COMMERCE' ? 'Commerce, Economics, Accountancy, Computer Application' :
-                             formData.academicStream
+                             getReadableStream(formData.academicStream, formData.academicStreamCustom)
                            }</Descriptions.Item>
                          )}
                          <Descriptions.Item label="Date of Birth">{formData.dob?.format?.("DD/MM/YYYY")}</Descriptions.Item>
@@ -1920,7 +2073,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                 
                 <div className="grid grid-cols-1 gap-8 mb-8 md:grid-cols-2">
                    <div className="p-6 border bg-slate-50 rounded-2xl border-slate-100">
-                      <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Paternal</h5>
+                      <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Father</h5>
                      <div className="space-y-1.5">
                          <div className="text-sm font-black text-slate-900">{formData.fatherName}</div>
                          <div className="text-xs font-bold text-slate-500">{formData.fatherOccupation}</div>
@@ -1936,7 +2089,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
                       </div>
                    </div>
                    <div className="p-6 border bg-slate-50 rounded-2xl border-slate-100">
-                      <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Maternal</h5>
+                      <h5 className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Mother</h5>
                      <div className="space-y-1.5">
                          <div className="text-sm font-black text-slate-900">{formData.motherName}</div>
                          <div className="text-xs font-bold text-slate-500">{formData.motherOccupation}</div>
@@ -2173,93 +2326,114 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
 const styles = {
   pdfWrapper: {
     width: "800px",
+    minHeight: "1131px",
     background: "white",
     fontFamily: "'Public Sans', sans-serif",
-    color: "#222",
-    border: "1px solid #d9d9d9",
+    color: "#0f172a",
+    border: "1px solid #cbd5e1",
+    boxSizing: "border-box",
   },
   header: {
     backgroundColor: "#ffffff",
-    borderBottom: "2px solid #111111",
-    padding: "16px 28px",
+    borderBottom: "2px solid #0f172a",
+    padding: "18px 28px 14px",
     textAlign: "center",
-    color: "#111111",
+    color: "#0f172a",
     position: "relative",
-    marginBottom: "12px",
+    marginBottom: "8px",
+  },
+  schoolHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "18px",
+    justifyContent: "center",
+    paddingRight: "90px",
   },
   institutionName: {
-    fontSize: "20px",
+    fontSize: "21px",
     fontWeight: "900",
     margin: 0,
     textTransform: "uppercase",
-    letterSpacing: "0.02em",
+    letterSpacing: "0.04em",
+    lineHeight: "1.2",
   },
   tagline: {
-    fontSize: "11px",
-    fontWeight: "500",
-    opacity: 0.95,
-    margin: "2px 0",
+    fontSize: "10px",
+    fontWeight: "600",
+    opacity: 1,
+    margin: "3px 0",
+    color: "#334155",
+    letterSpacing: "0.01em",
   },
   formTitle: {
-    fontSize: "14px",
+    fontSize: "12px",
     fontWeight: "800",
-    marginTop: "8px",
-    padding: "4px 14px",
-    border: "1px solid #111111",
+    marginTop: "10px",
+    padding: "5px 16px",
+    border: "1px solid #334155",
+    borderRadius: "4px",
     display: "inline-block",
     textTransform: "uppercase",
-    background: "#f5f5f5",
+    background: "#f8fafc",
+    letterSpacing: "0.06em",
   },
   photoBox: {
     position: "absolute",
     right: "28px",
-    top: "16px",
-    width: "80px",
-    height: "95px",
-    border: "1px dashed #666",
+    top: "14px",
+    width: "84px",
+    height: "102px",
+    border: "1px solid #94a3b8",
+    borderRadius: "4px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     fontSize: "9px",
-    color: "#444",
+    color: "#64748b",
     overflow: "hidden",
+    background: "#f8fafc",
   },
   content: {
-    padding: "0 28px 20px",
+    padding: "12px 28px 14px",
   },
   row: {
     display: "flex",
-    gap: "14px",
-    marginBottom: "10px",
+    gap: "12px",
+    // marginBottom: "10px",
     alignItems: "flex-end",
   },
   field: {
     display: "flex",
     flex: 1,
     alignItems: "flex-end",
-    gap: "8px",
+    gap: "6px",
   },
   label: {
-    fontSize: "11px",
+    fontSize: "10px",
     fontWeight: "700",
-    color: "#444",
+    color: "#475569",
     whiteSpace: "nowrap",
+    textTransform: "uppercase",
+    letterSpacing: "0.02em",
   },
   value: {
     flex: 1,
-    borderBottom: "1px dotted #999",
+    borderBottom: "1px solid #cbd5e1",
     fontSize: "12px",
-    paddingBottom: "1px",
-    color: "#000",
-    fontWeight: "500",
-    minHeight: "16px"
+    paddingBottom: "2px",
+    color: "#0f172a",
+    fontWeight: "600",
+    minHeight: "18px",
+    lineHeight: "1.25",
   },
   addressSection: {
-    border: "1px dashed #cbd5e1",
-    padding: "10px 14px",
+    border: "1px solid #dbe3ef",
+    borderRadius: "6px",
+    padding: "14px 14px 10px",
     marginTop: "12px",
-    marginBottom: "10px",
+    marginBottom: "12px",
     position: "relative",
+    background: "#fcfdff",
   },
   addressLabel: {
     position: "absolute",
@@ -2267,78 +2441,142 @@ const styles = {
     left: "14px",
     background: "white",
     padding: "0 8px",
-    fontSize: "10px",
+    fontSize: "9px",
     fontWeight: "800",
-    color: "#111111",
+    color: "#334155",
     textTransform: "uppercase",
+    letterSpacing: "0.04em",
   },
   declaration: {
     textAlign: "center",
-    marginTop: "18px",
-    padding: "0 14px",
+    marginTop: "16px",
+    padding: "0 6px",
   },
   declTitle: {
-    fontSize: "12px",
+    fontSize: "13px",
     fontWeight: "900",
     textTransform: "uppercase",
-    marginBottom: "6px",
+    marginBottom: "8px",
+    letterSpacing: "0.05em",
+    color: "#0f172a",
   },
   declText: {
-    fontSize: "10px",
-    color: "#555",
-    lineHeight: "1.5",
-    marginBottom: "18px",
+    fontSize: "11px",
+    color: "#334155",
+    lineHeight: "1.7",
+    marginBottom: "28px",
+    maxWidth: "680px",
+    marginLeft: "auto",
+    marginRight: "auto",
+    textAlign: "justify",
   },
   signatureRow: {
     display: "flex",
     justifyContent: "space-between",
-    padding: "0 20px",
+    alignItems: "flex-start",
+    gap: "18px",
+    padding: "4px 0 0",
+  },
+  sigBlock: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    minHeight: "92px",
+    justifyContent: "flex-end",
+  },
+  sigImage: {
+    width: "140px",
+    height: "46px",
+    objectFit: "contain",
+    marginBottom: "10px",
   },
   sigLine: {
-    width: "160px",
+    width: "100%",
+    borderTop: "1px solid #64748b",
     textAlign: "center",
-    paddingTop: "4px",
-    fontSize: "11px",
+    paddingTop: "6px",
+    fontSize: "10px",
     fontWeight: "700",
+    color: "#334155",
+    textTransform: "uppercase",
+    letterSpacing: "0.03em",
+  },
+  secondPageHeader: {
+    textAlign: "center",
+    padding: "22px 28px 16px",
+    borderBottom: "1px solid #dbe3ef",
+    background: "#f8fafc",
+  },
+  secondPageTitle: {
+    fontSize: "17px",
+    fontWeight: "900",
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    margin: 0,
+    color: "#0f172a",
+  },
+  secondPageSubTitle: {
+    fontSize: "10px",
+    color: "#475569",
+    marginTop: "8px",
+    letterSpacing: "0.02em",
+  },
+  secondPageBody: {
+    padding: "24px 32px 20px",
+    minHeight: "1000px",
+    boxSizing: "border-box",
+  },
+  sealWrap: {
+    marginTop: "22px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
   },
   academicSection: {
     marginTop: "12px",
-    marginBottom: "10px",
+    marginBottom: "14px",
   },
   academicTitle: {
-    fontSize: "11px",
+    fontSize: "10px",
     fontWeight: "800",
-    color: "#111111",
+    color: "#334155",
     textTransform: "uppercase",
     marginBottom: "8px",
-    borderBottom: "1px solid #111111",
-    paddingBottom: "3px",
+    borderBottom: "1px solid #cbd5e1",
+    paddingBottom: "4px",
     display: "inline-block",
+    letterSpacing: "0.04em",
   },
   academicTable: {
     width: "100%",
     borderCollapse: "collapse",
-    marginTop: "6px",
+    marginTop: "10px",
+    tableLayout: "fixed",
   },
   academicTh: {
-    backgroundColor: "#f5f5f5",
-    border: "1px solid #d0d0d0",
-    padding: "5px",
-    fontSize: "10px",
+    backgroundColor: "#f1f5f9",
+    border: "1px solid #cbd5e1",
+    padding: "6px 5px",
+    fontSize: "9px",
     fontWeight: "800",
-    color: "#111111",
+    color: "#334155",
     textAlign: "center",
+    textTransform: "uppercase",
+    letterSpacing: "0.03em",
   },
   academicTd: {
-    border: "1px solid #d0d0d0",
-    padding: "5px",
+    border: "1px solid #dbe3ef",
+    padding: "6px 5px",
     fontSize: "10px",
     textAlign: "center",
+    color: "#0f172a",
+    fontWeight: "600",
   },
   footer: {
-    height: "10px",
-    backgroundColor: "#111111",
-    marginTop: "28px",
+    height: "7px",
+    backgroundColor: "#0f172a",
+    marginTop: "10px",
   }
 };
 
@@ -2451,16 +2689,33 @@ Enroll Admission            </p>
                       try {
                         const values = form.getFieldsValue(true);
 
+                        try {
+                          await form.validateFields();
+                        } catch (validationError) {
+                          const fields = (validationError?.errorFields || [])
+                            .map((item) => item?.name?.join(" > "))
+                            .filter(Boolean);
+
+                          if (fields.length) {
+                            message.error(`Please complete required fields: ${fields.join(", ")}`, 5);
+                          } else {
+                            message.error("Please complete all required fields.", 4);
+                          }
+                          return;
+                        }
+
                         const hasBirthFile = !!values.birthCertFile?.[0];
                         const hasCommunityFile = !!values.communityCertFile?.[0];
                         const hasAadharFile = !!values.aadharStudentFile?.[0];
                         const hasTransferFile = !!values.transferCertFile?.[0];
+                        const hasEntranceFile = !!values.entranceExamFile?.[0];
 
                         const selectedDocs = new Set(values.documentsChecked || []);
                         if (hasBirthFile) selectedDocs.add("birthCert");
                         if (hasCommunityFile) selectedDocs.add("communityCert");
                         if (hasAadharFile) selectedDocs.add("aadharStudent");
                         if (hasTransferFile) selectedDocs.add("transferCert");
+                        if (hasEntranceFile) selectedDocs.add("entranceExam");
 
                         const selectedDocList = Array.from(selectedDocs);
                         
@@ -2547,7 +2802,7 @@ Enroll Admission            </p>
                              line2: values.street,
                              landmark: values.landmark,
                              city: values.city,
-                             state: values.state || "Tamil Nadu",
+                             state: values.state === "OTHERS" ? values.stateOther : (values.state || "Tamil Nadu"),
                              pin: values.pin,
                            },
                            documents: documents,
@@ -2566,7 +2821,8 @@ Enroll Admission            </p>
                                    maxMarks: Number(s.maxMarks) || 0,
                                    obtainedMarks: Number(s.obtainedMarks) || 0,
                                  })),
-                               stream: values.academicStream || undefined,
+                               stream: normalizeAcademicStreamPayload(values.academicStream),
+                               streamCustom: values.academicStream === "OTHER" ? values.academicStreamCustom : undefined,
                              }
                            ],
                            admission: {
@@ -2666,6 +2922,21 @@ Enroll Admission            </p>
                            if (existingPath) formDataToSend.append("transferCertPath", existingPath);
                          }
 
+                         if (
+                           selectedDocs.has("entranceExam") &&
+                           values.entranceExamFile?.[0]?.originFileObj
+                         ) {
+                           const file = values.entranceExamFile[0].originFileObj;
+                           if (file.size > 1024 * 1024) {
+                             message.error("Entrance exam file too large");
+                             return;
+                           }
+                           formDataToSend.append("entranceExam", file);
+                         } else if (selectedDocs.has("entranceExam")) {
+                           const existingPath = getExistingFilePath(values.entranceExamFile);
+                           if (existingPath) formDataToSend.append("entranceExamPath", existingPath);
+                         }
+
                         if (editData) {
                           console.log("Updating admission with data:", { id: editData.id, formDataToSend });
                           await updateAdmission(editData.id, formDataToSend);
@@ -2685,7 +2956,7 @@ Enroll Admission            </p>
                         
                       } catch (err) {
                         console.error("Admission error:", err);
-                        message.error("Error creating admission. Check required fields or try again.", 4);
+                        message.error(extractMissingFieldMessage(err), 5);
                       }
                     }}
                   >
@@ -2714,13 +2985,14 @@ Enroll Admission            </p>
 
       {/* ── HIDDEN PDF TEMPLATE ── */}
       <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
-        <div id="pdfContent" style={styles.pdfWrapper}>
+        <div id="pdfPage1" style={styles.pdfWrapper}>
           <div style={styles.header}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', justifyContent: 'center' }}>
-              <img src={logo} alt="logo" style={{ width: "80px" }} />
+            <div style={styles.schoolHeader}>
+              <img src={normalizeAssetSrc(documentAssets.schoolLogo) || logo} alt="logo" style={{ width: "80px" }} />
               <div style={{ textAlign: 'left' }}>
                 <h1 style={styles.institutionName}>Matric Hr Sec School</h1>
                 <p style={styles.tagline}>Excellence in Education - Vadugappatti, Salem</p>
+                <p style={styles.tagline}>{documentAssets.schoolAddress || "Vadugappatti, Salem - 636XXX"}</p>
                 <p style={{ ...styles.tagline, fontWeight: 700 }}>Admission Year: {formData.academicYear || '-'}</p>
               </div>
             </div>
@@ -2819,28 +3091,6 @@ Enroll Admission            </p>
                 </div>
              </div>
 
-             <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Religion :</span>
-                  <span style={styles.value}>{formData.religion}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Community / Caste :</span>
-                  <span style={styles.value}>{[formData.community, formData.caste].filter(Boolean).join(' / ') || '-'}</span>
-                </div>
-             </div>
-
-             <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Mother Tongue :</span>
-                  <span style={styles.value}>{formData.motherTongue || '-'}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Previous School :</span>
-                  <span style={styles.value}>{formData.previouslyStudied || '-'}</span>
-                </div>
-             </div>
-
              <div style={styles.academicSection}>
                 <div style={styles.academicTitle}>III. Academic Performance</div>
                 <div style={{...styles.row, marginBottom: '10px'}}>
@@ -2860,7 +3110,7 @@ Enroll Admission            </p>
                 <div style={{...styles.row, marginBottom: '8px'}}>
                   <div style={styles.field}>
                     <span style={styles.label}>Stream / Group :</span>
-                    <span style={styles.value}>{STREAM_LABELS[formData.academicStream] || formData.academicStream || '-'}</span>
+                    <span style={styles.value}>{getReadableStream(formData.academicStream, formData.academicStreamCustom)}</span>
                   </div>
                 </div>
                 <table style={styles.academicTable}>
@@ -2905,19 +3155,55 @@ Enroll Admission            </p>
                 </table>
              </div>
 
-             <div style={styles.row}>
+          </div>
+          <div style={styles.footer}></div>
+        </div>
+
+        <div id="pdfPage2" style={styles.pdfWrapper}>
+          <div style={styles.secondPageHeader}>
+            <h3 style={styles.secondPageTitle}>Declaration and Signatures</h3>
+            <p style={styles.secondPageSubTitle}>Admission No: {formData.admissionNo || '-'} | Student: {formData.name || '-'}</p>
+          </div>
+
+          <div style={styles.secondPageBody}>
+            <div style={styles.academicSection}>
+              <div style={styles.academicTitle}>IV. Contact and Family Details</div>
+
+              <div style={styles.row}>
+                <div style={{...styles.field, flex: 0.5}}>
+                  <span style={styles.label}>Religion :</span>
+                  <span style={styles.value}>{formData.religion || '-'}</span>
+                </div>
+                <div style={{...styles.field, flex: 0.5}}>
+                  <span style={styles.label}>Community / Caste :</span>
+                  <span style={styles.value}>{[formData.community, formData.caste].filter(Boolean).join(' / ') || '-'}</span>
+                </div>
+              </div>
+
+              <div style={styles.row}>
+                <div style={{...styles.field, flex: 0.5}}>
+                  <span style={styles.label}>Mother Tongue :</span>
+                  <span style={styles.value}>{formData.motherTongue || '-'}</span>
+                </div>
+                <div style={{...styles.field, flex: 0.5}}>
+                  <span style={styles.label}>Previous School :</span>
+                  <span style={styles.value}>{formData.previouslyStudied || '-'}</span>
+                </div>
+              </div>
+
+              <div style={styles.row}>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>Phone Number :</span>
-                  <span style={styles.value}>{formData.fatherPhone || formData.motherPhone}</span>
+                  <span style={styles.value}>{formData.fatherPhone || formData.motherPhone || '-'}</span>
                 </div>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>Email Address :</span>
-                  <span style={styles.value}>{formData.parentsEmail}</span>
+                  <span style={styles.value}>{formData.parentsEmail || '-'}</span>
                 </div>
-             </div>
+              </div>
 
-             {formData.isSingleParent && formData.guardianName && (
-               <div style={styles.row}>
+              {formData.isSingleParent && formData.guardianName && (
+                <div style={styles.row}>
                   <div style={{...styles.field, flex: 0.5}}>
                     <span style={styles.label}>Guardian Name :</span>
                     <span style={styles.value}>{formData.guardianName} {formData.guardianRelation ? `(${formData.guardianRelation})` : ''}</span>
@@ -2926,21 +3212,21 @@ Enroll Admission            </p>
                     <span style={styles.label}>Guardian Phone :</span>
                     <span style={styles.value}>{formData.guardianPhone || '-'}</span>
                   </div>
-               </div>
-             )}
+                </div>
+              )}
 
-             <div style={styles.row}>
+              <div style={styles.row}>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>Aadhar Number :</span>
-                  <span style={styles.value}>{formData.aadharNo}</span>
+                  <span style={styles.value}>{formData.aadharNo || '-'}</span>
                 </div>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>Blood Group :</span>
-                  <span style={styles.value}>{formData.bloodGroup}</span>
+                  <span style={styles.value}>{formData.bloodGroup || '-'}</span>
                 </div>
-             </div>
+              </div>
 
-             <div style={styles.row}>
+              <div style={styles.row}>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>Family Income :</span>
                   <span style={styles.value}>{formData.familyIncome || '-'}</span>
@@ -2949,74 +3235,86 @@ Enroll Admission            </p>
                   <span style={styles.label}>Siblings Count :</span>
                   <span style={styles.value}>{formData.siblingsCount || '-'}</span>
                 </div>
-             </div>
+              </div>
 
-             <div style={styles.row}>
+              <div style={styles.row}>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>Father Occupation :</span>
-                  <span style={styles.value}>{formData.fatherOccupation}</span>
+                  <span style={styles.value}>{formData.fatherOccupation || '-'}</span>
                 </div>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>Admission For :</span>
-                  <span style={styles.value}>STD {formData.standard}</span>
+                  <span style={styles.value}>STD {formData.standard || '-'}</span>
                 </div>
-             </div>
+              </div>
 
-             <div style={styles.row}>
+              <div style={styles.row}>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>Section :</span>
-                  <span style={styles.value}>{formData.section}</span>
+                  <span style={styles.value}>{formData.section || '-'}</span>
                 </div>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>Year :</span>
-                  <span style={styles.value}>{formData.academicYear}</span>
+                  <span style={styles.value}>{formData.academicYear || '-'}</span>
                 </div>
-             </div>
+              </div>
 
-             <div style={styles.row}>
+              <div style={styles.row}>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>Transport :</span>
-                  <span style={styles.value}>{formData.vanNeeded ? "School Van" : "Private / Local"}</span>
+                  <span style={styles.value}>{formData.vanNeeded ? 'School Van' : 'Private / Local'}</span>
                 </div>
                 <div style={{...styles.field, flex: 0.5}}>
                   <span style={styles.label}>RTE Student :</span>
-                  <span style={styles.value}>{formData.rteApplied ? "Yes" : "No"}</span>
+                  <span style={styles.value}>{formData.rteApplied ? 'Yes' : 'No'}</span>
                 </div>
-             </div>
+              </div>
+            </div>
 
-             <div style={styles.declaration}>
-                <h4 style={styles.declTitle}>Declaration</h4>
-                <p style={styles.declText}>
-                  I hereby, declaring that I will obey all the rules and regulations of the institution and be fully responsible for violating the rules.
-                </p>
-                
-                <div style={styles.signatureRow}>
+            <div style={styles.declaration}>
+              <h4 style={styles.declTitle}>Declaration</h4>
+              <p style={styles.declText}>
+                I hereby declare that all particulars furnished in this admission form are true to the best of my knowledge. I will abide by the rules and regulations of the institution.
+              </p>
+
+              <div style={styles.signatureRow}>
+                <div style={styles.sigBlock}>
                   <div style={styles.sigLine}>Student's Signature</div>
-                  <div style={{ ...styles.sigLine, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    {normalizeAssetSrc(documentAssets.principalSignature) && (
-                      <img
-                        src={normalizeAssetSrc(documentAssets.principalSignature)}
-                        alt="Principal Signature"
-                        crossOrigin="anonymous"
-                        style={{ width: '140px', height: '46px', objectFit: 'contain', marginBottom: '6px' }}
-                      />
-                    )}
-                    Principal's Signature
-                  </div>
-                  {normalizeAssetSrc(documentAssets.rubberStamp) && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <img
-                        src={normalizeAssetSrc(documentAssets.rubberStamp)}
-                        alt="Rubber Stamp"
-                        crossOrigin="anonymous"
-                        style={{ width: '90px', height: '90px', objectFit: 'contain', opacity: 0.95, filter: 'grayscale(100%)' }}
-                      />
-                      <span style={{ fontSize: 11, fontWeight: 700 }}>Authorization Seal</span>
-                    </div>
-                  )}
                 </div>
-             </div>
+
+                <div style={styles.sigBlock}>
+                  <div style={styles.sigLine}>Parent's Signature</div>
+                </div>
+
+                <div style={styles.sigBlock}>
+                  {normalizeAssetSrc(documentAssets.principalSignature) && (
+                    <img
+                      src={normalizeAssetSrc(documentAssets.principalSignature)}
+                      alt="Principal Signature"
+                      crossOrigin="anonymous"
+                      style={styles.sigImage}
+                    />
+                  )}
+                  <div style={styles.sigLine}>Principal's Signature</div>
+                </div>
+              </div>
+
+              {normalizeAssetSrc(documentAssets.rubberStamp) && (
+                <div style={styles.sealWrap}>
+                  <img
+                    src={normalizeAssetSrc(documentAssets.rubberStamp)}
+                    alt="Rubber Stamp"
+                    crossOrigin="anonymous"
+                    style={{ width: '100px', height: '100px', objectFit: 'contain', opacity: 0.95, filter: 'grayscale(100%)' }}
+                  />
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: '#334155' }}>
+                    Authorization Seal
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
+
           <div style={styles.footer}></div>
         </div>
       </div>
