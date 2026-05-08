@@ -2451,7 +2451,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       boxSizing: "border-box",
       display: "flex",
       flexDirection: "column",
-      padding: "50px",
+      padding: "30px 40px",
     },
     header: {
       display: "grid",
@@ -3028,9 +3028,9 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
             </div>
           </div>
 
-          <div style={{ marginBottom: "20px" }}>
-            <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "8px" }}>1. Student & Parental Profiles</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+          <div style={{ marginBottom: "12px" }}>
+            <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "6px", marginBottom: "8px" }}>1. Student & Parental Profiles</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 20px" }}>
                 {[
                   ["Student Name", formData.name],
                   ["Standard", formData.standard ? `STD ${formData.standard}` : "-"],
@@ -3055,8 +3055,8 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               </div>
             </div>
 
-          <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "8px" }}>2. Residential & Contact Info</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "30px", marginBottom: "20px" }}>
+          <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "6px", marginBottom: "8px" }}>2. Residential & Contact Info</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "12px" }}>
             <div style={{ padding: "16px", border: "1px solid #f1f5f9", borderRadius: "12px", background: "#f8fafc" }}>
               <p style={{ margin: "0 0 8px", fontSize: "10px", fontWeight: "900", color: "#64748b", textTransform: "uppercase" }}>Residential Domicile</p>
               <p style={{ margin: 0, fontSize: "12px", fontWeight: "800", color: "#0f172a", lineHeight: "1.5" }}>
@@ -3072,9 +3072,9 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
             </div>
           </div>
 
-          <div style={{ marginTop: "10px" }}>
-            <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "8px" }}>3. Academic & Institutional Information</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "16px" }}>
+          <div style={{ marginTop: "4px" }}>
+            <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "6px", marginBottom: "8px" }}>3. Academic & Institutional Information</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 20px", marginBottom: "12px" }}>
               <div style={styles.fieldRow}><span style={styles.fieldLabel}>Prev. School</span><span style={styles.fieldValue}>{formData.previouslyStudied || "—"}</span></div>
               <div style={styles.fieldRow}><span style={styles.fieldLabel}>Prev. Std</span><span style={styles.fieldValue}>{formData.previousSchoolStandard || "—"}</span></div>
               <div style={styles.fieldRow}><span style={styles.fieldLabel}>Qualifying Exam</span><span style={styles.fieldValue}>{formData.examName}</span></div>
