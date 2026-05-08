@@ -4,7 +4,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import instance from "../utils/axios";
 import dayjs from "dayjs";
-import { linkSiblings, demoteIndividualStudents } from "../modules/admission/admission.service";
+import { linkSiblings, demoteIndividualStudents, unlinkSibling } from "../modules/admission/admission.service";
 import { getAdminSettings } from "../modules/settings/settings.service";
 import { EnvironmentOutlined, SearchOutlined } from '@ant-design/icons';
 
@@ -78,6 +78,7 @@ const StudentView = ({ onCollectFee, onEdit }) => {
   const [areaFilter, setAreaFilter] = useState("");
   const [fatherFilter, setFatherFilter] = useState("");
   const [siblingFilter, setSiblingFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("active");
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize] = useState(12);
@@ -91,6 +92,8 @@ const StudentView = ({ onCollectFee, onEdit }) => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [targetSiblingIds, setTargetSiblingIds] = useState([]);
   const [linking, setLinking] = useState(false);
+  const [linkClassFilter, setLinkClassFilter] = useState("");
+  const [linkSectionFilter, setLinkSectionFilter] = useState("");
 
   // PDF export for a student row (custom layout)
   const handlePrintPDF = async () => {
@@ -128,8 +131,8 @@ const StudentView = ({ onCollectFee, onEdit }) => {
   };
   const fetchStudents = () => {
     instance.get("/admissions").then((res) => {
-      const approved = (res.data || []).filter((s) => s.admission?.isApproved);
-      const newestFirst = [...approved].sort((a, b) => {
+      const data = (res.data || []).filter((s) => s.admission?.isApproved);
+      const newestFirst = [...data].sort((a, b) => {
         const aDate = new Date(a?.createdAt || a?.admission?.admissionDate || 0).getTime();
         const bDate = new Date(b?.createdAt || b?.admission?.admissionDate || 0).getTime();
         return bDate - aDate;
@@ -137,6 +140,16 @@ const StudentView = ({ onCollectFee, onEdit }) => {
       setStudents(newestFirst);
       setPage(1);
     });
+  };
+
+  const handleUnarchive = async (studentId) => {
+    try {
+      await unarchiveStudent(studentId);
+      message.success("Student restored from archive");
+      fetchStudents();
+    } catch {
+      message.error("Failed to restore student");
+    }
   };
 
   const fetchAdminSettings = async () => {
@@ -167,6 +180,8 @@ const StudentView = ({ onCollectFee, onEdit }) => {
   const filtered = useMemo(() => {
     const q = searchText.trim().toLowerCase();
     return students.filter((s) => {
+      if (statusFilter === "active" && s.users?.isActive === false) return false;
+      if (statusFilter === "archived" && s.users?.isActive !== false) return false;
       if (classFilter && (s.standard || s.admission?.standard) !== classFilter) return false;
       if (sectionFilter && (s.section || "") !== sectionFilter) return false;
       if (genderFilter && (s.gender || "").toLowerCase() !== genderFilter) return false;
@@ -192,7 +207,7 @@ const StudentView = ({ onCollectFee, onEdit }) => {
       }
       return true;
     });
-  }, [students, classFilter, sectionFilter, genderFilter, areaFilter, searchText]);
+  }, [students, classFilter, sectionFilter, genderFilter, areaFilter, fatherFilter, siblingFilter, statusFilter, searchText]);
 
   // ── summary stats ─────────────────────────────────────────────────────────
   const totalEnrollment = students.length;
@@ -237,6 +252,26 @@ const StudentView = ({ onCollectFee, onEdit }) => {
           fetchStudents();
         } catch (err) {
           message.error(err?.response?.data?.message || 'Demotion failed');
+        }
+      },
+    });
+  };
+
+  const handleUnlink = (student) => {
+    Modal.confirm({
+      title: 'Unlink Sibling',
+      content: `Are you sure you want to remove ${student.name} from their sibling group?`,
+      okText: 'Yes, Unlink',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await unlinkSibling(student.id);
+          message.success(`${student.name} unlinked successfully`);
+          fetchStudents();
+          setSelectedStudent(prev => prev ? { ...prev, siblings: prev.siblings?.filter(s => s.id !== student.id) } : null);
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Unlinking failed');
         }
       },
     });
@@ -319,6 +354,7 @@ const StudentView = ({ onCollectFee, onEdit }) => {
                 value={classFilter || undefined}
                 placeholder="All Standard"
                 allowClear
+                size="large"
                 onChange={(val) => { setClassFilter(val || ''); setPage(1); }}
                 style={{ minWidth: 140 }}
                 options={[
@@ -330,6 +366,7 @@ const StudentView = ({ onCollectFee, onEdit }) => {
                 value={sectionFilter || undefined}
                 placeholder="Sections"
                 allowClear
+                size="large"
                 onChange={(val) => { setSectionFilter(val || ''); setPage(1); }}
                 style={{ minWidth: 120 }}
                 options={sectionOptions.map((c) => ({ value: c, label: c }))}
@@ -339,6 +376,7 @@ const StudentView = ({ onCollectFee, onEdit }) => {
                 value={genderFilter || undefined}
                 placeholder="Gender"
                 allowClear
+                size="large"
                 onChange={(val) => { setGenderFilter(val || ''); setPage(1); }}
                 style={{ minWidth: 120 }}
                 options={[
@@ -346,31 +384,55 @@ const StudentView = ({ onCollectFee, onEdit }) => {
                   { value: 'female', label: 'Female' },
                 ]}
               />
-            </div>
-          </div>
 
-          <div className="flex items-center gap-4 pt-4 mt-4 border-t border-slate-50">
-            <div className="w-64">
-              <Input
-                value={areaFilter}
-                onChange={(e) => { setAreaFilter(e.target.value); setPage(1); }}
-                placeholder="Street / Village"
-                prefix={<EnvironmentOutlined className="text-slate-400" />}
-                allowClear
+              <div className="w-48">
+                <Input
+                  value={areaFilter}
+                  onChange={(e) => { setAreaFilter(e.target.value); setPage(1); }}
+                  placeholder="Street / Village"
+                  prefix={<EnvironmentOutlined className="text-slate-400" />}
+                  allowClear
+                  size="large"
+                  className="filter-input text-[11px] font-bold"
+                />
+              </div>
+
+              <Select
+                value={siblingFilter || undefined}
+                placeholder="Siblings Status"
                 size="large"
-                className="filter-input text-[11px] font-bold"
+                allowClear
+                onChange={setSiblingFilter}
+                style={{ minWidth: 160 }}
+                options={[
+                  { value: "has", label: "Has Siblings" },
+                  { value: "none", label: "No Siblings" },
+                ]}
               />
-            </div>
 
-            {(classFilter || sectionFilter || genderFilter || areaFilter || fatherFilter || siblingFilter || searchText) && (
-              <button
-                onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setAreaFilter(""); setFatherFilter(""); setSiblingFilter(""); setSearchText(""); setPage(1); }}
-                className="px-4 py-2 flex items-center gap-1 text-rose-600 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all"
-              >
-                <span className="text-sm leading-none material-symbols-outlined">close</span>
-                Reset
-              </button>
-            )}
+              <Select
+                value={statusFilter}
+                placeholder="Profile Status"
+                size="large"
+                onChange={setStatusFilter}
+                style={{ minWidth: 160 }}
+                options={[
+                  { value: "active", label: "Active Profiles" },
+                  { value: "archived", label: "Archived Records" },
+                  { value: "all", label: "All Statuses" },
+                ]}
+              />
+
+              {(classFilter || sectionFilter || genderFilter || areaFilter || fatherFilter || siblingFilter || statusFilter !== "active" || searchText) && (
+                <button
+                  onClick={() => { setClassFilter(""); setSectionFilter(""); setGenderFilter(""); setAreaFilter(""); setFatherFilter(""); setSiblingFilter(""); setStatusFilter("active"); setSearchText(""); setPage(1); }}
+                  className="px-4 flex items-center gap-1 text-rose-600 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all h-[40px]"
+                >
+                  <span className="text-sm leading-none material-symbols-outlined">close</span>
+                  Reset
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -484,16 +546,6 @@ const StudentView = ({ onCollectFee, onEdit }) => {
                                 <span className="material-symbols-outlined text-[18px] leading-none">add_link</span>
                               </button>
                               <button
-                                onClick={() => { setDetailStudent(s); setDetailModalOpen(true); }}
-                                className="relative flex items-center justify-center transition-all shadow-sm w-9 h-9 rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-900 hover:text-white"
-                                title={hasMissingRequiredDocs ? `Full Bio. ${missingRequiredDocsTitle}` : "Full Bio"}
-                              >
-                                {hasMissingRequiredDocs && (
-                                  <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
-                                )}
-                                <span className="material-symbols-outlined text-[18px] leading-none">badge</span>
-                              </button>
-                              <button
                                 onClick={() => onEdit && onEdit(s)}
                                 className="flex items-center justify-center transition-all shadow-sm w-9 h-9 rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-900 hover:text-white"
                                 title="Edit"
@@ -502,15 +554,26 @@ const StudentView = ({ onCollectFee, onEdit }) => {
                               </button>
                               {/* demote button  */}
                               {adminSettings?.enableIndividualDemotion && <button onClick={() => handleDemote(s)} className="flex items-center justify-center text-yellow-600 transition-all shadow-sm w-9 h-9 rounded-xl bg-yellow-50 hover:bg-yellow-600 hover:text-black" title="Demote"><span className="material-symbols-outlined text-[18px] leading-none">arrow_downward</span></button>}
-                              {/* Archive button */}
-                              <Popconfirm title="Archive student record?" onConfirm={() => handleArchive(s.id)}>
-                                <button
-                                  className="flex items-center justify-center transition-all shadow-sm w-9 h-9 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white"
-                                  title="Archive"
-                                >
-                                  <span className="material-symbols-outlined text-[18px] leading-none">archive</span>
-                                </button>
-                              </Popconfirm>
+                              {/* Archive / Unarchive button */}
+                              {s.users?.isActive === false ? (
+                                <Popconfirm title="Restore student record?" onConfirm={() => handleUnarchive(s.id)}>
+                                  <button
+                                    className="flex items-center justify-center transition-all shadow-sm w-9 h-9 rounded-xl bg-teal-50 text-teal-600 hover:bg-teal-600 hover:text-white"
+                                    title="Unarchive"
+                                  >
+                                    <span className="material-symbols-outlined text-[18px] leading-none">unarchive</span>
+                                  </button>
+                                </Popconfirm>
+                              ) : (
+                                <Popconfirm title="Archive student record?" onConfirm={() => handleArchive(s.id)}>
+                                  <button
+                                    className="flex items-center justify-center transition-all shadow-sm w-9 h-9 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white"
+                                    title="Archive"
+                                  >
+                                    <span className="material-symbols-outlined text-[18px] leading-none">archive</span>
+                                  </button>
+                                </Popconfirm>
+                              )}
                               {/* Issue PDF button */}
                               <button
                                 onClick={() => {
@@ -710,10 +773,60 @@ const StudentView = ({ onCollectFee, onEdit }) => {
               Link siblings to group students with the same parents into one family for unified records, shared fees tracking, and streamlined communication.
             </p>
           </div>
-          <div className="space-y-3">
+          {selectedStudent?.siblings?.length > 0 && (
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
+                Currently Linked Siblings
+              </label>
+              <div className="space-y-2">
+                {selectedStudent.siblings.map(sib => (
+                  <div key={sib.id} className="flex items-center justify-between p-3 border bg-slate-50 rounded-2xl border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 flex items-center justify-center rounded-xl bg-teal-50 text-teal-600 font-black text-[11px]">
+                        {sib.name?.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="text-[12px] font-black text-slate-900 leading-tight">{sib.name}</div>
+                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{sib.standard} {sib.admission?.admissionNo ? `· ${sib.admission.admissionNo}` : ''}</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleUnlink(sib)}
+                      className="flex items-center justify-center w-8 h-8 transition-all shadow-sm rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white"
+                      title="Unlink Sibling"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">link_off</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3 pt-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
-              Progeny Search
+              Add New Sibling Link
             </label>
+            <div className="flex gap-2">
+              <Select
+                value={linkClassFilter || undefined}
+                placeholder="Standard Filter"
+                allowClear
+                size="large"
+                className="w-1/2"
+                onChange={setLinkClassFilter}
+                options={classOptions.map(c => ({ value: c, label: c }))}
+              />
+              <Select
+                value={linkSectionFilter || undefined}
+                placeholder="Section Filter"
+                allowClear
+                size="large"
+                className="w-1/2"
+                onChange={setLinkSectionFilter}
+                options={sectionOptions.map(c => ({ value: c, label: c }))}
+              />
+            </div>
             <Select
               mode="multiple"
               showSearch
@@ -729,6 +842,9 @@ const StudentView = ({ onCollectFee, onEdit }) => {
               }
               options={students
                 .filter((s) => s.id !== selectedStudent?.id)
+                .filter((s) => !selectedStudent?.siblings?.some(sib => sib.id === s.id))
+                .filter((s) => !linkClassFilter || s.standard === linkClassFilter || s.admission?.standard === linkClassFilter)
+                .filter((s) => !linkSectionFilter || s.section === linkSectionFilter || s.admission?.section === linkSectionFilter)
                 .map((s) => ({
                   label: `${s.name} (${s.admission?.admissionNo || s.id})`,
                   value: s.id,

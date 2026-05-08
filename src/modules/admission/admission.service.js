@@ -95,6 +95,16 @@ export const linkSiblings = async (payload) => {
   return res.data;
 };
 
+export const unlinkSibling = async (studentId) => {
+  const res = await axios.post('/admissions/siblings/unlink', { studentId });
+  return res.data;
+};
+
+export const unarchiveStudent = async (studentId) => {
+  const res = await axios.post(`/admissions/${studentId}/unarchive`);
+  return res.data;
+};
+
 export const getNextAdmissionNo = async () => {
   const res = await axios.get('/admissions/next-admission-no');
   return res.data;

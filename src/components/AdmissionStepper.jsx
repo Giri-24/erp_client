@@ -990,6 +990,27 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
 
 
+  const watchedGuardianRelation = Form.useWatch("guardianRelation", form);
+  
+  useEffect(() => {
+    if (isSingleParent && (watchedGuardianRelation === "father" || watchedGuardianRelation === "mother")) {
+      const relation = watchedGuardianRelation === "father" ? "father" : "mother";
+      const name = form.getFieldValue(`${relation}Name`);
+      const phone = form.getFieldValue(`${relation}Phone`);
+      const whatsapp = form.getFieldValue(`${relation}WhatsAppNo`);
+      const aadhar = form.getFieldValue(`${relation}AadharNo`);
+      const occupation = form.getFieldValue(`${relation}Occupation`);
+      
+      form.setFieldsValue({
+        guardianName: name,
+        guardianPhone: phone,
+        guardianWhatsapp: whatsapp,
+        guardianAadhar: aadhar,
+        guardianOccupation: occupation
+      });
+    }
+  }, [watchedGuardianRelation, isSingleParent, form]);
+
   // Re-sync subjects to Form.List after it mounts when navigating to the Academic step.
   // Form.List may not receive values set via setFieldsValue while it was unmounted,
   // so we push the stored formData.subjects back after the step renders.
@@ -1040,7 +1061,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
     {
       title: "Student",
       icon: <UserOutlined />,
-      fields: ["name", "gender", "dob", "community"],
+      fields: ["name", "gender", "dob", "community", "standard"],
       content: (
         <div className="space-y-6">
           <div className="mb-4">
@@ -1281,7 +1302,11 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
               <Form.Item label="Father WhatsApp">
                 <Space.Compact style={{ width: '100%' }}>
-                  <Form.Item name="fatherWhatsAppNo" noStyle>
+                  <Form.Item 
+                    name="fatherWhatsAppNo" 
+                    noStyle 
+                    rules={[{ pattern: /^\d{10}$/, message: 'Must be 10 digits' }]}
+                  >
                     <Input maxLength={10} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} style={{ width: 'calc(100% - 120px)' }} />
                   </Form.Item>
                   <Button
@@ -1317,7 +1342,11 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
               <Form.Item label="Mother WhatsApp">
                 <Space.Compact style={{ width: '100%' }}>
-                  <Form.Item name="motherWhatsAppNo" noStyle>
+                  <Form.Item 
+                    name="motherWhatsAppNo" 
+                    noStyle 
+                    rules={[{ pattern: /^\d{10}$/, message: 'Must be 10 digits' }]}
+                  >
                     <Input maxLength={10} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} style={{ width: 'calc(100% - 120px)' }} />
                   </Form.Item>
                   <Button
@@ -1370,8 +1399,15 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item name="guardianName" label="Guardian Name" rules={[{ required: true, message: 'Enter guardian name' }]}>
-                    <Input />
+                  <Form.Item 
+                    name="guardianName" 
+                    label="Guardian Name" 
+                    rules={[{ 
+                      required: watchedGuardianRelation !== "father" && watchedGuardianRelation !== "mother", 
+                      message: 'Enter guardian name' 
+                    }]}
+                  >
+                    <Input disabled={watchedGuardianRelation === "father" || watchedGuardianRelation === "mother"} />
                   </Form.Item>
                 </Col>
                 <Col span={8}>
@@ -1383,7 +1419,11 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                 <Col span={8}>
                   <Form.Item label="Guardian WhatsApp">
                     <Space.Compact style={{ width: '100%' }}>
-                      <Form.Item name="guardianWhatsapp" noStyle>
+                      <Form.Item 
+                        name="guardianWhatsapp" 
+                        noStyle 
+                        rules={[{ pattern: /^\d{10}$/, message: 'Must be 10 digits' }]}
+                      >
                         <Input maxLength={10} style={{ width: 'calc(100% - 120px)' }} />
                       </Form.Item>
                       <Button
@@ -1667,8 +1707,13 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
             <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Details of qualifying examinations and subject-wise performance.</p>
           </div>
           <>
-            {/* ── Qualifying Exam header ── */}
-            <Divider titlePlacement="left">Qualifying Examination Passed and Percentage of Mark Obtained</Divider>
+            {(() => {
+              const std = form.getFieldValue("standard");
+              return !std || (std !== "LKG" && std !== "UKG");
+            })() ? (
+              <>
+                {/* ── Qualifying Exam header ── */}
+                <Divider titlePlacement="left">Qualifying Examination Passed and Percentage of Mark Obtained</Divider>
             <Row gutter={16}>
               <Col span={6}>
                 <Form.Item name="examName" label="Name of Examination" >
@@ -1908,6 +1953,20 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               </>
             )}
           </>
+        ) : (
+          <div className="py-12 flex flex-col items-center justify-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+            <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4">
+              <span className="text-3xl material-symbols-outlined text-slate-300">history_edu</span>
+            </div>
+            <h4 className="text-slate-900 font-bold">Academic History Not Required</h4>
+            <p className="text-slate-500 text-sm mt-1">Previous performance data is not applicable for {watchedStandard} admissions.</p>
+            <div className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-teal-600 bg-teal-50 px-4 py-2 rounded-full">
+              <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-pulse"></span>
+              Safe to skip
+            </div>
+          </div>
+        )}
+      </>
         </div>
       ),
     },
@@ -2650,6 +2709,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               form={form}
               layout="vertical"
               requiredMark={false}
+              preserve={true}
               className="admission-form"
               onValuesChange={(changedValues, allValues) => {
                 if (Object.prototype.hasOwnProperty.call(changedValues, "standard") && !allValues.section) {
@@ -2730,19 +2790,25 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                         // Build the documents array
                         const documents = [];
                         const hardCopyDocs = values.hardCopyDocs || [];
+                        
                         // Profile photo
-                        if (values.profilePhotoChecked) {
-                          documents.push({ key: "profilePhoto", photoPath: "" }); // backend will set photoPath
-                        }
-                        // Other documents (with hardCopy flag)
-                        selectedDocList.forEach(docKey => {
-                          documents.push({ key: docKey, photoPath: "", hardCopy: hardCopyDocs.includes(docKey) });
+                        documents.push({ 
+                          key: "photo", 
+                          uploaded: !!values.profilePhoto?.[0],
+                          photoPath: "" 
                         });
-                        // Hard-copy only docs (not in documentsChecked but marked as hard copy)
-                        hardCopyDocs.forEach(docKey => {
-                          if (!selectedDocs.has(docKey)) {
-                            documents.push({ key: docKey, uploaded: false, hardCopy: true });
-                          }
+
+                        const ALL_DOC_KEYS = ["birthCert", "communityCert", "aadharStudent", "transferCert", "entranceExam", "aadharFather", "aadharMother"];
+                        ALL_DOC_KEYS.forEach(docKey => {
+                          const hasFile = !!values[`${docKey}File`]?.[0];
+                          const isHardCopy = hardCopyDocs.includes(docKey);
+                          
+                          documents.push({
+                            key: docKey,
+                            uploaded: hasFile,
+                            hardCopy: isHardCopy,
+                            photoPath: ""
+                          });
                         });
 
                         // Add photosReceived flag
@@ -2968,7 +3034,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                       }
                     }}
                   >
-                    Enroll the  student
+                    {editData ? "Update student profile" : "Enroll the student"}
                     <span className="text-lg material-symbols-outlined">verified</span>
                   </button>
                 )}
@@ -3062,47 +3128,50 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               <p style={{ margin: 0, fontSize: "12px", fontWeight: "800", color: "#0f172a", lineHeight: "1.5" }}>
                 {[formData.line1, formData.street, formData.city, formData.state, formData.pin].filter(Boolean).join(", ")}
               </p>
-              <p style={{ margin: "6px 0 0", fontSize: "10px", color: "#64748b" }}>Landmark: {formData.landmark || "N/A"}</p>
             </div>
             <div>
-              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Alt Comm.</span><span style={styles.fieldValue}>{formData.communityOther || "—"}</span></div>
               <div style={styles.fieldRow}><span style={styles.fieldLabel}>Parent Email</span><span style={styles.fieldValue}>{formData.parentsEmail || "—"}</span></div>
               <div style={styles.fieldRow}><span style={styles.fieldLabel}>Identity 1</span><span style={styles.fieldValue}>{formData.identityMark1 || "—"}</span></div>
               <div style={styles.fieldRow}><span style={styles.fieldLabel}>Identity 2</span><span style={styles.fieldValue}>{formData.identityMark2 || "—"}</span></div>
+              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Blood Group</span><span style={styles.fieldValue}>{formData.bloodGroup || "—"}</span></div>
             </div>
           </div>
 
-          <div style={{ marginTop: "4px" }}>
-            <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "6px", marginBottom: "8px" }}>3. Academic & Institutional Information</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 20px", marginBottom: "12px" }}>
-              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Prev. School</span><span style={styles.fieldValue}>{formData.previouslyStudied || "—"}</span></div>
-              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Prev. Std</span><span style={styles.fieldValue}>{formData.previousSchoolStandard || "—"}</span></div>
-              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Qualifying Exam</span><span style={styles.fieldValue}>{formData.examName}</span></div>
-              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Board Name</span><span style={styles.fieldValue}>{formData.boardExamType === "Other" ? formData.boardName : formData.boardExamType}</span></div>
-            </div>
-          </div>
-          <table style={{ ...styles.academicTable, marginBottom: "20px" }}>
-            <thead>
-              <tr>
-                <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488" }}>Subject</th>
-                <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488", textAlign: "center" }}>Max Marks</th>
-                <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488", textAlign: "center" }}>Obtained</th>
-                <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488", textAlign: "center" }}>%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(formData.subjects || []).map((exam, idx) => (
-                <tr key={idx}>
-                  <td style={styles.academicTd}>{exam.subjectName}</td>
-                  <td style={{ ...styles.academicTd, textAlign: "center" }}>{exam.maxMarks}</td>
-                  <td style={{ ...styles.academicTd, textAlign: "center" }}>{exam.obtainedMarks}</td>
-                  <td style={{ ...styles.academicTd, textAlign: "center", color: "#0d9488", fontWeight: "900" }}>
-                    {exam.maxMarks > 0 ? ((exam.obtainedMarks / exam.maxMarks) * 100).toFixed(1) + '%' : '-'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {formData.standard !== "LKG" && formData.standard !== "UKG" && (
+            <>
+              <div style={{ marginTop: "4px" }}>
+                <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "6px", marginBottom: "8px" }}>3. Academic & Institutional Information</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 20px", marginBottom: "12px" }}>
+                  <div style={styles.fieldRow}><span style={styles.fieldLabel}>Prev. School</span><span style={styles.fieldValue}>{formData.previouslyStudied || "—"}</span></div>
+                  <div style={styles.fieldRow}><span style={styles.fieldLabel}>Prev. Std</span><span style={styles.fieldValue}>{formData.previousSchoolStandard || "—"}</span></div>
+                  <div style={styles.fieldRow}><span style={styles.fieldLabel}>Qualifying Exam</span><span style={styles.fieldValue}>{formData.examName}</span></div>
+                  <div style={styles.fieldRow}><span style={styles.fieldLabel}>Board Name</span><span style={styles.fieldValue}>{formData.boardExamType === "Other" ? formData.boardName : formData.boardExamType}</span></div>
+                </div>
+              </div>
+              <table style={{ ...styles.academicTable, marginBottom: "20px" }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488" }}>Subject</th>
+                    <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488", textAlign: "center" }}>Max Marks</th>
+                    <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488", textAlign: "center" }}>Obtained</th>
+                    <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488", textAlign: "center" }}>%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(formData.subjects || []).map((exam, idx) => (
+                    <tr key={idx}>
+                      <td style={styles.academicTd}>{exam.subjectName}</td>
+                      <td style={{ ...styles.academicTd, textAlign: "center" }}>{exam.maxMarks}</td>
+                      <td style={{ ...styles.academicTd, textAlign: "center" }}>{exam.obtainedMarks}</td>
+                      <td style={{ ...styles.academicTd, textAlign: "center", color: "#0d9488", fontWeight: "900" }}>
+                        {exam.maxMarks > 0 ? ((exam.obtainedMarks / exam.maxMarks) * 100).toFixed(1) + '%' : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
 
           <div style={styles.footer}>
             <p style={styles.footerText}>Generated for {formData.name || 'Student'} • {dayjs().format("DD MMM YYYY")}</p>
@@ -3156,30 +3225,32 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
             </div>
           )}
 
-          <h3 style={styles.sectionTitle}>5. Institutional Declaration</h3>
-          <div style={{ padding: "24px", border: "2px solid #0f172a", borderRadius: "20px", marginBottom: "40px" }}>
-            <p style={{ margin: 0, fontSize: "11px", color: "#475569", lineHeight: "1.8", textAlign: "justify" }}>
-              I hereby declare that all particulars furnished in this admission form are true and correct to the best of my knowledge. I undertake to abide by the rules, regulations, and disciplinary code of conduct established by the institution. I understand that providing false information may result in the immediate cancellation of this admission.
-            </p>
-          </div>
-
-          <div style={styles.signatureSection}>
-            <div style={{ ...styles.sigBlock, width: "200px", textAlign: "left" }}>
-              <div style={{ height: "60px" }} />
-              <p style={{ ...styles.sigLine, textAlign: "left" }}>Parent / Guardian Signature</p>
+          <div style={{ marginTop: "auto" }}>
+            <h3 style={styles.sectionTitle}>5. Institutional Declaration</h3>
+            <div style={{ padding: "24px", border: "2px solid #0f172a", borderRadius: "20px", marginBottom: "40px" }}>
+              <p style={{ margin: 0, fontSize: "11px", color: "#475569", lineHeight: "1.8", textAlign: "justify" }}>
+                I hereby declare that all particulars furnished in this admission form are true and correct to the best of my knowledge. I undertake to abide by the rules, regulations, and disciplinary code of conduct established by the institution. I understand that providing false information may result in the immediate cancellation of this admission.
+              </p>
             </div>
-            <div style={{ ...styles.sigBlock, width: "200px", textAlign: "right" }}>
-              <div style={{ height: "60px", display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
-                {normalizeAssetSrc(documentAssets.principalSignature) && (
-                  <img
-                    src={normalizeAssetSrc(documentAssets.principalSignature)}
-                    alt="Principal"
-                    crossOrigin="anonymous"
-                    style={styles.sigImage}
-                  />
-                )}
+
+            <div style={{ ...styles.signatureSection, paddingTop: "20px" }}>
+              <div style={{ ...styles.sigBlock, width: "200px", textAlign: "left" }}>
+                <div style={{ height: "60px" }} />
+                <p style={{ ...styles.sigLine, textAlign: "left" }}>Parent / Guardian Signature</p>
               </div>
-              <p style={{ ...styles.sigLine, textAlign: "right" }}>Principal / Headmaster</p>
+              <div style={{ ...styles.sigBlock, width: "200px", textAlign: "right" }}>
+                <div style={{ height: "60px", display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
+                  {normalizeAssetSrc(documentAssets.principalSignature) && (
+                    <img
+                      src={normalizeAssetSrc(documentAssets.principalSignature)}
+                      alt="Principal"
+                      crossOrigin="anonymous"
+                      style={styles.sigImage}
+                    />
+                  )}
+                </div>
+                <p style={{ ...styles.sigLine, textAlign: "right" }}>Principal / Headmaster</p>
+              </div>
             </div>
           </div>
 

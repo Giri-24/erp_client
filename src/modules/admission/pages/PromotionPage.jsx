@@ -230,11 +230,11 @@ const PromotionPage = () => {
                 <Row gutter={16}>
                   <Col span={12}>
                     <Text type="secondary">Total Students in {academicYear}:</Text>
-                    <Title level={3} style={{ margin: 0 }}>{summary?.totalStudents || 0}</Title>
+                    <Title level={3} style={{ margin: 0 }}>{summary?.total || 0}</Title>
                   </Col>
                   <Col span={12}>
                     <Text type="secondary">Students Eligible for {newAcademicYear}:</Text>
-                    <Title level={3} style={{ margin: 0, color: '#0d9488' }}>{summary?.totalStudents || 0}</Title>
+                    <Title level={3} style={{ margin: 0, color: '#0d9488' }}>{summary?.total || 0}</Title>
                   </Col>
                 </Row>
               </div>
