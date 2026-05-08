@@ -357,6 +357,7 @@ const StaffManagementPage = () => {
       await unlinkChildFromStaff(studentId);
       message.success("Child unlinked");
       fetchStaff();
+      if (linkModal) fetchStudents(linkStaffId);
     } catch {
       message.error("Failed to unlink");
     }
@@ -1455,10 +1456,47 @@ const StaffManagementPage = () => {
         <div style={{ marginTop: 28 }}>
           <div style={{ background: '#f8fafc', padding: 20, borderRadius: 20, border: '1px solid #edf2f7', marginBottom: 24 }}>
              <p style={{ fontSize: 13, color: '#64748b', margin: 0, fontWeight: 600, lineHeight: 1.6 }}>
-               Linking a student as a child of a staff member enables tuition benefits, family-centric communication, and consolidated financial auditing.
+               Manage kinship links for staff members to enable tuition benefits and consolidated family auditing.
              </p>
           </div>
-          <span className="filter-label" style={{ display: 'block', marginBottom: 8, marginLeft: 0 }}>SELECT STUDENT PROGENY</span>
+
+          {/* Currently Linked Children Section */}
+          <div style={{ marginBottom: 32 }}>
+            <span className="filter-label" style={{ display: 'block', marginBottom: 12, marginLeft: 0 }}>CURRENTLY LINKED PROGENY</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {staff.find(s => s.id === linkStaffId)?.children?.filter(c => c.isActive !== false && c.users?.isActive !== false).map(child => (
+                <div key={child.id} style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between', 
+                  background: 'var(--surface-container-low)', 
+                  padding: '12px 16px', 
+                  borderRadius: 16,
+                  border: '1px solid var(--surface-container-high)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <Avatar size="small" style={{ backgroundColor: '#f0fdf4', color: '#10b981', fontWeight: 800 }}>{getInitials(child.name)}</Avatar>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--primary)' }}>{child.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--on-surface-variant)', fontWeight: 700, opacity: 0.6 }}>{formatStandardLabel(child.standard)}</div>
+                    </div>
+                  </div>
+                  <Popconfirm title="Dissolve this kinship link?" onConfirm={() => handleUnlinkChild(child.id)}>
+                    <Button type="text" danger icon={<DeleteOutlined />} size="small" style={{ fontWeight: 800, fontSize: 11 }}>UNLINK</Button>
+                  </Popconfirm>
+                </div>
+              ))}
+              {(!staff.find(s => s.id === linkStaffId)?.children || staff.find(s => s.id === linkStaffId)?.children?.filter(c => c.isActive !== false && c.users?.isActive !== false).length === 0) && (
+                <div style={{ textAlign: 'center', padding: '24px', background: '#f8fafc', borderRadius: 16, border: '1px dashed #ced4da', color: '#94a3b8', fontSize: 12, fontWeight: 600 }}>
+                  No active kinship links established.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Divider style={{ margin: '32px 0', opacity: 0.5 }} />
+
+          <span className="filter-label" style={{ display: 'block', marginBottom: 12, marginLeft: 0 }}>MAP NEW PROGENY</span>
           <Select
             showSearch
             placeholder="Search by student name or cohort ID..."
@@ -1467,14 +1505,16 @@ const StaffManagementPage = () => {
             className="premium-select"
             onChange={(studentId) => handleLinkChild(studentId)}
             filterOption={(input, option) =>
-              String(option?.children || "").toLowerCase().includes(input.toLowerCase())
+              String(option?.children?.[0] || "").toLowerCase().includes(input.toLowerCase())
             }
           >
-            {students.map((s) => (
-              <Option key={s.id} value={s.id}>
-                {s.name} <span style={{ opacity: 0.4, marginLeft: 8 }}>{formatStandardLabel(s.standard)}</span>
-              </Option>
-            ))}
+            {students
+              .filter(s => !staff.find(st => st.id === linkStaffId)?.children?.some(c => c.id === s.id))
+              .map((s) => (
+                <Option key={s.id} value={s.id}>
+                  {s.name} <span style={{ opacity: 0.4, marginLeft: 8 }}>{formatStandardLabel(s.standard)}</span>
+                </Option>
+              ))}
           </Select>
         </div>
       </Modal>
