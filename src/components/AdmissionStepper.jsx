@@ -2633,7 +2633,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       marginBottom: "8px",
     },
     footer: {
-      marginTop: "auto",
+      marginTop: "20px",
       paddingTop: "20px",
       borderTop: "1px solid #f1f5f9",
       display: "flex",
@@ -3173,7 +3173,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
             </>
           )}
 
-          <div style={styles.footer}>
+          <div style={{ ...styles.footer, marginTop: "auto" }}>
             <p style={styles.footerText}>Generated for {formData.name || 'Student'} • {dayjs().format("DD MMM YYYY")}</p>
             <p style={{ ...styles.footerText, fontWeight: "800", color: "#0d9488" }}>Page 1 of 2</p>
           </div>
@@ -3225,21 +3225,23 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
             </div>
           )}
 
-          <div style={{ marginTop: "auto" }}>
+          <div style={{ flex: 1 }} />
+
+          <div style={{ paddingBottom: "20px" }}>
             <h3 style={styles.sectionTitle}>5. Institutional Declaration</h3>
-            <div style={{ padding: "24px", border: "2px solid #0f172a", borderRadius: "20px", marginBottom: "40px" }}>
+            <div style={{ padding: "20px 24px", border: "2px solid #0f172a", borderRadius: "20px", marginBottom: "30px" }}>
               <p style={{ margin: 0, fontSize: "11px", color: "#475569", lineHeight: "1.8", textAlign: "justify" }}>
                 I hereby declare that all particulars furnished in this admission form are true and correct to the best of my knowledge. I undertake to abide by the rules, regulations, and disciplinary code of conduct established by the institution. I understand that providing false information may result in the immediate cancellation of this admission.
               </p>
             </div>
 
-            <div style={{ ...styles.signatureSection, paddingTop: "20px" }}>
+            <div style={{ ...styles.signatureSection, paddingTop: "10px", paddingBottom: "20px" }}>
               <div style={{ ...styles.sigBlock, width: "200px", textAlign: "left" }}>
-                <div style={{ height: "60px" }} />
+                <div style={{ height: "50px" }} />
                 <p style={{ ...styles.sigLine, textAlign: "left" }}>Parent / Guardian Signature</p>
               </div>
               <div style={{ ...styles.sigBlock, width: "200px", textAlign: "right" }}>
-                <div style={{ height: "60px", display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
+                <div style={{ height: "50px", display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
                   {normalizeAssetSrc(documentAssets.principalSignature) && (
                     <img
                       src={normalizeAssetSrc(documentAssets.principalSignature)}
@@ -3252,21 +3254,21 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                 <p style={{ ...styles.sigLine, textAlign: "right" }}>Principal / Headmaster</p>
               </div>
             </div>
+
+            {normalizeAssetSrc(documentAssets.rubberStamp) && (
+              <div style={{ textAlign: "center", marginTop: "10px" }}>
+                <img
+                  src={normalizeAssetSrc(documentAssets.rubberStamp)}
+                  alt="Seal"
+                  crossOrigin="anonymous"
+                  style={{ width: '70px', height: '70px', objectFit: 'contain', opacity: 0.8 }}
+                />
+                <p style={{ margin: "4px 0 0", fontSize: "9px", fontWeight: "800", color: "#64748b", textTransform: "uppercase" }}>Institutional Seal</p>
+              </div>
+            )}
           </div>
 
-          {normalizeAssetSrc(documentAssets.rubberStamp) && (
-            <div style={{ textAlign: "center", marginTop: "30px" }}>
-              <img
-                src={normalizeAssetSrc(documentAssets.rubberStamp)}
-                alt="Seal"
-                crossOrigin="anonymous"
-                style={{ width: '80px', height: '80px', objectFit: 'contain', opacity: 0.8 }}
-              />
-              <p style={{ margin: "8px 0 0", fontSize: "9px", fontWeight: "800", color: "#64748b", textTransform: "uppercase" }}>Institutional Seal</p>
-            </div>
-          )}
-
-          <div style={styles.footer}>
+          <div style={{ ...styles.footer, marginTop: "0px" }}>
             <p style={styles.footerText}>System Generated Record • {dayjs().format("DD MMM YYYY, HH:mm")}</p>
             <p style={{ ...styles.footerText, fontWeight: "800", color: "#0f172a" }}>Page 2 of 2</p>
           </div>
