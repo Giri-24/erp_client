@@ -481,13 +481,19 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
   const handleSaveDraft = () => {
     const values = form.getFieldsValue(true);
+    const studentName = values.name || "Unnamed_Student";
+    const draftKey = `admission_draft_${studentName.replace(/\s+/g, '_')}`;
+    
     const draft = {
       values,
       step: current,
       timestamp: new Date().toISOString()
     };
-    localStorage.setItem("admission_draft", JSON.stringify(draft));
-    message.success("Progress saved as draft locally!", 4);
+    
+    localStorage.setItem(draftKey, JSON.stringify(draft));
+    // Also update a 'recent drafts' list for the dashboard if needed
+    localStorage.setItem("admission_draft", JSON.stringify(draft)); // Keep last for quick restore
+    message.success(`Progress for "${studentName}" saved successfully!`, 4);
     setDraftExists(true);
   };
 
@@ -561,7 +567,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
     try {
       const label = customValue.trim();
       const name = label.toUpperCase().replace(/\s+/g, '_');
-      
+
       const newStream = await createAcademicStream({
         name,
         label,
@@ -569,11 +575,11 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       });
 
       message.success(`Stream "${label}" added successfully!`);
-      
+
       // Refresh the list
       const updatedStreams = await getAcademicStreams();
       setAcademicStreams(Array.isArray(updatedStreams) ? updatedStreams : []);
-      
+
       // Select the newly created stream and clear custom field
       form.setFieldsValue({
         academicStream: newStream.name,
@@ -1064,7 +1070,6 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                       options={[
                         { value: 'Self', label: 'Self' },
                         { value: 'Van', label: 'School Van' },
-                        { value: 'Bus', label: 'School Bus' },
                       ]}
                     />
                   </Form.Item>
@@ -1139,12 +1144,12 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                 {selectedAcademicStream === "OTHER" && (
                   <Col span={12}>
                     <Form.Item name="academicStreamCustom" label="Custom Stream Name" rules={[{ required: true, message: 'Enter custom stream name' }]}>
-                      <Input 
-                        placeholder="e.g. Fine Arts" 
+                      <Input
+                        placeholder="e.g. Fine Arts"
                         suffix={
-                          <Button 
-                            type="primary" 
-                            size="small" 
+                          <Button
+                            type="primary"
+                            size="small"
                             loading={isAddingStream}
                             onClick={handleAddNewStream}
                             icon={<PlusOutlined />}
@@ -1164,6 +1169,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                 <Select>
                   <Select.Option value="MALE">Male</Select.Option>
                   <Select.Option value="FEMALE">Female</Select.Option>
+                  <Select.Option value="OTHERS">Others</Select.Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -1206,10 +1212,11 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               </Form.Item>
             </Col>
             <Col span={12}><Form.Item name="motherTongue" label="Mother Tongue" rules={[requiredRule]}><Input /></Form.Item></Col>
-            <Col span={12}><Form.Item name="aadharNo" label="Aadhar No" ><Input maxLength={12} /></Form.Item></Col>
+            <Col span={12}><Form.Item name="aadharNo" label="Aadhar No" rules={[{ pattern: /^\d{12}$/, message: 'Must be 12 digits' }]}><Input maxLength={12} /></Form.Item></Col>
+
             <Col span={12}><Form.Item name="bloodGroup" label="Blood Group" ><Input /></Form.Item></Col>
-            <Col span={12}><Form.Item name="identityMark1" label="Identity Mark 1" rules={[requiredRule]}><Input /></Form.Item></Col>
-            <Col span={12}><Form.Item name="identityMark2" label="Identity Mark 2" rules={[requiredRule]}><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item name="identityMark1" label="Identity Mark 1"><Input /></Form.Item></Col>
+            <Col span={12}><Form.Item name="identityMark2" label="Identity Mark 2"><Input /></Form.Item></Col>
             <Col span={12}><Form.Item name="previouslyStudied" label="Previously Studied" ><Input placeholder="Optional" /></Form.Item></Col>
             <Col span={12}><Form.Item name="previousSchoolStandard" label="Previous School Standard" >
 
@@ -1268,9 +1275,10 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               <Form.Item name="fatherName" label="Father Name" rules={isSingleParent ? [] : []}>
                 <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
               </Form.Item>
-              <Form.Item name="fatherPhone" label="Father Mobile">
+              <Form.Item name="fatherPhone" label="Father Mobile" rules={[{ pattern: /^\d{10}$/, message: 'Must be 10 digits' }]}>
                 <Input maxLength={10} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
               </Form.Item>
+
               <Form.Item label="Father WhatsApp">
                 <Space.Compact style={{ width: '100%' }}>
                   <Form.Item name="fatherWhatsAppNo" noStyle>
@@ -1291,9 +1299,10 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               <Form.Item name="fatherOccupation" label="Father Occupation">
                 <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
               </Form.Item>
-              <Form.Item name="fatherAadharNo" label="Father Aadhar" rules={[optionalAadharRule]}>
+              <Form.Item name="fatherAadharNo" label="Father Aadhar" rules={[{ pattern: /^\d{12}$/, message: 'Must be 12 digits' }]}>
                 <Input maxLength={12} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} />
               </Form.Item>
+
             </Col>
 
             {/* RIGHT — MOTHER */}
@@ -1302,9 +1311,10 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               <Form.Item name="motherName" label="Mother Name">
                 <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
-              <Form.Item name="motherPhone" label="Mother Mobile">
+              <Form.Item name="motherPhone" label="Mother Mobile" rules={[{ pattern: /^\d{10}$/, message: 'Must be 10 digits' }]}>
                 <Input maxLength={10} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
+
               <Form.Item label="Mother WhatsApp">
                 <Space.Compact style={{ width: '100%' }}>
                   <Form.Item name="motherWhatsAppNo" noStyle>
@@ -1325,9 +1335,10 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               <Form.Item name="motherOccupation" label="Mother Occupation">
                 <Input disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
-              <Form.Item name="motherAadharNo" label="Mother Aadhar" rules={[optionalAadharRule]}>
+              <Form.Item name="motherAadharNo" label="Mother Aadhar" rules={[{ pattern: /^\d{12}$/, message: 'Must be 12 digits' }]}>
                 <Input maxLength={12} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} />
               </Form.Item>
+
 
             </Col>
           </Row>
@@ -1364,10 +1375,11 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item name="guardianPhone" label="Guardian Phone">
+                  <Form.Item name="guardianPhone" label="Guardian Phone" rules={[{ pattern: /^\d{10}$/, message: 'Must be 10 digits' }]}>
                     <Input maxLength={10} />
                   </Form.Item>
                 </Col>
+
                 <Col span={8}>
                   <Form.Item label="Guardian WhatsApp">
                     <Space.Compact style={{ width: '100%' }}>
@@ -1387,10 +1399,11 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item name="guardianAadhar" rules={[optionalAadharRule]} label="Guardian Aadhar">
+                  <Form.Item name="guardianAadhar" label="Guardian Aadhar" rules={[{ pattern: /^\d{12}$/, message: 'Must be 12 digits' }]}>
                     <Input maxLength={12} />
                   </Form.Item>
                 </Col>
+
                 <Col span={8}>
                   <Form.Item name="guardianOccupation" label="Guardian Occupation">
                     <Input />
@@ -1693,8 +1706,8 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               </Col>
               <Col span={12}>
                 <Form.Item name="academicStream" label="Academic Stream / Group">
-                  <Select 
-                    placeholder="Select group" 
+                  <Select
+                    placeholder="Select group"
                     allowClear
                     options={[
                       ...academicStreams.map(s => ({ value: s.name, label: s.label })),
@@ -1707,13 +1720,13 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               {selectedAcademicStream === "OTHER" && (
                 <Col span={12}>
                   <Form.Item name="academicStreamCustom" label="Specify Custom Stream" rules={[requiredRule]}>
-                    <Input 
-                      autoFocus 
-                      placeholder="Type custom stream/course here" 
+                    <Input
+                      autoFocus
+                      placeholder="Type custom stream/course here"
                       suffix={
-                        <Button 
-                          type="primary" 
-                          size="small" 
+                        <Button
+                          type="primary"
+                          size="small"
                           loading={isAddingStream}
                           onClick={handleAddNewStream}
                           icon={<PlusOutlined />}
@@ -2377,7 +2390,8 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       try {
         await form.validateFields();
       } catch (err) {
-        message.error("Please fill all required fields correctly.", 4);
+        const errorFields = err?.errorFields?.map(f => f.errors?.[0]).filter(Boolean).join(", ");
+        message.error(`Please check these fields: ${errorFields || "Required data missing"}`, 5);
         return;
       }
     }
@@ -2437,15 +2451,15 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       boxSizing: "border-box",
       display: "flex",
       flexDirection: "column",
-      padding: "40px",
+      padding: "50px",
     },
     header: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
-      marginBottom: "40px",
-      paddingBottom: "20px",
-      borderBottom: "2px solid #f1f5f9",
+      display: "grid",
+      gridTemplateColumns: "1fr 2fr 1fr",
+      alignItems: "center",
+      marginBottom: "20px",
+      paddingBottom: "15px",
+      borderBottom: "1px solid #e2e8f0",
     },
     schoolHeader: {
       display: "flex",
@@ -2467,15 +2481,16 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       maxWidth: "400px",
     },
     photoBox: {
-      width: "140px",
-      height: "170px",
+      width: "100px",
+      height: "120px",
       background: "#f8fafc",
-      border: "1px solid #e2e8f0",
-      borderRadius: "12px",
+      border: "1px solid #cbd5e1",
+      borderRadius: "8px",
       overflow: "hidden",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
+      justifySelf: "end",
     },
     sectionTitle: {
       margin: "0 0 16px",
@@ -2489,7 +2504,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
       gap: "20px",
-      marginBottom: "30px",
+      marginBottom: "15px",
     },
     fieldRow: {
       display: "flex",
@@ -2514,16 +2529,18 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       borderRadius: "12px",
       overflow: "hidden",
       border: "1px solid #f1f5f9",
-      marginBottom: "30px",
+      marginBottom: "20px",
     },
     academicTh: {
-      backgroundColor: "#0f172a",
-      padding: "12px 16px",
+      backgroundColor: "transparent",
+      padding: "10px 16px",
       fontSize: "10px",
       textAlign: "left",
       textTransform: "uppercase",
-      color: "#fff",
+      color: "#64748b",
+      fontWeight: "900",
       letterSpacing: "0.05em",
+      borderBottom: "2px solid #0f172a",
     },
     academicTd: {
       padding: "12px 16px",
@@ -2532,11 +2549,11 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       borderBottom: "1px solid #f1f5f9",
     },
     signatureSection: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr",
-      gap: "20px",
+      display: "flex",
+      justifyContent: "space-between",
       marginTop: "auto",
-      paddingTop: "40px",
+      paddingTop: "20px",
+      paddingBottom: "40px",
     },
     sigBlock: {
       textAlign: "center",
@@ -2979,21 +2996,24 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
         {/* PAGE 1 */}
         <div id="pdfPage1" style={styles.pdfWrapper}>
           <div style={styles.header}>
-            <div style={styles.schoolHeader}>
-              <img src={normalizeAssetSrc(documentAssets.schoolLogo) || logo} alt="logo" style={{ width: "80px", height: "80px", objectFit: "contain" }} />
-              <div>
-                <h1 style={styles.institutionName}>{adminSettings?.schoolName || "MATRIC HR SEC SCHOOL"}</h1>
-                <p style={styles.tagline}>{adminSettings?.address || "Vadugappatti, Salem - 636XXX"}</p>
-                <p style={{ ...styles.tagline, fontWeight: 700, color: "#0f172a" }}>Admission Session: {formData.academicYear || '-'}</p>
+            <div style={{ textAlign: "left" }}>
+              <p style={{ margin: 0, fontSize: "10px", color: "#64748b", fontWeight: "900", textTransform: "uppercase" }}>Admission No</p>
+              <p style={{ margin: 0, fontSize: "18px", color: "#0d9488", fontWeight: "900" }}>{formData.admissionNo || "PENDING"}</p>
+              <p style={{ margin: "4px 0 0", fontSize: "10px", color: "#64748b" }}>AY: {formData.academicYear}</p>
+            </div>
+
+            <div style={{ textAlign: "center" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+                <img src={logo} alt="Logo" style={{ height: "60px", objectFit: "contain" }} />
+                <div>
+                  <h1 style={{ ...styles.institutionName, fontSize: "20px", color: "#0d9488" }}>{adminSettings.schoolName || "PSF Public School"}</h1>
+                  <p style={{ margin: "2px 0 0", fontSize: "10px", fontWeight: "700", color: "#475569" }}>
+                    Vadugappatti (Po), Sankari (Tk), Salem (Dt) - 637301
+                  </p>
+                </div>
               </div>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ display: "inline-block", padding: "8px 16px", background: "#0f172a", color: "#fff", borderRadius: "8px", fontSize: "12px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.1em" }}>Admission Form</div>
-              <p style={{ margin: "10px 0 0", fontSize: "11px", color: "#64748b" }}>Adm No: <span style={{ color: "#0f172a", fontWeight: "800" }}>{formData.admissionNo || "PENDING"}</span></p>
-            </div>
-          </div>
 
-          <div style={{ display: "flex", gap: "40px", marginBottom: "40px" }}>
             <div style={styles.photoBox}>
               {getSafePreviewUrl(formData.profilePhoto?.[0]) ? (
                 <img
@@ -3006,67 +3026,68 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                 <span style={{ fontSize: "10px", fontWeight: "800", color: "#cbd5e1" }}>PASTE PHOTO</span>
               )}
             </div>
-            <div style={{ flex: 1 }}>
-              <h3 style={styles.sectionTitle}>1. Personal Profiles</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
+          </div>
+
+          <div style={{ marginBottom: "20px" }}>
+            <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "8px" }}>1. Student & Parental Profiles</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
                 {[
-                  ["Full Name", formData.name],
-                  ["Father's Name", formData.fatherName],
-                  ["Mother's Name", formData.motherName],
-                  ["Date of Birth", formData.dob?.format?.("DD MMM YYYY") || "-"],
-                  ["Gender", formData.gender],
+                  ["Student Name", formData.name],
                   ["Standard", formData.standard ? `STD ${formData.standard}` : "-"],
                   ["Section", formData.section || "A"],
-                  ["Stream", getReadableStream(formData.academicStream, formData.academicStreamCustom)],
+                  ["Date of Birth", formData.dob?.format?.("DD MMM YYYY") || "-"],
+                  ["Gender", formData.gender],
+                  ["Academic Stream", getReadableStream(formData.academicStream, formData.academicStreamCustom, academicStreams)],
+                  ["Father's Name", formData.fatherName],
+                  ["Father's Phone", formData.fatherPhone],
+                  ["Father's Aadhar", formData.fatherAadharNo],
+                  ["Mother's Name", formData.motherName],
+                  ["Mother's Phone", formData.motherPhone],
+                  ["Mother's Aadhar", formData.motherAadharNo],
+                  ["Transport Mode", formData.transportMode || "Self"],
                   ["RTE Applied", formData.rteApplied ? "YES" : "NO"],
-                  ["Transport", formData.transportMode || "Self"],
                 ].map(([l, v], i) => (
                   <div key={i} style={styles.fieldRow}>
                     <span style={styles.fieldLabel}>{l}</span>
                     <span style={styles.fieldValue}>{v || "-"}</span>
                   </div>
                 ))}
-                {formData.community === "OTHERS" && formData.communityOther && (
-                  <div style={styles.fieldRow}>
-                    <span style={styles.fieldLabel}>Alt Community</span>
-                    <span style={styles.fieldValue}>{formData.communityOther}</span>
-                  </div>
-                )}
               </div>
             </div>
-          </div>
 
-          <h3 style={styles.sectionTitle}>2. Residential & Physical Markers</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "30px", marginBottom: "30px" }}>
+          <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "8px" }}>2. Residential & Contact Info</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "30px", marginBottom: "20px" }}>
             <div style={{ padding: "16px", border: "1px solid #f1f5f9", borderRadius: "12px", background: "#f8fafc" }}>
               <p style={{ margin: "0 0 8px", fontSize: "10px", fontWeight: "900", color: "#64748b", textTransform: "uppercase" }}>Residential Domicile</p>
               <p style={{ margin: 0, fontSize: "12px", fontWeight: "800", color: "#0f172a", lineHeight: "1.5" }}>
-                {[formData.line1, formData.line2 || formData.street, formData.city, formData.state, formData.pin].filter(Boolean).join(", ")}
+                {[formData.line1, formData.street, formData.city, formData.state, formData.pin].filter(Boolean).join(", ")}
               </p>
               <p style={{ margin: "6px 0 0", fontSize: "10px", color: "#64748b" }}>Landmark: {formData.landmark || "N/A"}</p>
             </div>
             <div>
-              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Identity Mark 1</span><span style={styles.fieldValue}>{formData.identityMark1 || "—"}</span></div>
-              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Identity Mark 2</span><span style={styles.fieldValue}>{formData.identityMark2 || "—"}</span></div>
-              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Prev. School</span><span style={styles.fieldValue}>{formData.previouslyStudied || "—"}</span></div>
-              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Prev. Std</span><span style={styles.fieldValue}>{formData.previousSchoolStandard || "—"}</span></div>
+              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Alt Comm.</span><span style={styles.fieldValue}>{formData.communityOther || "—"}</span></div>
+              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Parent Email</span><span style={styles.fieldValue}>{formData.parentsEmail || "—"}</span></div>
+              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Identity 1</span><span style={styles.fieldValue}>{formData.identityMark1 || "—"}</span></div>
+              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Identity 2</span><span style={styles.fieldValue}>{formData.identityMark2 || "—"}</span></div>
             </div>
           </div>
 
-          <h3 style={styles.sectionTitle}>3. Academic Performance</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "16px" }}>
-            <div style={styles.fieldRow}><span style={styles.fieldLabel}>Examination</span><span style={styles.fieldValue}>{formData.examName}</span></div>
-            <div style={styles.fieldRow}><span style={styles.fieldLabel}>Board</span><span style={styles.fieldValue}>{formData.boardExamType === "Other" ? formData.boardName : formData.boardExamType}</span></div>
-            <div style={styles.fieldRow}><span style={styles.fieldLabel}>Register No</span><span style={styles.fieldValue}>{formData.registerNo}</span></div>
-            <div style={styles.fieldRow}><span style={styles.fieldLabel}>Month/Year</span><span style={styles.fieldValue}>{formData.monthYear}</span></div>
+          <div style={{ marginTop: "10px" }}>
+            <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "8px" }}>3. Academic & Institutional Information</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "16px" }}>
+              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Prev. School</span><span style={styles.fieldValue}>{formData.previouslyStudied || "—"}</span></div>
+              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Prev. Std</span><span style={styles.fieldValue}>{formData.previousSchoolStandard || "—"}</span></div>
+              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Qualifying Exam</span><span style={styles.fieldValue}>{formData.examName}</span></div>
+              <div style={styles.fieldRow}><span style={styles.fieldLabel}>Board Name</span><span style={styles.fieldValue}>{formData.boardExamType === "Other" ? formData.boardName : formData.boardExamType}</span></div>
+            </div>
           </div>
-          <table style={styles.academicTable}>
+          <table style={{ ...styles.academicTable, marginBottom: "20px" }}>
             <thead>
               <tr>
-                <th style={styles.academicTh}>Subject</th>
-                <th style={{ ...styles.academicTh, textAlign: "center" }}>Max Marks</th>
-                <th style={{ ...styles.academicTh, textAlign: "center" }}>Obtained</th>
-                <th style={{ ...styles.academicTh, textAlign: "center" }}>%</th>
+                <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488" }}>Subject</th>
+                <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488", textAlign: "center" }}>Max Marks</th>
+                <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488", textAlign: "center" }}>Obtained</th>
+                <th style={{ ...styles.academicTh, borderBottom: "2px solid #0d9488", textAlign: "center" }}>%</th>
               </tr>
             </thead>
             <tbody>
@@ -3084,26 +3105,25 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
           </table>
 
           <div style={styles.footer}>
-            <p style={styles.footerText}>Generated for {formData.name || 'Student'} • Page 1 of 2</p>
-            <p style={{ ...styles.footerText, fontWeight: "800", color: "#0f172a" }}>Official Admission Record</p>
+            <p style={styles.footerText}>Generated for {formData.name || 'Student'} • {dayjs().format("DD MMM YYYY")}</p>
+            <p style={{ ...styles.footerText, fontWeight: "800", color: "#0d9488" }}>Page 1 of 2</p>
           </div>
         </div>
 
         {/* PAGE 2 */}
         <div id="pdfPage2" style={styles.pdfWrapper}>
-          <h3 style={styles.sectionTitle}>4. Contact & Demographic Matrix</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "40px" }}>
+          <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "8px" }}>4. Demographic Matrix</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "30px" }}>
             {[
               ["Religion", formData.religion],
               ["Community", formData.community],
               ["Caste", formData.caste],
               ["Mother Tongue", formData.motherTongue],
-              ["Phone (P)", formData.fatherPhone || formData.motherPhone],
-              ["Email", formData.parentsEmail],
-              ["Aadhar No", formData.aadharNo],
               ["Blood Group", formData.bloodGroup],
-              ["Family Income", `₹${formData.familyIncome || 0}`],
+              ["Aadhar No", formData.aadharNo],
+              ["Single Parent", formData.isSingleParent ? "YES" : "NO"],
               ["Guardian", formData.isSingleParent ? `${formData.guardianName} (${formData.guardianRelation})` : "N/A"],
+              ["Income", `₹${formData.familyIncome || 0}`],
             ].map(([l, v], i) => (
               <div key={i} style={styles.fieldRow}>
                 <span style={styles.fieldLabel}>{l}</span>
@@ -3144,12 +3164,12 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
           </div>
 
           <div style={styles.signatureSection}>
-            <div style={styles.sigBlock}>
+            <div style={{ ...styles.sigBlock, width: "200px", textAlign: "left" }}>
               <div style={{ height: "60px" }} />
-              <p style={styles.sigLine}>Parent / Guardian</p>
+              <p style={{ ...styles.sigLine, textAlign: "left" }}>Parent / Guardian Signature</p>
             </div>
-            <div style={styles.sigBlock}>
-              <div style={{ height: "60px", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            <div style={{ ...styles.sigBlock, width: "200px", textAlign: "right" }}>
+              <div style={{ height: "60px", display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
                 {normalizeAssetSrc(documentAssets.principalSignature) && (
                   <img
                     src={normalizeAssetSrc(documentAssets.principalSignature)}
@@ -3159,7 +3179,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                   />
                 )}
               </div>
-              <p style={styles.sigLine}>Principal / Headmaster</p>
+              <p style={{ ...styles.sigLine, textAlign: "right" }}>Principal / Headmaster</p>
             </div>
           </div>
 
