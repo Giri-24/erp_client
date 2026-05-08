@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Button,
   Form,
@@ -315,11 +315,23 @@ const extractMissingFieldMessage = (err) => {
   return "Error creating admission. Please review required fields and try again.";
 };
 
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
+const handleBeforeUpload = (file) => {
+  const isLt20M = file.size <= MAX_FILE_SIZE;
+  if (!isLt20M) {
+    message.error(`${file.name} exceeds 20MB limit.`);
+    return Upload.LIST_IGNORE;
+  }
+  return false; // Prevent automatic upload
+};
+
 const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
   const [current, setCurrent] = useState(0);
   const [form] = Form.useForm();
   const [formData, setFormData] = useState({});
   const [community, setCommunity] = useState("");
+  const [adminSettings, setAdminSettings] = useState({});
   const [documentAssets, setDocumentAssets] = useState({});
 
   const normalizeAssetSrc = (value) => {
@@ -355,8 +367,8 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
   useEffect(() => {
     getAdminSettings().then((s) => {
-      const assets = s?.documentAssets || {};
-      setDocumentAssets(assets);
+      setAdminSettings(s || {});
+      setDocumentAssets(s?.documentAssets || {});
     }).catch(() => {});
   }, []);
 
@@ -395,7 +407,7 @@ async function generatePDF() {
 
     const renderPage = async (element) => {
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#ffffff",
@@ -410,17 +422,15 @@ async function generatePDF() {
     const pageWidth = 210;
     const pageHeight = 297;
 
-    const drawFullPage = (imgData) => {
-      pdf.addImage(imgData, "PNG", 0, 0, pageWidth, pageHeight);
-    };
-
-    drawFullPage(firstPageImage);
+    pdf.addImage(firstPageImage, "PNG", 0, 0, pageWidth, pageHeight);
     pdf.addPage();
-    drawFullPage(secondPageImage);
+    pdf.addImage(secondPageImage, "PNG", 0, 0, pageWidth, pageHeight);
 
     pdf.save(`Admission_${formData.admissionNo || "draft"}.pdf`);
+    message.success("Admission PDF generated successfully!");
   } catch (err) {
     console.error(err);
+    message.error("Failed to generate PDF.");
   }
 }
 
@@ -1803,7 +1813,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       content: (
         <div className="space-y-6">
           <div className="mb-4">
-            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Upload certificates and student profile photo (optional).</p>
+            <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Upload certificates and student profile photo (optional). <span className="font-bold text-primary">Max size: 20MB per file.</span></p>
           </div>
           <>
             {/* ✅ PROFILE PHOTO */}
@@ -1821,7 +1831,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
     listType="picture-card"
     maxCount={1}
     accept="image/*"
-    beforeUpload={() => false}
+    beforeUpload={handleBeforeUpload}
     showUploadList={{ showPreviewIcon: false }}
   >
     <div className="flex flex-col items-center">
@@ -1843,7 +1853,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       valuePropName="fileList"
       getValueFromEvent={(e) => e?.fileList}
     >
-      <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
+      <Upload listType="picture-card" maxCount={1} beforeUpload={handleBeforeUpload} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
         <div className="text-center">
           <span className="text-2xl material-symbols-outlined">description</span>
           <p className="mt-1 text-xs">Birth Cert</p>
@@ -1857,7 +1867,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       valuePropName="fileList"
       getValueFromEvent={(e) => e?.fileList}
     >
-      <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
+      <Upload listType="picture-card" maxCount={1} beforeUpload={handleBeforeUpload} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
         <div className="text-center">
           <span className="text-2xl material-symbols-outlined">badge</span>
           <p className="mt-1 text-xs">Community</p>
@@ -1871,7 +1881,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
       valuePropName="fileList"
       getValueFromEvent={(e) => e?.fileList}
     >
-      <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
+      <Upload listType="picture-card" maxCount={1} beforeUpload={handleBeforeUpload} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
         <div className="text-center">
           <span className="text-2xl material-symbols-outlined">credit_card</span>
           <p className="mt-1 text-xs">Aadhaar</p>
@@ -1885,7 +1895,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   valuePropName="fileList"
   getValueFromEvent={(e) => e?.fileList}
 >
-  <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
+  <Upload listType="picture-card" maxCount={1} beforeUpload={handleBeforeUpload} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
     <div className="text-center">
       <span className="text-2xl material-symbols-outlined">
         description
@@ -1900,7 +1910,7 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
   valuePropName="fileList"
   getValueFromEvent={(e) => e?.fileList}
 >
-  <Upload listType="picture-card" maxCount={1} beforeUpload={() => false} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
+  <Upload listType="picture-card" maxCount={1} beforeUpload={handleBeforeUpload} accept="image/*,.pdf" showUploadList={{ showPreviewIcon: false }}>
     <div className="text-center">
       <span className="text-2xl material-symbols-outlined">fact_check</span>
       <p className="mt-1 text-xs">Entrance Exam</p>
@@ -2325,258 +2335,145 @@ const siblingCount = Form.useWatch("siblingsCount", form) || 0;
 
 const styles = {
   pdfWrapper: {
-    width: "800px",
-    minHeight: "1131px",
-    background: "white",
-    fontFamily: "'Public Sans', sans-serif",
+    width: "794px",
+    height: "1123px",
+    background: "#fff",
+    fontFamily: "'Inter', 'Segoe UI', sans-serif",
     color: "#0f172a",
-    border: "1px solid #cbd5e1",
     boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
+    padding: "40px",
   },
   header: {
-    backgroundColor: "#ffffff",
-    borderBottom: "2px solid #0f172a",
-    padding: "18px 28px 14px",
-    textAlign: "center",
-    color: "#0f172a",
-    position: "relative",
-    marginBottom: "8px",
-  },
-  schoolHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "18px",
-    justifyContent: "center",
-    paddingRight: "90px",
-  },
-  institutionName: {
-    fontSize: "21px",
-    fontWeight: "900",
-    margin: 0,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    lineHeight: "1.2",
-  },
-  tagline: {
-    fontSize: "10px",
-    fontWeight: "600",
-    opacity: 1,
-    margin: "3px 0",
-    color: "#334155",
-    letterSpacing: "0.01em",
-  },
-  formTitle: {
-    fontSize: "12px",
-    fontWeight: "800",
-    marginTop: "10px",
-    padding: "5px 16px",
-    border: "1px solid #334155",
-    borderRadius: "4px",
-    display: "inline-block",
-    textTransform: "uppercase",
-    background: "#f8fafc",
-    letterSpacing: "0.06em",
-  },
-  photoBox: {
-    position: "absolute",
-    right: "28px",
-    top: "14px",
-    width: "84px",
-    height: "102px",
-    border: "1px solid #94a3b8",
-    borderRadius: "4px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "9px",
-    color: "#64748b",
-    overflow: "hidden",
-    background: "#f8fafc",
-  },
-  content: {
-    padding: "12px 28px 14px",
-  },
-  row: {
-    display: "flex",
-    gap: "12px",
-    // marginBottom: "10px",
-    alignItems: "flex-end",
-  },
-  field: {
-    display: "flex",
-    flex: 1,
-    alignItems: "flex-end",
-    gap: "6px",
-  },
-  label: {
-    fontSize: "10px",
-    fontWeight: "700",
-    color: "#475569",
-    whiteSpace: "nowrap",
-    textTransform: "uppercase",
-    letterSpacing: "0.02em",
-  },
-  value: {
-    flex: 1,
-    borderBottom: "1px solid #cbd5e1",
-    fontSize: "12px",
-    paddingBottom: "2px",
-    color: "#0f172a",
-    fontWeight: "600",
-    minHeight: "18px",
-    lineHeight: "1.25",
-  },
-  addressSection: {
-    border: "1px solid #dbe3ef",
-    borderRadius: "6px",
-    padding: "14px 14px 10px",
-    marginTop: "12px",
-    marginBottom: "12px",
-    position: "relative",
-    background: "#fcfdff",
-  },
-  addressLabel: {
-    position: "absolute",
-    top: "-9px",
-    left: "14px",
-    background: "white",
-    padding: "0 8px",
-    fontSize: "9px",
-    fontWeight: "800",
-    color: "#334155",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-  },
-  declaration: {
-    textAlign: "center",
-    marginTop: "16px",
-    padding: "0 6px",
-  },
-  declTitle: {
-    fontSize: "13px",
-    fontWeight: "900",
-    textTransform: "uppercase",
-    marginBottom: "8px",
-    letterSpacing: "0.05em",
-    color: "#0f172a",
-  },
-  declText: {
-    fontSize: "11px",
-    color: "#334155",
-    lineHeight: "1.7",
-    marginBottom: "28px",
-    maxWidth: "680px",
-    marginLeft: "auto",
-    marginRight: "auto",
-    textAlign: "justify",
-  },
-  signatureRow: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: "18px",
-    padding: "4px 0 0",
+    marginBottom: "40px",
+    paddingBottom: "20px",
+    borderBottom: "2px solid #f1f5f9",
   },
-  sigBlock: {
-    flex: 1,
+  schoolHeader: {
     display: "flex",
-    flexDirection: "column",
+    gap: "20px",
     alignItems: "center",
-    minHeight: "92px",
-    justifyContent: "flex-end",
   },
-  sigImage: {
-    width: "140px",
-    height: "46px",
-    objectFit: "contain",
-    marginBottom: "10px",
-  },
-  sigLine: {
-    width: "100%",
-    borderTop: "1px solid #64748b",
-    textAlign: "center",
-    paddingTop: "6px",
-    fontSize: "10px",
-    fontWeight: "700",
-    color: "#334155",
-    textTransform: "uppercase",
-    letterSpacing: "0.03em",
-  },
-  secondPageHeader: {
-    textAlign: "center",
-    padding: "22px 28px 16px",
-    borderBottom: "1px solid #dbe3ef",
-    background: "#f8fafc",
-  },
-  secondPageTitle: {
-    fontSize: "17px",
-    fontWeight: "900",
-    letterSpacing: "0.05em",
-    textTransform: "uppercase",
+  institutionName: {
     margin: 0,
+    fontSize: "24px",
+    fontWeight: "900",
     color: "#0f172a",
+    letterSpacing: "-0.02em",
   },
-  secondPageSubTitle: {
-    fontSize: "10px",
-    color: "#475569",
-    marginTop: "8px",
-    letterSpacing: "0.02em",
+  tagline: {
+    margin: "4px 0 0",
+    fontSize: "12px",
+    color: "#64748b",
+    fontWeight: "500",
+    maxWidth: "400px",
   },
-  secondPageBody: {
-    padding: "24px 32px 20px",
-    minHeight: "1000px",
-    boxSizing: "border-box",
-  },
-  sealWrap: {
-    marginTop: "22px",
+  photoBox: {
+    width: "140px",
+    height: "170px",
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    borderRadius: "12px",
+    overflow: "hidden",
     display: "flex",
-    flexDirection: "column",
     alignItems: "center",
+    justifyContent: "center",
   },
-  academicSection: {
-    marginTop: "12px",
-    marginBottom: "14px",
-  },
-  academicTitle: {
-    fontSize: "10px",
+  sectionTitle: {
+    margin: "0 0 16px",
+    fontSize: "14px",
     fontWeight: "800",
-    color: "#334155",
+    color: "#0f172a",
     textTransform: "uppercase",
-    marginBottom: "8px",
-    borderBottom: "1px solid #cbd5e1",
-    paddingBottom: "4px",
-    display: "inline-block",
-    letterSpacing: "0.04em",
+    letterSpacing: "0.05em",
+  },
+  contentGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "20px",
+    marginBottom: "30px",
+  },
+  fieldRow: {
+    display: "flex",
+    padding: "8px 0",
+    borderBottom: "1px solid #f8fafc",
+  },
+  fieldLabel: {
+    fontSize: "11px",
+    color: "#64748b",
+    fontWeight: "600",
+    width: "120px",
+  },
+  fieldValue: {
+    fontSize: "11px",
+    color: "#0f172a",
+    fontWeight: "800",
+    flex: 1,
   },
   academicTable: {
     width: "100%",
     borderCollapse: "collapse",
-    marginTop: "10px",
-    tableLayout: "fixed",
+    borderRadius: "12px",
+    overflow: "hidden",
+    border: "1px solid #f1f5f9",
+    marginBottom: "30px",
   },
   academicTh: {
-    backgroundColor: "#f1f5f9",
-    border: "1px solid #cbd5e1",
-    padding: "6px 5px",
-    fontSize: "9px",
-    fontWeight: "800",
-    color: "#334155",
-    textAlign: "center",
+    backgroundColor: "#0f172a",
+    padding: "12px 16px",
+    fontSize: "10px",
+    textAlign: "left",
     textTransform: "uppercase",
-    letterSpacing: "0.03em",
+    color: "#fff",
+    letterSpacing: "0.05em",
   },
   academicTd: {
-    border: "1px solid #dbe3ef",
-    padding: "6px 5px",
-    fontSize: "10px",
+    padding: "12px 16px",
+    fontSize: "11px",
+    fontWeight: "700",
+    borderBottom: "1px solid #f1f5f9",
+  },
+  signatureSection: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gap: "20px",
+    marginTop: "auto",
+    paddingTop: "40px",
+  },
+  sigBlock: {
     textAlign: "center",
-    color: "#0f172a",
-    fontWeight: "600",
+  },
+  sigLine: {
+    margin: 0,
+    fontSize: "10px",
+    fontWeight: "800",
+    color: "#64748b",
+    textTransform: "uppercase",
+    paddingTop: "8px",
+    borderTop: "1px dashed #cbd5e1",
+  },
+  sigImage: {
+    maxHeight: "60px",
+    maxWidth: "120px",
+    objectFit: "contain",
+    marginBottom: "8px",
   },
   footer: {
-    height: "7px",
-    backgroundColor: "#0f172a",
-    marginTop: "10px",
+    marginTop: "auto",
+    paddingTop: "20px",
+    borderTop: "1px solid #f1f5f9",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  footerText: {
+    margin: 0,
+    fontSize: "9px",
+    color: "#94a3b8",
   }
 };
 
@@ -2845,8 +2742,8 @@ Enroll Admission            </p>
                          const profileFileObj = values.profilePhoto?.[0];
                          if (profileFileObj?.originFileObj) {
                            const file = profileFileObj.originFileObj;
-                           if (file.size > 1024 * 1024) {
-                             message.error("Profile photo too large. Max 1MB");
+                           if (file.size > MAX_FILE_SIZE) {
+                             message.error("Profile photo too large. Max 20MB");
                              return;
                            }
                            formDataToSend.append("profilePhoto", file);
@@ -2864,8 +2761,8 @@ Enroll Admission            </p>
                          ) {
                            const file = values.birthCertFile[0].originFileObj;
  
-                           if (file.size > 1024 * 1024) {
-                             message.error("Birth Certificate too large");
+                           if (file.size > MAX_FILE_SIZE) {
+                             message.error("Birth Certificate too large (Max 20MB)");
                              return;
                            }
  
@@ -2881,8 +2778,8 @@ Enroll Admission            </p>
                          ) {
                            const file = values.communityCertFile[0].originFileObj;
  
-                           if (file.size > 1024 * 1024) {
-                             message.error("Community Certificate too large");
+                           if (file.size > MAX_FILE_SIZE) {
+                             message.error("Community Certificate too large (Max 20MB)");
                              return;
                            }
  
@@ -2897,8 +2794,8 @@ Enroll Admission            </p>
                            values.aadharStudentFile?.[0]?.originFileObj
                          ) {
                            const file = values.aadharStudentFile[0].originFileObj;
-                           if (file.size > 1024 * 1024) {
-                             message.error("Aadhar file too large");
+                           if (file.size > MAX_FILE_SIZE) {
+                             message.error("Aadhar file too large (Max 20MB)");
                              return;
                            }
                            formDataToSend.append("aadharStudent", file);
@@ -2912,8 +2809,8 @@ Enroll Admission            </p>
                            values.transferCertFile?.[0]?.originFileObj
                          ) {
                            const file = values.transferCertFile[0].originFileObj;
-                           if (file.size > 1024 * 1024) {
-                             message.error("Transfer certificate file too large");
+                           if (file.size > MAX_FILE_SIZE) {
+                             message.error("Transfer certificate file too large (Max 20MB)");
                              return;
                            }
                            formDataToSend.append("transferCert", file);
@@ -2927,8 +2824,8 @@ Enroll Admission            </p>
                            values.entranceExamFile?.[0]?.originFileObj
                          ) {
                            const file = values.entranceExamFile[0].originFileObj;
-                           if (file.size > 1024 * 1024) {
-                             message.error("Entrance exam file too large");
+                           if (file.size > MAX_FILE_SIZE) {
+                             message.error("Entrance exam file too large (Max 20MB)");
                              return;
                            }
                            formDataToSend.append("entranceExam", file);
@@ -2985,17 +2882,24 @@ Enroll Admission            </p>
 
       {/* ── HIDDEN PDF TEMPLATE ── */}
       <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
+        {/* PAGE 1 */}
         <div id="pdfPage1" style={styles.pdfWrapper}>
           <div style={styles.header}>
             <div style={styles.schoolHeader}>
-              <img src={normalizeAssetSrc(documentAssets.schoolLogo) || logo} alt="logo" style={{ width: "80px" }} />
-              <div style={{ textAlign: 'left' }}>
-                <h1 style={styles.institutionName}>Matric Hr Sec School</h1>
-                <p style={styles.tagline}>Excellence in Education - Vadugappatti, Salem</p>
-                <p style={styles.tagline}>{documentAssets.schoolAddress || "Vadugappatti, Salem - 636XXX"}</p>
-                <p style={{ ...styles.tagline, fontWeight: 700 }}>Admission Year: {formData.academicYear || '-'}</p>
+              <img src={normalizeAssetSrc(documentAssets.schoolLogo) || logo} alt="logo" style={{ width: "80px", height: "80px", objectFit: "contain" }} />
+              <div>
+                <h1 style={styles.institutionName}>{adminSettings?.schoolName || "MATRIC HR SEC SCHOOL"}</h1>
+                <p style={styles.tagline}>{adminSettings?.address || "Vadugappatti, Salem - 636XXX"}</p>
+                <p style={{ ...styles.tagline, fontWeight: 700, color: "#0f172a" }}>Admission Session: {formData.academicYear || '-'}</p>
               </div>
             </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ display: "inline-block", padding: "8px 16px", background: "#0f172a", color: "#fff", borderRadius: "8px", fontSize: "12px", fontWeight: "800", textTransform: "uppercase", letterSpacing: "0.1em" }}>Admission Form</div>
+              <p style={{ margin: "10px 0 0", fontSize: "11px", color: "#64748b" }}>Adm No: <span style={{ color: "#0f172a", fontWeight: "800" }}>{formData.admissionNo || "PENDING"}</span></p>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "40px", marginBottom: "40px" }}>
             <div style={styles.photoBox}>
               {getSafePreviewUrl(formData.profilePhoto?.[0]) ? (
                 <img
@@ -3005,317 +2909,142 @@ Enroll Admission            </p>
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               ) : (
-                <span>PASTE PHOTO</span>
+                <span style={{ fontSize: "10px", fontWeight: "800", color: "#cbd5e1" }}>PASTE PHOTO</span>
               )}
             </div>
-            <div style={styles.formTitle}>Admission Form</div>
+            <div style={{ flex: 1 }}>
+              <h3 style={styles.sectionTitle}>1. Personal Profiles</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
+                {[
+                  ["Full Name", formData.name],
+                  ["Father's Name", formData.fatherName],
+                  ["Mother's Name", formData.motherName],
+                  ["Date of Birth", formData.dob?.format?.("DD MMM YYYY") || "-"],
+                  ["Gender", formData.gender],
+                  ["Standard", formData.standard ? `STD ${formData.standard}` : "-"],
+                ].map(([l, v], i) => (
+                  <div key={i} style={styles.fieldRow}>
+                    <span style={styles.fieldLabel}>{l}</span>
+                    <span style={styles.fieldValue}>{v || "-"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          <div style={styles.content}>
-             <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Admission No :</span>
-                  <span style={styles.value}>{formData.admissionNo || '-'}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Admission Date :</span>
-                  <span style={styles.value}>{formData.admissionDate?.format?.("DD/MM/YYYY") || '-'}</span>
-                </div>
-             </div>
-
-             <div style={styles.row}>
-                <div style={styles.field}>
-                  <span style={styles.label}>Student's Name :</span>
-                  <span style={styles.value}>{formData.name}</span>
-                </div>
-             </div>
-
-             <div style={styles.row}>
-                <div style={styles.field}>
-                  <span style={styles.label}>Father's Name :</span>
-                  <span style={styles.value}>{formData.fatherName}</span>
-                </div>
-             </div>
-
-             <div style={styles.row}>
-                <div style={styles.field}>
-                  <span style={styles.label}>Mother's Name :</span>
-                  <span style={styles.value}>{formData.motherName}</span>
-                </div>
-             </div>
-
-             <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.6}}>
-                  <span style={styles.label}>Date of Birth :</span>
-                  <span style={styles.value}>{formData.dob?.format?.("DD/MM/YYYY") || ".... / .... / ...."}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.4}}>
-                  <span style={styles.label}>Gender :</span>
-                  <span style={styles.value}>{formData.gender}</span>
-                </div>
-             </div>
-
-             <div style={styles.addressSection}>
-                <span style={styles.addressLabel}>Residential Address</span>
-                <div style={styles.row}>
-                  <div style={styles.field}>
-                    <span style={styles.label}>Address Line 1 :</span>
-                    <span style={styles.value}>{formData.line1}</span>
-                  </div>
-                </div>
-                <div style={styles.row}>
-                  <div style={{...styles.field, flex: 0.6}}>
-                    <span style={styles.label}>Address Line 2 :</span>
-                    <span style={styles.value}>{formData.line2 || formData.street}</span>
-                  </div>
-                  <div style={{...styles.field, flex: 0.4}}>
-                    <span style={styles.label}>Pincode :</span>
-                    <span style={styles.value}>{formData.pin}</span>
-                  </div>
-                </div>
-                <div style={styles.row}>
-                  <div style={{...styles.field, flex: 0.5}}>
-                    <span style={styles.label}>City :</span>
-                    <span style={styles.value}>{formData.city}</span>
-                  </div>
-                  <div style={{...styles.field, flex: 0.5}}>
-                    <span style={styles.label}>State :</span>
-                    <span style={styles.value}>{formData.state}</span>
-                  </div>
-                </div>
-                <div style={styles.row}>
-                  <div style={styles.field}>
-                    <span style={styles.label}>Landmark :</span>
-                    <span style={styles.value}>{formData.landmark}</span>
-                  </div>
-                </div>
-             </div>
-
-             <div style={styles.academicSection}>
-                <div style={styles.academicTitle}>III. Academic Performance</div>
-                <div style={{...styles.row, marginBottom: '10px'}}>
-                  <div style={{...styles.field, flex: 0.4}}>
-                    <span style={styles.label}>Exam :</span>
-                    <span style={styles.value}>{formData.examName}</span>
-                  </div>
-                  <div style={{...styles.field, flex: 0.3}}>
-                    <span style={styles.label}>Reg No :</span>
-                    <span style={styles.value}>{formData.registerNo}</span>
-                  </div>
-                  <div style={{...styles.field, flex: 0.3}}>
-                    <span style={styles.label}>Year :</span>
-                    <span style={styles.value}>{formData.monthYear}</span>
-                  </div>
-                </div>
-                <div style={{...styles.row, marginBottom: '8px'}}>
-                  <div style={styles.field}>
-                    <span style={styles.label}>Stream / Group :</span>
-                    <span style={styles.value}>{getReadableStream(formData.academicStream, formData.academicStreamCustom)}</span>
-                  </div>
-                </div>
-                <table style={styles.academicTable}>
-                  <thead>
-                    <tr>
-                      <th style={styles.academicTh}>SUBJECT</th>
-                      <th style={styles.academicTh}>MAX MARKS</th>
-                      <th style={styles.academicTh}>MARKS OBTAINED</th>
-                      <th style={styles.academicTh}>PERCENTAGE</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(formData.subjects || []).map((exam, idx) => (
-                      <tr key={idx}>
-                        <td style={{...styles.academicTd, textAlign: 'left'}}>{exam.subjectName}</td>
-                        <td style={styles.academicTd}>{exam.maxMarks}</td>
-                        <td style={styles.academicTd}>{exam.obtainedMarks}</td>
-                        <td style={styles.academicTd}>
-                          {exam.maxMarks > 0 ? ((exam.obtainedMarks / exam.maxMarks) * 100).toFixed(1) + '%' : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                    {formData.subjects?.length > 0 && (
-                       <tr style={{backgroundColor: '#f5f5f5', fontWeight: 'bold'}}>
-                         <td style={{...styles.academicTd, textAlign: 'right'}}>TOTAL</td>
-                         <td style={styles.academicTd}>
-                           {formData.subjects.reduce((sum, s) => sum + (Number(s.maxMarks) || 0), 0)}
-                         </td>
-                         <td style={styles.academicTd}>
-                           {formData.subjects.reduce((sum, s) => sum + (Number(s.obtainedMarks) || 0), 0)}
-                         </td>
-                         <td style={styles.academicTd}>
-                            {(() => {
-                              const tm = formData.subjects.reduce((sum, s) => sum + (Number(s.maxMarks) || 0), 0);
-                              const to = formData.subjects.reduce((sum, s) => sum + (Number(s.obtainedMarks) || 0), 0);
-                              return tm > 0 ? ((to / tm) * 100).toFixed(1) + '%' : '-';
-                            })()}
-                         </td>
-                       </tr>
-                    )}
-                  </tbody>
-                </table>
-             </div>
-
+          <h3 style={styles.sectionTitle}>2. Residential Domicile</h3>
+          <div style={{ padding: "20px", border: "1px solid #f1f5f9", borderRadius: "16px", background: "#f8fafc", marginBottom: "40px" }}>
+             <p style={{ margin: 0, fontSize: "13px", fontWeight: "800", color: "#0f172a", lineHeight: "1.6" }}>
+               {[formData.line1, formData.line2 || formData.street, formData.city, formData.state, formData.pin].filter(Boolean).join(", ")}
+             </p>
+             <p style={{ margin: "8px 0 0", fontSize: "11px", color: "#64748b" }}>Landmark: {formData.landmark || "N/A"}</p>
           </div>
-          <div style={styles.footer}></div>
+
+          <h3 style={styles.sectionTitle}>3. Academic Performance</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px", marginBottom: "16px" }}>
+             <div style={styles.fieldRow}><span style={styles.fieldLabel}>Examination</span><span style={styles.fieldValue}>{formData.examName}</span></div>
+             <div style={styles.fieldRow}><span style={styles.fieldLabel}>Register No</span><span style={styles.fieldValue}>{formData.registerNo}</span></div>
+             <div style={styles.fieldRow}><span style={styles.fieldLabel}>Month/Year</span><span style={styles.fieldValue}>{formData.monthYear}</span></div>
+          </div>
+          <table style={styles.academicTable}>
+            <thead>
+              <tr>
+                <th style={styles.academicTh}>Subject</th>
+                <th style={{ ...styles.academicTh, textAlign: "center" }}>Max Marks</th>
+                <th style={{ ...styles.academicTh, textAlign: "center" }}>Obtained</th>
+                <th style={{ ...styles.academicTh, textAlign: "center" }}>%</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(formData.subjects || []).map((exam, idx) => (
+                <tr key={idx}>
+                  <td style={styles.academicTd}>{exam.subjectName}</td>
+                  <td style={{ ...styles.academicTd, textAlign: "center" }}>{exam.maxMarks}</td>
+                  <td style={{ ...styles.academicTd, textAlign: "center" }}>{exam.obtainedMarks}</td>
+                  <td style={{ ...styles.academicTd, textAlign: "center", color: "#0d9488", fontWeight: "900" }}>
+                    {exam.maxMarks > 0 ? ((exam.obtainedMarks / exam.maxMarks) * 100).toFixed(1) + '%' : '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div style={styles.footer}>
+            <p style={styles.footerText}>Generated for {formData.name || 'Student'} • Page 1 of 2</p>
+            <p style={{ ...styles.footerText, fontWeight: "800", color: "#0f172a" }}>Official Admission Record</p>
+          </div>
         </div>
 
+        {/* PAGE 2 */}
         <div id="pdfPage2" style={styles.pdfWrapper}>
-          <div style={styles.secondPageHeader}>
-            <h3 style={styles.secondPageTitle}>Declaration and Signatures</h3>
-            <p style={styles.secondPageSubTitle}>Admission No: {formData.admissionNo || '-'} | Student: {formData.name || '-'}</p>
+          <h3 style={styles.sectionTitle}>4. Contact & Demographic Matrix</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "40px" }}>
+            {[
+              ["Religion", formData.religion],
+              ["Community", formData.community],
+              ["Caste", formData.caste],
+              ["Mother Tongue", formData.motherTongue],
+              ["Phone (P)", formData.fatherPhone || formData.motherPhone],
+              ["Email", formData.parentsEmail],
+              ["Aadhar No", formData.aadharNo],
+              ["Blood Group", formData.bloodGroup],
+              ["Family Income", `₹${formData.familyIncome || 0}`],
+              ["Siblings", formData.siblingsCount],
+            ].map(([l, v], i) => (
+              <div key={i} style={styles.fieldRow}>
+                <span style={styles.fieldLabel}>{l}</span>
+                <span style={styles.fieldValue}>{v || "-"}</span>
+              </div>
+            ))}
           </div>
 
-          <div style={styles.secondPageBody}>
-            <div style={styles.academicSection}>
-              <div style={styles.academicTitle}>IV. Contact and Family Details</div>
+          <h3 style={styles.sectionTitle}>5. Institutional Declaration</h3>
+          <div style={{ padding: "24px", border: "2px solid #0f172a", borderRadius: "20px", marginBottom: "40px" }}>
+            <p style={{ margin: 0, fontSize: "11px", color: "#475569", lineHeight: "1.8", textAlign: "justify" }}>
+              I hereby declare that all particulars furnished in this admission form are true and correct to the best of my knowledge. I undertake to abide by the rules, regulations, and disciplinary code of conduct established by the institution. I understand that providing false information may result in the immediate cancellation of this admission.
+            </p>
+          </div>
 
-              <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Religion :</span>
-                  <span style={styles.value}>{formData.religion || '-'}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Community / Caste :</span>
-                  <span style={styles.value}>{[formData.community, formData.caste].filter(Boolean).join(' / ') || '-'}</span>
-                </div>
-              </div>
-
-              <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Mother Tongue :</span>
-                  <span style={styles.value}>{formData.motherTongue || '-'}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Previous School :</span>
-                  <span style={styles.value}>{formData.previouslyStudied || '-'}</span>
-                </div>
-              </div>
-
-              <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Phone Number :</span>
-                  <span style={styles.value}>{formData.fatherPhone || formData.motherPhone || '-'}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Email Address :</span>
-                  <span style={styles.value}>{formData.parentsEmail || '-'}</span>
-                </div>
-              </div>
-
-              {formData.isSingleParent && formData.guardianName && (
-                <div style={styles.row}>
-                  <div style={{...styles.field, flex: 0.5}}>
-                    <span style={styles.label}>Guardian Name :</span>
-                    <span style={styles.value}>{formData.guardianName} {formData.guardianRelation ? `(${formData.guardianRelation})` : ''}</span>
-                  </div>
-                  <div style={{...styles.field, flex: 0.5}}>
-                    <span style={styles.label}>Guardian Phone :</span>
-                    <span style={styles.value}>{formData.guardianPhone || '-'}</span>
-                  </div>
-                </div>
-              )}
-
-              <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Aadhar Number :</span>
-                  <span style={styles.value}>{formData.aadharNo || '-'}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Blood Group :</span>
-                  <span style={styles.value}>{formData.bloodGroup || '-'}</span>
-                </div>
-              </div>
-
-              <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Family Income :</span>
-                  <span style={styles.value}>{formData.familyIncome || '-'}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Siblings Count :</span>
-                  <span style={styles.value}>{formData.siblingsCount || '-'}</span>
-                </div>
-              </div>
-
-              <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Father Occupation :</span>
-                  <span style={styles.value}>{formData.fatherOccupation || '-'}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Admission For :</span>
-                  <span style={styles.value}>STD {formData.standard || '-'}</span>
-                </div>
-              </div>
-
-              <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Section :</span>
-                  <span style={styles.value}>{formData.section || '-'}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Year :</span>
-                  <span style={styles.value}>{formData.academicYear || '-'}</span>
-                </div>
-              </div>
-
-              <div style={styles.row}>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>Transport :</span>
-                  <span style={styles.value}>{formData.vanNeeded ? 'School Van' : 'Private / Local'}</span>
-                </div>
-                <div style={{...styles.field, flex: 0.5}}>
-                  <span style={styles.label}>RTE Student :</span>
-                  <span style={styles.value}>{formData.rteApplied ? 'Yes' : 'No'}</span>
-                </div>
-              </div>
+          <div style={styles.signatureSection}>
+            <div style={styles.sigBlock}>
+              <div style={{ height: "60px" }} />
+              <p style={styles.sigLine}>Student Signature</p>
             </div>
-
-            <div style={styles.declaration}>
-              <h4 style={styles.declTitle}>Declaration</h4>
-              <p style={styles.declText}>
-                I hereby declare that all particulars furnished in this admission form are true to the best of my knowledge. I will abide by the rules and regulations of the institution.
-              </p>
-
-              <div style={styles.signatureRow}>
-                <div style={styles.sigBlock}>
-                  <div style={styles.sigLine}>Student's Signature</div>
-                </div>
-
-                <div style={styles.sigBlock}>
-                  <div style={styles.sigLine}>Parent's Signature</div>
-                </div>
-
-                <div style={styles.sigBlock}>
-                  {normalizeAssetSrc(documentAssets.principalSignature) && (
-                    <img
-                      src={normalizeAssetSrc(documentAssets.principalSignature)}
-                      alt="Principal Signature"
-                      crossOrigin="anonymous"
-                      style={styles.sigImage}
-                    />
-                  )}
-                  <div style={styles.sigLine}>Principal's Signature</div>
-                </div>
-              </div>
-
-              {normalizeAssetSrc(documentAssets.rubberStamp) && (
-                <div style={styles.sealWrap}>
+            <div style={styles.sigBlock}>
+              <div style={{ height: "60px" }} />
+              <p style={styles.sigLine}>Parent / Guardian</p>
+            </div>
+            <div style={styles.sigBlock}>
+              <div style={{ height: "60px", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                {normalizeAssetSrc(documentAssets.principalSignature) && (
                   <img
-                    src={normalizeAssetSrc(documentAssets.rubberStamp)}
-                    alt="Rubber Stamp"
+                    src={normalizeAssetSrc(documentAssets.principalSignature)}
+                    alt="Principal"
                     crossOrigin="anonymous"
-                    style={{ width: '100px', height: '100px', objectFit: 'contain', opacity: 0.95, filter: 'grayscale(100%)' }}
+                    style={styles.sigImage}
                   />
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: '#334155' }}>
-                    Authorization Seal
-                  </span>
-                </div>
-              )}
+                )}
+              </div>
+              <p style={styles.sigLine}>Principal / Headmaster</p>
             </div>
           </div>
 
-          <div style={styles.footer}></div>
+          {normalizeAssetSrc(documentAssets.rubberStamp) && (
+            <div style={{ textAlign: "center", marginTop: "30px" }}>
+              <img
+                src={normalizeAssetSrc(documentAssets.rubberStamp)}
+                alt="Seal"
+                crossOrigin="anonymous"
+                style={{ width: '80px', height: '80px', objectFit: 'contain', opacity: 0.8 }}
+              />
+              <p style={{ margin: "8px 0 0", fontSize: "9px", fontWeight: "800", color: "#64748b", textTransform: "uppercase" }}>Institutional Seal</p>
+            </div>
+          )}
+
+          <div style={styles.footer}>
+            <p style={styles.footerText}>System Generated Record • {dayjs().format("DD MMM YYYY, HH:mm")}</p>
+            <p style={{ ...styles.footerText, fontWeight: "800", color: "#0f172a" }}>Page 2 of 2</p>
+          </div>
         </div>
       </div>
     </div>

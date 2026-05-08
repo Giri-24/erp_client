@@ -9,8 +9,6 @@ const CSV_TEMPLATE_HEADERS = [
   'section',
   'academicYear',
   'admissionDate',
-  'admissionFrom',
-  'admissionTo',
   'gender',
   'dob',
   'religion',
@@ -352,7 +350,7 @@ const BulkUploadPage = () => {
             <p>Admission, student, family, address, and academic form fields are supported. Documents are intentionally excluded.</p>
             <p>Standard values: LKG, UKG, 1 to 12, or STD_1 to STD_12.</p>
             <p>Gender values: MALE, FEMALE. Boolean values: true or false.</p>
-            <p>Date format: YYYY-MM-DD for dob, admissionDate, admissionFrom, admissionTo.</p>
+            <p>Date format: YYYY-MM-DD for dob and admissionDate.</p>
             <p>Use <strong>subjectsJson</strong> for subject-wise marks as a JSON array, for example: <strong>{'[{"subjectName":"Tamil","maxMarks":150,"obtainedMarks":130}]'}</strong></p>
             <p>Academic stream values: BIO_MATHS, CS_MATHS, BIO_CS, COMMERCE, HUMANITIES, OTHER.</p>
             <p>Maximum 500 rows per upload. Admission numbers are auto-generated.</p>

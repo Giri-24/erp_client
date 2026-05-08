@@ -202,22 +202,28 @@ const AdminSettings = () => {
   const onFinish = async (values) => {
     try {
       setSaving(true);
+      
+      // Strip documentAssets from values if it was accidentally included via setFieldsValue
+      const { documentAssets: _ignored, ...settingsPayload } = values;
+
       await updateAdminSettings({
-        ...values,
+        ...settingsPayload,
         documentAssets,
       });
       message.success('Settings updated');
       await loadSettings();
     } catch (err) {
       const serverMessage = err?.response?.data?.message || '';
+      const isDocumentAssetsError = typeof serverMessage === 'string' && 
+        serverMessage.toLowerCase().includes('documentassets') && 
+        serverMessage.toLowerCase().includes('should not exist');
 
-      if (typeof serverMessage === 'string' && serverMessage.toLowerCase().includes('documentassets') && serverMessage.toLowerCase().includes('should not exist')) {
+      if (isDocumentAssetsError) {
+        console.warn('Backend rejected documentAssets, retrying without it...');
         try {
-          await updateAdminSettings({
-            ...values,
-            documentassert: documentAssets,
-          });
-          message.success('Settings updated');
+          const { documentAssets: _ignored, ...settingsPayload } = values;
+          await updateAdminSettings(settingsPayload);
+          message.success('Settings updated (Signatures were not changed)');
           await loadSettings();
           return;
         } catch (retryErr) {
