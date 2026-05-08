@@ -118,3 +118,13 @@ export const demoteIndividualStudents = async (payload) => {
   const res = await axios.post('/admissions/demote-individual', payload);
   return res.data;
 };
+
+export const getAcademicStreams = async () => {
+  const res = await axios.get('/admissions/streams');
+  return res.data;
+};
+
+export const createAcademicStream = async (payload) => {
+  const res = await axios.post('/admissions/streams', payload);
+  return res.data;
+};

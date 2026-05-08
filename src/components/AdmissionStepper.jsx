@@ -36,7 +36,8 @@ import {
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import logo from "../assets/logo.jpeg";
-import { createAdmission, updateAdmission, getNextAdmissionNo } from "../modules/admission/admission.service";
+import { createAdmission, updateAdmission, getNextAdmissionNo, getAcademicStreams, createAcademicStream } from "../modules/admission/admission.service";
+
 import { getAcademicYears } from "../modules/fees/fees.service";
 import { getAdminSettings } from "../modules/settings/settings.service";
 import dayjs from "dayjs";
@@ -272,30 +273,11 @@ const normalizeSubjectRow = (subject) => ({
     null,
 });
 
-const STREAM_LABELS = {
-  BIO_MATHS: "Physics, Chemistry, Biology, Mathematics",
-  CS_MATHS: "Physics, Chemistry, Computer Science, Mathematics",
-  BIO_CS: "Physics, Chemistry, Biology, Computer Science",
-  COMMERCE: "Commerce, Economics, Accountancy, Computer Application",
-  HUMANITIES: "History, Geography, Political Science, Economics",
-  OTHER: "Other",
-};
-
-const BACKEND_STREAM_VALUES = new Set([
-  "BIO_MATHS",
-  "CS_MATHS",
-  "BIO_CS",
-  "COMMERCE",
-]);
-
-const getReadableStream = (stream, customStream) => {
+const getReadableStream = (stream, customStream, academicStreams = []) => {
   if (stream === "OTHER") return customStream || "Other";
-  return STREAM_LABELS[stream] || stream || "-";
+  const found = academicStreams.find(s => s.name === stream || s.id === stream);
+  return found ? found.label : (stream || "-");
 };
-
-const normalizeAcademicStreamPayload = (stream) => (
-  BACKEND_STREAM_VALUES.has(stream) ? stream : undefined
-);
 
 const extractMissingFieldMessage = (err) => {
   const data = err?.response?.data;
@@ -333,6 +315,10 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
   const [community, setCommunity] = useState("");
   const [adminSettings, setAdminSettings] = useState({});
   const [documentAssets, setDocumentAssets] = useState({});
+  const [academicStreams, setAcademicStreams] = useState([]);
+  const [isAddingStream, setIsAddingStream] = useState(false);
+
+
 
   const normalizeAssetSrc = (value) => {
     if (!value) return "";
@@ -370,7 +356,12 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       setAdminSettings(s || {});
       setDocumentAssets(s?.documentAssets || {});
     }).catch(() => { });
+
+    getAcademicStreams().then((streams) => {
+      setAcademicStreams(Array.isArray(streams) ? streams : []);
+    }).catch(() => { });
   }, []);
+
 
   useEffect(() => {
     message.config({ duration: 4 });
@@ -545,6 +536,60 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       fetchAdmissionNo();
     }
   }, []);
+
+  // Fetch academic streams on mount
+  useEffect(() => {
+    const loadStreams = async () => {
+      try {
+        const streams = await getAcademicStreams();
+        setAcademicStreams(Array.isArray(streams) ? streams : []);
+      } catch {
+        setAcademicStreams([]);
+      }
+    };
+    loadStreams();
+  }, []);
+
+  const handleAddNewStream = async () => {
+    const customValue = form.getFieldValue("academicStreamCustom");
+    if (!customValue || !customValue.trim()) {
+      message.warning("Please enter a stream name first");
+      return;
+    }
+
+    setIsAddingStream(true);
+    try {
+      const label = customValue.trim();
+      const name = label.toUpperCase().replace(/\s+/g, '_');
+      
+      const newStream = await createAcademicStream({
+        name,
+        label,
+        isCustom: true
+      });
+
+      message.success(`Stream "${label}" added successfully!`);
+      
+      // Refresh the list
+      const updatedStreams = await getAcademicStreams();
+      setAcademicStreams(Array.isArray(updatedStreams) ? updatedStreams : []);
+      
+      // Select the newly created stream and clear custom field
+      form.setFieldsValue({
+        academicStream: newStream.name,
+        academicStreamCustom: undefined
+      });
+    } catch (err) {
+      if (err.response?.status === 409) {
+        message.error("This stream already exists");
+      } else {
+        message.error("Failed to add new stream");
+      }
+    } finally {
+      setIsAddingStream(false);
+    }
+  };
+
 
   useEffect(() => {
     if (editData) {
@@ -1075,6 +1120,45 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                 </Select>
               </Form.Item>
             </Col>
+
+            {/* Academic Stream - visible only for 11th & 12th */}
+            {(watchedStandard === "11" || watchedStandard === "12" || watchedStandard === "11th" || watchedStandard === "12th") && (
+              <>
+                <Col span={12}>
+                  <Form.Item name="academicStream" label="Academic Stream">
+                    <Select
+                      placeholder="Select stream"
+                      allowClear
+                      options={[
+                        ...academicStreams.map(s => ({ value: s.name, label: s.label })),
+                        { value: "OTHER", label: "Other (Add New)" },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+                {selectedAcademicStream === "OTHER" && (
+                  <Col span={12}>
+                    <Form.Item name="academicStreamCustom" label="Custom Stream Name" rules={[{ required: true, message: 'Enter custom stream name' }]}>
+                      <Input 
+                        placeholder="e.g. Fine Arts" 
+                        suffix={
+                          <Button 
+                            type="primary" 
+                            size="small" 
+                            loading={isAddingStream}
+                            onClick={handleAddNewStream}
+                            icon={<PlusOutlined />}
+                          >
+                            Add
+                          </Button>
+                        }
+                      />
+                    </Form.Item>
+                  </Col>
+                )}
+
+              </>
+            )}
             <Col span={12}>
               <Form.Item name="gender" label="Gender" rules={[requiredRule]}>
                 <Select>
@@ -1375,7 +1459,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
             ))}
 
             {/* Sibling 1 Details */}
-            {/* <Divider orientation="left" style={{ fontSize: 13 }}>Sibling 1 Details</Divider>
+            {/* <Divider titlePlacement="left" style={{ fontSize: 13 }}>Sibling 1 Details</Divider>
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item name="sibling1Name" label="Sibling 1 Name">
@@ -1419,7 +1503,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
             )}
 
             {/* Sibling 2 Details */}
-            {/* <Divider orientation="left" style={{ fontSize: 13 }}>Sibling 2 Details</Divider>
+            {/* <Divider titlePlacement="left" style={{ fontSize: 13 }}>Sibling 2 Details</Divider>
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item name="sibling2Name" label="Sibling 2 Name">
@@ -1571,7 +1655,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
           </div>
           <>
             {/* ── Qualifying Exam header ── */}
-            <Divider orientation="left">Qualifying Examination Passed and Percentage of Mark Obtained</Divider>
+            <Divider titlePlacement="left">Qualifying Examination Passed and Percentage of Mark Obtained</Divider>
             <Row gutter={16}>
               <Col span={6}>
                 <Form.Item name="examName" label="Name of Examination" >
@@ -1609,31 +1693,38 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               </Col>
               <Col span={12}>
                 <Form.Item name="academicStream" label="Academic Stream / Group">
-                  <Select
-                    placeholder="Select group"
-                    dropdownRender={(menu) => (
-                      <>
-                        {menu}
-                        {selectedAcademicStream === "OTHER" && (
-                          <div style={{ padding: 8, borderTop: "1px solid #f0f0f0" }}>
-                            <Form.Item name="academicStreamCustom" noStyle rules={[requiredRule]}>
-                              <Input placeholder="Type custom stream/course here" />
-                            </Form.Item>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  >
-                    {/* pure biology */}
-                    <Select.Option value="BIO_MATHS">Physics, Chemistry,Maths, Biology</Select.Option>
-                    <Select.Option value="CS_MATHS">Physics, Chemistry, Maths, Computer Science</Select.Option>
-                    <Select.Option value="BIO_CS">Physics, Chemistry, Biology, Computer Science</Select.Option>
-                    <Select.Option value="COMMERCE">Commerce, Economics, Accountancy, Computer Application</Select.Option>
-                    {/* <Select.Option value="HUMANITIES">History, Geography, Political Science, Economics</Select.Option> */}
-                    <Select.Option value="OTHER">Other</Select.Option>
-                  </Select>
+                  <Select 
+                    placeholder="Select group" 
+                    allowClear
+                    options={[
+                      ...academicStreams.map(s => ({ value: s.name, label: s.label })),
+                      { value: "OTHER", label: "Other (Add New)" },
+                    ]}
+                  />
                 </Form.Item>
               </Col>
+
+              {selectedAcademicStream === "OTHER" && (
+                <Col span={12}>
+                  <Form.Item name="academicStreamCustom" label="Specify Custom Stream" rules={[requiredRule]}>
+                    <Input 
+                      autoFocus 
+                      placeholder="Type custom stream/course here" 
+                      suffix={
+                        <Button 
+                          type="primary" 
+                          size="small" 
+                          loading={isAddingStream}
+                          onClick={handleAddNewStream}
+                          icon={<PlusOutlined />}
+                        >
+                          Add
+                        </Button>
+                      }
+                    />
+                  </Form.Item>
+                </Col>
+              )}
             </Row>
 
             {/* ── Per-subject marks table ── */}
@@ -1740,22 +1831,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                 <Row gutter={16}>
                   <Col span={14}>
                     <Form.Item name="academicStream" label="Academic Stream / Group" rules={[requiredRule]}>
-                      <Select
-                        placeholder="Select stream"
-                        dropdownRender={(menu) => (
-                          <>
-                            {menu}
-                            {selectedAcademicStream === "OTHER" && (
-                              <div style={{ padding: 8, borderTop: "1px solid #f0f0f0" }}>
-                                <Form.Item name="academicStreamCustom" noStyle rules={[requiredRule]}>
-                                  <Input placeholder="Type custom stream/course here" />
-                                </Form.Item>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      >
-
+                      <Select placeholder="Select stream">
                         <Select.Option value="BIO_MATHS">Physics, Chemistry, Biology, Mathematics</Select.Option>
                         <Select.Option value="CS_MATHS">Physics, Chemistry, Computer Science, Mathematics</Select.Option>
                         <Select.Option value="BIO_CS">Physics, Chemistry, Biology, Computer Science</Select.Option>
@@ -1765,6 +1841,14 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                       </Select>
                     </Form.Item>
                   </Col>
+
+                  {selectedAcademicStream === "OTHER" && (
+                    <Col span={10}>
+                      <Form.Item name="academicStreamCustom" label="Specify Custom Stream" rules={[requiredRule]}>
+                        <Input autoFocus placeholder="Type custom stream/course here" />
+                      </Form.Item>
+                    </Col>
+                  )}
                 </Row>
                 <Card size="small" title="Subjects Offered" style={{ marginBottom: 16 }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -2024,8 +2108,9 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                     <Descriptions.Item label="Academic Year">{formData.academicYear}</Descriptions.Item>
                     {formData.academicStream && (
                       <Descriptions.Item label="Stream / Group">{
-                        getReadableStream(formData.academicStream, formData.academicStreamCustom)
+                        getReadableStream(formData.academicStream, formData.academicStreamCustom, academicStreams)
                       }</Descriptions.Item>
+
                     )}
                     <Descriptions.Item label="Date of Birth">{formData.dob?.format?.("DD/MM/YYYY")}</Descriptions.Item>
                     <Descriptions.Item label="Gender">{formData.gender}</Descriptions.Item>
@@ -2667,6 +2752,8 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                           transportMode: values.transportMode || "Self",
                           section: values.section || getDefaultSection(),
                           academicYear: values.academicYear || getLatestAcademicYearFromApi(availableYears) || undefined,
+                          academicStream: values.academicStream || undefined,
+                          academicStreamCustom: values.academicStream === "OTHER" ? values.academicStreamCustom : undefined,
                           family: {
                             fatherName: values.fatherName,
                             fatherPhone: values.fatherPhone,
@@ -2727,8 +2814,6 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                                   maxMarks: Number(s.maxMarks) || 0,
                                   obtainedMarks: Number(s.obtainedMarks) || 0,
                                 })),
-                              stream: normalizeAcademicStreamPayload(values.academicStream),
-                              streamCustom: values.academicStream === "OTHER" ? values.academicStreamCustom : undefined,
                             }
                           ],
                           admission: {

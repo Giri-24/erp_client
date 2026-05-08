@@ -1,18 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Card, Form, Input, InputNumber, message, Modal, Select, Space, Table, Tag } from 'antd';
 import { createExam, createExamSubject, getExams, getExamSubjects } from '../exam.service';
+import { getAcademicStreams } from '../../admission/admission.service';
+
 
 const STANDARD_OPTIONS = [
   'LKG', 'UKG', 'STD_1', 'STD_2', 'STD_3', 'STD_4', 'STD_5',
   'STD_6', 'STD_7', 'STD_8', 'STD_9', 'STD_10', 'STD_11', 'STD_12',
 ].map((v) => ({ label: v, value: v }));
 
-const STREAM_OPTIONS = [
-  { label: 'BIO_MATHS', value: 'BIO_MATHS' },
-  { label: 'CS_MATHS', value: 'CS_MATHS' },
-  { label: 'BIO_CS', value: 'BIO_CS' },
-  { label: 'COMMERCE', value: 'COMMERCE' },
-];
+
 
 export default function SubjectCreationPage() {
   const [loading, setLoading] = useState(false);
@@ -21,8 +18,10 @@ export default function SubjectCreationPage() {
   const [examId, setExamId] = useState();
   const [subjects, setSubjects] = useState([]);
   const [createExamOpen, setCreateExamOpen] = useState(false);
+  const [streams, setStreams] = useState([]);
   const [examForm] = Form.useForm();
   const [subjectForm] = Form.useForm();
+
 
   const loadExams = async () => {
     setExamLoading(true);
@@ -48,7 +47,17 @@ export default function SubjectCreationPage() {
     setLoading(false);
   };
 
-  useEffect(() => { loadExams(); }, []);
+  const loadStreams = async () => {
+    try {
+      const data = await getAcademicStreams();
+      setStreams(data || []);
+    } catch {
+      message.error('Failed to load streams');
+    }
+  };
+
+  useEffect(() => { loadExams(); loadStreams(); }, []);
+
   useEffect(() => { loadSubjects(examId); }, [examId]);
 
   const submitExam = async () => {
@@ -81,8 +90,13 @@ export default function SubjectCreationPage() {
     { title: 'Subject', dataIndex: 'name' },
     { title: 'Standard', dataIndex: 'standard', render: (v) => <Tag>{v}</Tag> },
     { title: 'Section', dataIndex: 'section', render: (v) => v || '-' },
-    { title: 'Stream', dataIndex: 'stream', render: (v) => v || '-' },
+    { 
+      title: 'Stream', 
+      dataIndex: 'academicStreamId', 
+      render: (v) => streams.find(s => s.id === v)?.label || v || '-' 
+    },
     { title: 'Marks', key: 'marks', render: (_, r) => `${r.passMarks}/${r.maxMarks}` },
+
   ];
 
   return (
@@ -117,9 +131,14 @@ export default function SubjectCreationPage() {
             <Form.Item name="section" label="Section">
               <Input placeholder="A" />
             </Form.Item>
-            <Form.Item name="stream" label="Stream">
-              <Select allowClear options={STREAM_OPTIONS} />
+            <Form.Item name="academicStreamId" label="Stream">
+              <Select 
+                allowClear 
+                options={streams.map(s => ({ label: s.label, value: s.id }))} 
+                placeholder="Standard 11/12 only"
+              />
             </Form.Item>
+
             <Form.Item name="maxMarks" label="Max Marks" initialValue={100}>
               <InputNumber min={1} className="w-full" />
             </Form.Item>
