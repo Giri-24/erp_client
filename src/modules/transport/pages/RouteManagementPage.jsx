@@ -11,6 +11,16 @@ import { usePermissionHelpers, PERMISSIONS } from "../../../utils/permissions";
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmt = (v) => "₹" + Number(v || 0).toLocaleString("en-IN");
 
+const formatTime = (timeStr) => {
+  if (!timeStr) return "";
+  const [hours, minutes] = timeStr.split(":");
+  const h = parseInt(hours, 10);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const displayH = h % 12 || 12;
+  return `${displayH}:${minutes} ${ampm}`;
+};
+
+
 const statusMeta = (route) => {
   const s = (route.status || "ACTIVE").toUpperCase();
   if (s === "ACTIVE") return { label: "ACTIVE", border: "border-[#44ddc1]", dot: "bg-[#44ddc1]" };
@@ -111,6 +121,24 @@ const RouteManagementPage = () => {
   const handlePublish = async () => {
     if (!inlineForm.routeName) { message.error("Route name is required"); return; }
     if (!inlineForm.baseFee) { message.error("Base fee is required"); return; }
+    if (inlineForm.conductorPhone && !/^\d{10}$/.test(inlineForm.conductorPhone)) {
+      message.error("Conductor phone must be exactly 10 digits");
+      return;
+    }
+
+    // Validate stop times (HH:mm format)
+    for (const stop of inlineStops) {
+      const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+      if (stop.pickupTime && !timeRegex.test(stop.pickupTime)) {
+        message.error(`Invalid pickup time for stop "${stop.stopName || 'Unknown'}". Use HH:mm format.`);
+        return;
+      }
+      if (stop.dropTime && !timeRegex.test(stop.dropTime)) {
+        message.error(`Invalid drop time for stop "${stop.stopName || 'Unknown'}". Use HH:mm format.`);
+        return;
+      }
+    }
+
     setSavingRoute(true);
     try {
       const payload = {
@@ -225,6 +253,12 @@ const RouteManagementPage = () => {
                       value={inlineForm[field]}
                       onChange={(e) => setInlineForm((p) => ({ ...p, [field]: e.target.value }))}
                       placeholder={placeholder}
+                      maxLength={field === "conductorPhone" ? 10 : undefined}
+                      onKeyPress={(e) => {
+                        if (field === "conductorPhone" && !/[0-9]/.test(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
                       className="w-full bg-surface-container-high border-none focus:ring-2 focus:ring-primary/20 p-4 rounded-xl text-primary font-medium text-sm outline-none transition-all"
                     />
                   </div>
@@ -316,10 +350,9 @@ const RouteManagementPage = () => {
                     {/* pickup */}
                     <div className="flex-1 min-w-[80px]">
                       <input
-                        type="text"
+                        type="time"
                         value={stop.pickupTime}
                         onChange={(e) => updateStop(idx, "pickupTime", e.target.value)}
-                        placeholder="07:30 AM"
                         className="bg-transparent border-none text-sm font-semibold w-full focus:ring-0 outline-none p-0 text-[#44ddc1]"
                       />
                       <p className="text-[10px] text-on-surface-variant mt-0.5">Pickup</p>
@@ -328,10 +361,9 @@ const RouteManagementPage = () => {
                     {/* drop */}
                     <div className="flex-1 min-w-[80px]">
                       <input
-                        type="text"
+                        type="time"
                         value={stop.dropTime}
                         onChange={(e) => updateStop(idx, "dropTime", e.target.value)}
-                        placeholder="04:15 PM"
                         className="bg-transparent border-none text-sm font-semibold w-full focus:ring-0 outline-none p-0"
                       />
                       <p className="text-[10px] text-on-surface-variant mt-0.5">Drop</p>
@@ -577,8 +609,8 @@ const RouteManagementPage = () => {
                           <p className="text-sm font-bold text-primary truncate">{stop.stopName}</p>
                           <p className="text-[10px] text-on-surface-variant">
                             {stop.distanceKm != null ? `${stop.distanceKm} km` : ""}
-                            {stop.pickupTime ? ` · ↑ ${stop.pickupTime}` : ""}
-                            {stop.dropTime ? ` · ↓ ${stop.dropTime}` : ""}
+                            {stop.pickupTime ? ` · ↑ ${formatTime(stop.pickupTime)}` : ""}
+                            {stop.dropTime ? ` · ↓ ${formatTime(stop.dropTime)}` : ""}
                             {stop.fee ? ` · ₹${stop.fee}` : ""}
                           </p>
                         </div>

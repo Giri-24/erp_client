@@ -56,6 +56,11 @@ export const assignStudentTransport = async (data) => {
   return res.data;
 };
 
+export const bulkAssignTransport = async (data) => {
+  const res = await axios.post('/transport/bulk-assign', data);
+  return res.data;
+};
+
 export const getStudentTransport = async (studentId) => {
   const res = await axios.get(`/transport/student/${studentId}`);
   return res.data;

@@ -355,9 +355,14 @@ const StaffManagementPage = () => {
     }
     try {
       await unlinkChildFromStaff(studentId);
-      message.success("Child unlinked");
-      fetchStaff();
-      if (linkModal) fetchStudents(linkStaffId);
+      message.success("Child unlinked successfully");
+      await fetchStaff();
+      
+      // If we are looking at this staff in details, refresh that too
+      if (detailStaff?.id) {
+        const updated = (await getAllStaff()).find(s => s.id === detailStaff.id);
+        if (updated) setDetailStaff(updated);
+      }
     } catch {
       message.error("Failed to unlink");
     }

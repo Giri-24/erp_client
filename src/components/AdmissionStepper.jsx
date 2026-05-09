@@ -31,6 +31,7 @@ import {
   DownloadOutlined,
   PlusOutlined,
   MinusCircleOutlined,
+  EnvironmentOutlined,
 } from "@ant-design/icons";
 
 import jsPDF from "jspdf";
@@ -42,6 +43,12 @@ import { getAcademicYears } from "../modules/fees/fees.service";
 import { getAdminSettings } from "../modules/settings/settings.service";
 import dayjs from "dayjs";
 const { Title, Text } = Typography;
+
+const isPreschool = (standard) => {
+  if (!standard) return false;
+  const s = String(standard).toUpperCase().trim();
+  return s === "LKG" || s === "UKG" || s.includes("PRE") || s.includes("KINDERGARTEN");
+};
 
 // --- Premium Scholar Obsidian Styles ---
 const scholarStyles = `
@@ -367,6 +374,46 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
     message.config({ duration: 4 });
   }, []);
 
+  const syncFormData = () => {
+    const values = form.getFieldsValue(true);
+    setFormData(values);
+    return values;
+  };
+
+  const goToStep = async (targetStep) => {
+    if (targetStep < 0 || targetStep >= steps.length || targetStep === current) {
+      return;
+    }
+
+    if (targetStep > current) {
+      try {
+        const currentFields = steps[current].fields || [];
+        if (currentFields.length > 0) {
+          await form.validateFields(currentFields);
+        } else {
+          // If no fields defined, validate everything as a fallback
+          await form.validateFields();
+        }
+      } catch (err) {
+        const errorFields = err?.errorFields?.map(f => f.errors?.[0]).filter(Boolean).join(", ");
+        message.error(`Please check these fields: ${errorFields || "Required data missing"}`, 5);
+        return;
+      }
+    }
+
+    syncFormData();
+    setCurrent(targetStep);
+    scrollToTop();
+  };
+
+  const next = () => goToStep(current + 1);
+
+  const prev = () => {
+    syncFormData();
+    setCurrent(current - 1);
+    scrollToTop();
+  };
+
   useEffect(() => {
     const loadAcademicYears = async () => {
       try {
@@ -392,6 +439,10 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
   async function generatePDF() {
     try {
+      syncFormData();
+      // Wait a tick for formData to propagate to DOM
+      await new Promise(r => setTimeout(r, 100));
+
       const pageOne = document.getElementById("pdfPage1");
       const pageTwo = document.getElementById("pdfPage2");
       if (!pageOne || !pageTwo) return;
@@ -483,13 +534,13 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
     const values = form.getFieldsValue(true);
     const studentName = values.name || "Unnamed_Student";
     const draftKey = `admission_draft_${studentName.replace(/\s+/g, '_')}`;
-    
+
     const draft = {
       values,
       step: current,
       timestamp: new Date().toISOString()
     };
-    
+
     localStorage.setItem(draftKey, JSON.stringify(draft));
     // Also update a 'recent drafts' list for the dashboard if needed
     localStorage.setItem("admission_draft", JSON.stringify(draft)); // Keep last for quick restore
@@ -873,6 +924,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
   const boardExamType = Form.useWatch("boardExamType", form);
   const selectedState = Form.useWatch("state", form);
   const selectedAcademicStream = Form.useWatch("academicStream", form);
+  const isHigherSecondary = watchedStandard === '11' || watchedStandard === '12' || watchedStandard === '11th' || watchedStandard === '12th';
   const siblingReviewItems = (() => {
     const configuredCount = Number(formData?.siblingsCount) || 0;
     const discoveredCount = Object.keys(formData || {}).reduce((max, key) => {
@@ -961,7 +1013,6 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       });
     }
   }, [watchedSubjects]);
-  const isHigherSecondary = watchedStandard === '11' || watchedStandard === '12';
 
 
 
@@ -991,7 +1042,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
 
   const watchedGuardianRelation = Form.useWatch("guardianRelation", form);
-  
+
   useEffect(() => {
     if (isSingleParent && (watchedGuardianRelation === "father" || watchedGuardianRelation === "mother")) {
       const relation = watchedGuardianRelation === "father" ? "father" : "mother";
@@ -1000,7 +1051,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
       const whatsapp = form.getFieldValue(`${relation}WhatsAppNo`);
       const aadhar = form.getFieldValue(`${relation}AadharNo`);
       const occupation = form.getFieldValue(`${relation}Occupation`);
-      
+
       form.setFieldsValue({
         guardianName: name,
         guardianPhone: phone,
@@ -1061,7 +1112,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
     {
       title: "Student",
       icon: <UserOutlined />,
-      fields: ["name", "gender", "dob", "community", "standard"],
+      fields: ["admissionDate", "name", "standard", "section", "gender", "dob", "religion", "community", "caste", "motherTongue"],
       content: (
         <div className="space-y-6">
           <div className="mb-4">
@@ -1148,7 +1199,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
             </Col>
 
             {/* Academic Stream - visible only for 11th & 12th */}
-            {(watchedStandard === "11" || watchedStandard === "12" || watchedStandard === "11th" || watchedStandard === "12th") && (
+            {isHigherSecondary && (
               <>
                 <Col span={12}>
                   <Form.Item name="academicStream" label="Academic Stream">
@@ -1274,7 +1325,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
     {
       title: "Family",
       icon: <TeamOutlined />,
-      fields: [],
+      fields: ["fatherName", "fatherPhone", "motherName", "motherPhone", "guardianName", "guardianPhone", "guardianRelation"],
       content: (
         <div className="space-y-6">
           <div className="mb-4">
@@ -1302,9 +1353,9 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
               <Form.Item label="Father WhatsApp">
                 <Space.Compact style={{ width: '100%' }}>
-                  <Form.Item 
-                    name="fatherWhatsAppNo" 
-                    noStyle 
+                  <Form.Item
+                    name="fatherWhatsAppNo"
+                    noStyle
                     rules={[{ pattern: /^\d{10}$/, message: 'Must be 10 digits' }]}
                   >
                     <Input maxLength={10} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'father'} style={{ width: 'calc(100% - 120px)' }} />
@@ -1342,9 +1393,9 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
               <Form.Item label="Mother WhatsApp">
                 <Space.Compact style={{ width: '100%' }}>
-                  <Form.Item 
-                    name="motherWhatsAppNo" 
-                    noStyle 
+                  <Form.Item
+                    name="motherWhatsAppNo"
+                    noStyle
                     rules={[{ pattern: /^\d{10}$/, message: 'Must be 10 digits' }]}
                   >
                     <Input maxLength={10} disabled={isSingleParent && form.getFieldValue('guardianRelation') !== 'mother'} style={{ width: 'calc(100% - 120px)' }} />
@@ -1399,12 +1450,12 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item 
-                    name="guardianName" 
-                    label="Guardian Name" 
-                    rules={[{ 
-                      required: watchedGuardianRelation !== "father" && watchedGuardianRelation !== "mother", 
-                      message: 'Enter guardian name' 
+                  <Form.Item
+                    name="guardianName"
+                    label="Guardian Name"
+                    rules={[{
+                      required: watchedGuardianRelation !== "father" && watchedGuardianRelation !== "mother",
+                      message: 'Enter guardian name'
                     }]}
                   >
                     <Input disabled={watchedGuardianRelation === "father" || watchedGuardianRelation === "mother"} />
@@ -1419,9 +1470,9 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                 <Col span={8}>
                   <Form.Item label="Guardian WhatsApp">
                     <Space.Compact style={{ width: '100%' }}>
-                      <Form.Item 
-                        name="guardianWhatsapp" 
-                        noStyle 
+                      <Form.Item
+                        name="guardianWhatsapp"
+                        noStyle
                         rules={[{ pattern: /^\d{10}$/, message: 'Must be 10 digits' }]}
                       >
                         <Input maxLength={10} style={{ width: 'calc(100% - 120px)' }} />
@@ -1637,8 +1688,8 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
     // 🔥 ADDRESS
     {
       title: "Address",
-      icon: <HomeOutlined />,
-      fields: [],
+      icon: <EnvironmentOutlined />,
+      fields: ["line1", "city", "state", "pin"],
       content: (
         <div className="space-y-6">
           <div className="mb-4">
@@ -1700,273 +1751,273 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
     {
       title: "Academic",
       icon: <BookOutlined />,
-      fields: [],
+      fields: ["examName", "totalPercentage"],
       content: (
         <div className="space-y-6">
           <div className="mb-4">
             <p className="pb-2 text-sm border-b text-on-surface-variant border-outline-variant">Details of qualifying examinations and subject-wise performance.</p>
           </div>
           <>
-            {(() => {
-              const std = form.getFieldValue("standard");
-              return !std || (std !== "LKG" && std !== "UKG");
-            })() ? (
+            {!isPreschool(watchedStandard) ? (
               <>
                 {/* ── Qualifying Exam header ── */}
                 <Divider titlePlacement="left">Qualifying Examination Passed and Percentage of Mark Obtained</Divider>
-            <Row gutter={16}>
-              <Col span={6}>
-                <Form.Item name="examName" label="Name of Examination" >
-                  <Select placeholder="10th/11th/Entrance" allowClear={false}>
-                    <Select.Option value="10th">10th</Select.Option>
-                    <Select.Option value="11th">11th</Select.Option>
-                    <Select.Option value="Entrance">Entrance</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item name="boardExamType" label="Board" initialValue="State Board">
-                  <Select>
-                    <Select.Option value="State Board">State Board</Select.Option>
-                    <Select.Option value="Other">Other</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              {boardExamType === "Other" && (
-                <Col span={6}>
-                  <Form.Item name="boardName" label="Board Name" >
-                    <Input placeholder="e.g. CBSE, ICSE" />
-                  </Form.Item>
-                </Col>
-              )}
-              <Col span={6}>
-                <Form.Item name="monthYear" label="Date of Appearance">
-                  <Input placeholder="March 2025 or 01/03/25" />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item name="registerNo" label="Register No">
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="academicStream" label="Academic Stream / Group">
-                  <Select
-                    placeholder="Select group"
-                    allowClear
-                    options={[
-                      ...academicStreams.map(s => ({ value: s.name, label: s.label })),
-                      { value: "OTHER", label: "Other (Add New)" },
-                    ]}
-                  />
-                </Form.Item>
-              </Col>
-
-              {selectedAcademicStream === "OTHER" && (
-                <Col span={12}>
-                  <Form.Item name="academicStreamCustom" label="Specify Custom Stream" rules={[requiredRule]}>
-                    <Input
-                      autoFocus
-                      placeholder="Type custom stream/course here"
-                      suffix={
-                        <Button
-                          type="primary"
-                          size="small"
-                          loading={isAddingStream}
-                          onClick={handleAddNewStream}
-                          icon={<PlusOutlined />}
-                        >
-                          Add
-                        </Button>
-                      }
-                    />
-                  </Form.Item>
-                </Col>
-              )}
-            </Row>
-
-            {/* ── Per-subject marks table ── */}
-            <Card
-              size="small"
-              title="Subject-wise Marks"
-              extra={<span style={{ color: '#888', fontSize: 12 }}>Totals are auto-calculated from rows</span>}
-              style={{ marginBottom: 16 }}
-            >
-              <Form.List name="subjects" initialValue={[{ subjectName: '', maxMarks: null, obtainedMarks: null }]}>
-                {(fields, { add, remove }) => (
-                  <>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
-                      <thead>
-                        <tr style={{ background: '#fafafa' }}>
-                          <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'left' }}>Subject</th>
-                          <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center', width: 140 }}>Maximum Marks Prescribed</th>
-                          <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center', width: 140 }}>Marks Obtained</th>
-                          <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center', width: 100 }}>% in Subject</th>
-                          <th style={{ border: '1px solid #d9d9d9', padding: '8px', width: 40 }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {fields.map(({ key, name }) => {
-                          const s = watchedSubjects[name] || {};
-                          const pct =
-                            Number(s.maxMarks) > 0 && s.obtainedMarks != null
-                              ? ((Number(s.obtainedMarks) / Number(s.maxMarks)) * 100).toFixed(1)
-                              : '-';
-                          return (
-                            <tr key={key}>
-                              <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px' }}>
-                                <Form.Item name={[name, 'subjectName']} rules={[requiredRule]} noStyle>
-                                  <Input placeholder="Subject name" />
-                                </Form.Item>
-                              </td>
-                              <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px' }}>
-                                <Form.Item name={[name, 'maxMarks']} rules={[requiredRule]} noStyle>
-                                  <InputNumber min={0} max={999} style={{ width: '100%' }} placeholder="Max" />
-                                </Form.Item>
-                              </td>
-                              <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px' }}>
-                                <Form.Item name={[name, 'obtainedMarks']} rules={[requiredRule]} noStyle>
-                                  <InputNumber min={0} max={999} style={{ width: '100%' }} placeholder="Obtained" />
-                                </Form.Item>
-                              </td>
-                              <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>
-                                {pct !== '-' ? `${pct}%` : '-'}
-                              </td>
-                              <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px', textAlign: 'center' }}>
-                                <MinusCircleOutlined
-                                  style={{ color: '#ff4d4f', cursor: 'pointer' }}
-                                  onClick={() => remove(name)}
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {/* TOTAL row */}
-                        {(() => {
-                          const totalMax = watchedSubjects.reduce((sum, s) => sum + (Number(s?.maxMarks) || 0), 0);
-                          const totalObtained = watchedSubjects.reduce((sum, s) => sum + (Number(s?.obtainedMarks) || 0), 0);
-                          const totalPct = totalMax > 0 ? ((totalObtained / totalMax) * 100).toFixed(1) : '-';
-                          return (
-                            <tr style={{ background: '#f0f5ff', fontWeight: 700 }}>
-                              <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'right' }}>TOTAL</td>
-                              <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center' }}>{totalMax || '-'}</td>
-                              <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center' }}>{totalObtained || '-'}</td>
-                              <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center' }}>
-                                {totalPct !== '-' ? `${totalPct}%` : '-'}
-                              </td>
-                              <td style={{ border: '1px solid #d9d9d9' }}></td>
-                            </tr>
-                          );
-                        })()}
-                      </tbody>
-                    </table>
-                    <Button
-                      type="dashed"
-                      onClick={() => add({ subjectName: '', maxMarks: null, obtainedMarks: null })}
-                      icon={<PlusOutlined />}
-                      style={{ width: '100%' }}
-                    >
-                      Add Subject
-                    </Button>
-                  </>
-                )}
-              </Form.List>
-            </Card>
-
-            {/* Overall % — can be left blank for auto-calculation on the backend */}
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item name="totalPercentage" label="Overall % (leave blank to auto-calculate)">
-                  <InputNumber min={0} max={100} step={0.01} style={{ width: '100%' }} placeholder="e.g. 87.50" />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            {/* ── Higher Secondary stream selector (11th / 12th only) ── */}
-            {isHigherSecondary && (
-              <>
-                <Divider orientation="left">Higher Secondary — Subjects Offered (Part III)</Divider>
                 <Row gutter={16}>
-                  <Col span={14}>
-                    <Form.Item name="academicStream" label="Academic Stream / Group" rules={[requiredRule]}>
-                      <Select placeholder="Select stream">
-                        <Select.Option value="BIO_MATHS">Physics, Chemistry, Biology, Mathematics</Select.Option>
-                        <Select.Option value="CS_MATHS">Physics, Chemistry, Computer Science, Mathematics</Select.Option>
-                        <Select.Option value="BIO_CS">Physics, Chemistry, Biology, Computer Science</Select.Option>
-                        <Select.Option value="COMMERCE">Commerce, Economics, Accountancy, Computer Application</Select.Option>
-                        <Select.Option value="HUMANITIES">History, Geography, Political Science, Economics</Select.Option>
-                        <Select.Option value="OTHER">Other</Select.Option>
+                  <Col span={6}>
+                    <Form.Item name="examName" label="Name of Examination" >
+                      <Select placeholder="Select/Type exam" showSearch allowClear={false}>
+                        <Select.Option value="10th">10th Standard</Select.Option>
+                        <Select.Option value="11th">11th Standard</Select.Option>
+                        <Select.Option value="Entrance">Entrance Exam</Select.Option>
+                        <Select.Option value="Previous">Previous Class</Select.Option>
                       </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={6}>
+                    <Form.Item name="boardExamType" label="Board" initialValue="State Board">
+                      <Select>
+                        <Select.Option value="State Board">State Board</Select.Option>
+                        <Select.Option value="Other">Other</Select.Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  {boardExamType === "Other" && (
+                    <Col span={6}>
+                      <Form.Item name="boardName" label="Board Name" >
+                        <Input placeholder="e.g. CBSE, ICSE" />
+                      </Form.Item>
+                    </Col>
+                  )}
+                  <Col span={6}>
+                    <Form.Item name="monthYear" label="Date of Appearance">
+                      <Input placeholder="March 2025 or 01/03/25" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={6}>
+                    <Form.Item name="registerNo" label="Register No">
+                      <Input />
                     </Form.Item>
                   </Col>
 
                   {selectedAcademicStream === "OTHER" && (
-                    <Col span={10}>
+                    <Col span={12}>
                       <Form.Item name="academicStreamCustom" label="Specify Custom Stream" rules={[requiredRule]}>
-                        <Input autoFocus placeholder="Type custom stream/course here" />
+                        <Input
+                          autoFocus
+                          placeholder="Type custom stream/course here"
+                          suffix={
+                            <Button
+                              type="primary"
+                              size="small"
+                              loading={isAddingStream}
+                              onClick={handleAddNewStream}
+                              icon={<PlusOutlined />}
+                            >
+                              Add
+                            </Button>
+                          }
+                        />
                       </Form.Item>
                     </Col>
                   )}
                 </Row>
-                <Card size="small" title="Subjects Offered" style={{ marginBottom: 16 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: '#f5f5f5' }}>
-                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>Academic Stream</th>
-                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>Part</th>
-                        <th style={{ border: '1px solid #ddd', padding: '8px' }}>Subject</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td rowSpan={3} style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>
-                          {form.getFieldValue('academicStream') === 'BIO_MATHS' && 'Physics, Chemistry, Biology, Mathematics'}
-                          {form.getFieldValue('academicStream') === 'CS_MATHS' && 'Physics, Chemistry, Computer Science, Mathematics'}
-                          {form.getFieldValue('academicStream') === 'BIO_CS' && 'Physics, Chemistry, Biology, Computer Science'}
-                          {form.getFieldValue('academicStream') === 'HUMANITIES' && 'History, Geography, Political Science, Economics'}
-                          {form.getFieldValue('academicStream') === 'OTHER' && (form.getFieldValue('academicStreamCustom') || 'Other')}
-                          {form.getFieldValue('academicStream') === 'COMMERCE' && 'Commerce, Economics, Accountancy, Computer Application'}
-                          {!form.getFieldValue('academicStream') && <em>—</em>}
-                        </td>
-                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>Part I (Compulsory)</td>
-                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>Tamil</td>
-                      </tr>
-                      <tr>
-                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>Part II (Compulsory)</td>
-                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>English</td>
-                      </tr>
-                      <tr>
-                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>Part III (Choose)</td>
-                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                          {form.getFieldValue('academicStream') === 'BIO_MATHS' && 'Physics, Chemistry, Biology, Mathematics'}
-                          {form.getFieldValue('academicStream') === 'CS_MATHS' && 'Physics, Chemistry, Computer Science, Mathematics'}
-                          {form.getFieldValue('academicStream') === 'BIO_CS' && 'Physics, Chemistry, Biology, Computer Science'}
-                          {form.getFieldValue('academicStream') === 'COMMERCE' && 'Commerce, Economics, Accountancy, Computer Application'}
-                          {form.getFieldValue('academicStream') === 'HUMANITIES' && 'History, Geography, Political Science, Economics'}
-                          {form.getFieldValue('academicStream') === 'OTHER' && (form.getFieldValue('academicStreamCustom') || 'Other')}
-                          {!form.getFieldValue('academicStream') && <em>Select a stream above</em>}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+
+                {/* ── Per-subject marks table ── */}
+                <Card
+                  size="small"
+                  title="Subject-wise Marks"
+                  extra={<span style={{ color: '#888', fontSize: 12 }}>Totals are auto-calculated from rows</span>}
+                  style={{ marginBottom: 16 }}
+                >
+                  <Form.List name="subjects" initialValue={[{ subjectName: '', maxMarks: null, obtainedMarks: null }]}>
+                    {(fields, { add, remove }) => (
+                      <>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+                          <thead>
+                            <tr style={{ background: '#fafafa' }}>
+                              <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'left' }}>Subject</th>
+                              <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center', width: 140 }}>Maximum Marks Prescribed</th>
+                              <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center', width: 140 }}>Marks Obtained</th>
+                              <th style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center', width: 100 }}>% in Subject</th>
+                              <th style={{ border: '1px solid #d9d9d9', padding: '8px', width: 40 }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {fields.map(({ key, name }) => {
+                              const s = watchedSubjects[name] || {};
+                              const pct =
+                                Number(s.maxMarks) > 0 && s.obtainedMarks != null
+                                  ? ((Number(s.obtainedMarks) / Number(s.maxMarks)) * 100).toFixed(1)
+                                  : '-';
+                              return (
+                                <tr key={key}>
+                                  <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px' }}>
+                                    <Form.Item name={[name, 'subjectName']} rules={[requiredRule]} noStyle>
+                                      <Input placeholder="Subject name" />
+                                    </Form.Item>
+                                  </td>
+                                  <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px' }}>
+                                    <Form.Item name={[name, 'maxMarks']} rules={[requiredRule]} noStyle>
+                                      <InputNumber min={0} max={999} style={{ width: '100%' }} placeholder="Max" />
+                                    </Form.Item>
+                                  </td>
+                                  <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px' }}>
+                                    <Form.Item name={[name, 'obtainedMarks']} rules={[requiredRule]} noStyle>
+                                      <InputNumber min={0} max={999} style={{ width: '100%' }} placeholder="Obtained" />
+                                    </Form.Item>
+                                  </td>
+                                  <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px', textAlign: 'center', fontWeight: 500 }}>
+                                    {pct !== '-' ? `${pct}%` : '-'}
+                                  </td>
+                                  <td style={{ border: '1px solid #d9d9d9', padding: '4px 8px', textAlign: 'center' }}>
+                                    <MinusCircleOutlined
+                                      style={{ color: '#ff4d4f', cursor: 'pointer' }}
+                                      onClick={() => remove(name)}
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                            {/* TOTAL row */}
+                            {(() => {
+                              const totalMax = watchedSubjects.reduce((sum, s) => sum + (Number(s?.maxMarks) || 0), 0);
+                              const totalObtained = watchedSubjects.reduce((sum, s) => sum + (Number(s?.obtainedMarks) || 0), 0);
+                              const totalPct = totalMax > 0 ? ((totalObtained / totalMax) * 100).toFixed(1) : '-';
+                              return (
+                                <tr style={{ background: '#f0f5ff', fontWeight: 700 }}>
+                                  <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'right' }}>TOTAL</td>
+                                  <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center' }}>{totalMax || '-'}</td>
+                                  <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center' }}>{totalObtained || '-'}</td>
+                                  <td style={{ border: '1px solid #d9d9d9', padding: '8px', textAlign: 'center' }}>
+                                    {totalPct !== '-' ? `${totalPct}%` : '-'}
+                                  </td>
+                                  <td style={{ border: '1px solid #d9d9d9' }}></td>
+                                </tr>
+                              );
+                            })()}
+                          </tbody>
+                        </table>
+                        <Button
+                          type="dashed"
+                          onClick={() => add({ subjectName: '', maxMarks: null, obtainedMarks: null })}
+                          icon={<PlusOutlined />}
+                          style={{ width: '100%' }}
+                        >
+                          Add Subject
+                        </Button>
+                      </>
+                    )}
+                  </Form.List>
                 </Card>
+
+                {/* Overall % — can be left blank for auto-calculation on the backend */}
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Form.Item name="totalPercentage" label="Overall % (leave blank to auto-calculate)">
+                      <InputNumber min={0} max={100} step={0.01} style={{ width: '100%' }} placeholder="e.g. 87.50" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+
+                {/* ── Higher Secondary stream selector (11th / 12th only) ── */}
+                {isHigherSecondary && (
+                  <>
+                    <Divider orientation="left">Higher Secondary — Subjects Offered (Part III)</Divider>
+                    <Row gutter={16}>
+                      <Col span={14}>
+                        <Form.Item name="academicStream" label="Academic Stream / Group" rules={[requiredRule]}>
+                          <Select placeholder="Select stream">
+                            <Select.Option value="BIO_MATHS">Physics, Chemistry, Biology, Mathematics</Select.Option>
+                            <Select.Option value="CS_MATHS">Physics, Chemistry, Computer Science, Mathematics</Select.Option>
+                            <Select.Option value="BIO_CS">Physics, Chemistry, Biology, Computer Science</Select.Option>
+                            <Select.Option value="COMMERCE">Commerce, Economics, Accountancy, Computer Application</Select.Option>
+                            <Select.Option value="HUMANITIES">History, Geography, Political Science, Economics</Select.Option>
+                            <Select.Option value="OTHER">Other</Select.Option>
+                          </Select>
+                        </Form.Item>
+                      </Col>
+
+                      {selectedAcademicStream === "OTHER" && (
+                        <Col span={10}>
+                          <Form.Item name="academicStreamCustom" label="Specify Custom Stream" rules={[requiredRule]}>
+                            <Input
+                              autoFocus
+                              placeholder="Type custom stream/course here"
+                              suffix={
+                                <Button
+                                  type="primary"
+                                  size="small"
+                                  loading={isAddingStream}
+                                  onClick={handleAddNewStream}
+                                  icon={<PlusOutlined />}
+                                >
+                                  Add
+                                </Button>
+                              }
+                            />
+                          </Form.Item>
+                        </Col>
+                      )}
+                    </Row>
+                    <Card size="small" title="Subjects Offered" style={{ marginBottom: 16 }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: '#f5f5f5' }}>
+                            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Academic Stream</th>
+                            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Part</th>
+                            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Subject</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td rowSpan={3} style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'center' }}>
+                              {form.getFieldValue('academicStream') === 'BIO_MATHS' && 'Physics, Chemistry, Biology, Mathematics'}
+                              {form.getFieldValue('academicStream') === 'CS_MATHS' && 'Physics, Chemistry, Computer Science, Mathematics'}
+                              {form.getFieldValue('academicStream') === 'BIO_CS' && 'Physics, Chemistry, Biology, Computer Science'}
+                              {form.getFieldValue('academicStream') === 'HUMANITIES' && 'History, Geography, Political Science, Economics'}
+                              {form.getFieldValue('academicStream') === 'OTHER' && (form.getFieldValue('academicStreamCustom') || 'Other')}
+                              {form.getFieldValue('academicStream') === 'COMMERCE' && 'Commerce, Economics, Accountancy, Computer Application'}
+                              {!form.getFieldValue('academicStream') && <em>—</em>}
+                            </td>
+                            <td style={{ border: '1px solid #ddd', padding: '8px' }}>Part I (Compulsory)</td>
+                            <td style={{ border: '1px solid #ddd', padding: '8px' }}>Tamil</td>
+                          </tr>
+                          <tr>
+                            <td style={{ border: '1px solid #ddd', padding: '8px' }}>Part II (Compulsory)</td>
+                            <td style={{ border: '1px solid #ddd', padding: '8px' }}>English</td>
+                          </tr>
+                          <tr>
+                            <td style={{ border: '1px solid #ddd', padding: '8px' }}>Part III (Choose)</td>
+                            <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                              {form.getFieldValue('academicStream') === 'BIO_MATHS' && 'Physics, Chemistry, Biology, Mathematics'}
+                              {form.getFieldValue('academicStream') === 'CS_MATHS' && 'Physics, Chemistry, Computer Science, Mathematics'}
+                              {form.getFieldValue('academicStream') === 'BIO_CS' && 'Physics, Chemistry, Biology, Computer Science'}
+                              {form.getFieldValue('academicStream') === 'COMMERCE' && 'Commerce, Economics, Accountancy, Computer Application'}
+                              {form.getFieldValue('academicStream') === 'HUMANITIES' && 'History, Geography, Political Science, Economics'}
+                              {form.getFieldValue('academicStream') === 'OTHER' && (form.getFieldValue('academicStreamCustom') || 'Other')}
+                              {!form.getFieldValue('academicStream') && <em>Select a stream above</em>}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </Card>
+                  </>
+                )}
               </>
+            ) : (
+              <div className="py-12 flex flex-col items-center justify-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4">
+                  <span className="text-3xl material-symbols-outlined text-slate-300">history_edu</span>
+                </div>
+                <h4 className="text-slate-900 font-bold">Academic History Not Required</h4>
+                <p className="text-slate-500 text-sm mt-1">Previous performance data is not applicable for {watchedStandard} admissions.</p>
+                <div className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-teal-600 bg-teal-50 px-4 py-2 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-pulse"></span>
+                  Safe to skip
+                </div>
+              </div>
             )}
           </>
-        ) : (
-          <div className="py-12 flex flex-col items-center justify-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-            <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4">
-              <span className="text-3xl material-symbols-outlined text-slate-300">history_edu</span>
-            </div>
-            <h4 className="text-slate-900 font-bold">Academic History Not Required</h4>
-            <p className="text-slate-500 text-sm mt-1">Previous performance data is not applicable for {watchedStandard} admissions.</p>
-            <div className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-teal-600 bg-teal-50 px-4 py-2 rounded-full">
-              <span className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-pulse"></span>
-              Safe to skip
-            </div>
-          </div>
-        )}
-      </>
         </div>
       ),
     },
@@ -2434,39 +2485,6 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
     }
   ];
 
-  const syncFormData = () => {
-    const values = form.getFieldsValue(true);
-    setFormData(values);
-    return values;
-  };
-
-  const goToStep = async (targetStep) => {
-    if (targetStep < 0 || targetStep >= steps.length || targetStep === current) {
-      return;
-    }
-
-    if (targetStep > current) {
-      try {
-        await form.validateFields();
-      } catch (err) {
-        const errorFields = err?.errorFields?.map(f => f.errors?.[0]).filter(Boolean).join(", ");
-        message.error(`Please check these fields: ${errorFields || "Required data missing"}`, 5);
-        return;
-      }
-    }
-
-    syncFormData();
-    setCurrent(targetStep);
-    scrollToTop();
-  };
-
-  const next = () => goToStep(current + 1);
-
-  const prev = () => {
-    syncFormData();
-    setCurrent(current - 1);
-    scrollToTop();
-  };
   const getImageDimensions = (src) =>
     new Promise((resolve) => {
       const img = new Image();
@@ -2610,9 +2628,16 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
     signatureSection: {
       display: "flex",
       justifyContent: "space-between",
-      marginTop: "auto",
-      paddingTop: "20px",
-      paddingBottom: "40px",
+      marginTop: "20px",
+      paddingTop: "10px",
+      paddingBottom: "10px",
+    },
+    signatureSection: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-end",
+      marginTop: "30px",
+      padding: "0 10px",
     },
     sigBlock: {
       textAlign: "center",
@@ -2790,19 +2815,19 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                         // Build the documents array
                         const documents = [];
                         const hardCopyDocs = values.hardCopyDocs || [];
-                        
+
                         // Profile photo
-                        documents.push({ 
-                          key: "photo", 
+                        documents.push({
+                          key: "photo",
                           uploaded: !!values.profilePhoto?.[0],
-                          photoPath: "" 
+                          photoPath: ""
                         });
 
                         const ALL_DOC_KEYS = ["birthCert", "communityCert", "aadharStudent", "transferCert", "entranceExam", "aadharFather", "aadharMother"];
                         ALL_DOC_KEYS.forEach(docKey => {
                           const hasFile = !!values[`${docKey}File`]?.[0];
                           const isHardCopy = hardCopyDocs.includes(docKey);
-                          
+
                           documents.push({
                             key: docKey,
                             uploaded: hasFile,
@@ -3097,29 +3122,29 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
           <div style={{ marginBottom: "12px" }}>
             <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "6px", marginBottom: "8px" }}>1. Student & Parental Profiles</h3>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 20px" }}>
-                {[
-                  ["Student Name", formData.name],
-                  ["Standard", formData.standard ? `STD ${formData.standard}` : "-"],
-                  ["Section", formData.section || "A"],
-                  ["Date of Birth", formData.dob?.format?.("DD MMM YYYY") || "-"],
-                  ["Gender", formData.gender],
-                  ["Academic Stream", getReadableStream(formData.academicStream, formData.academicStreamCustom, academicStreams)],
-                  ["Father's Name", formData.fatherName],
-                  ["Father's Phone", formData.fatherPhone],
-                  ["Father's Aadhar", formData.fatherAadharNo],
-                  ["Mother's Name", formData.motherName],
-                  ["Mother's Phone", formData.motherPhone],
-                  ["Mother's Aadhar", formData.motherAadharNo],
-                  ["Transport Mode", formData.transportMode || "Self"],
-                  ["RTE Applied", formData.rteApplied ? "YES" : "NO"],
-                ].map(([l, v], i) => (
-                  <div key={i} style={styles.fieldRow}>
-                    <span style={styles.fieldLabel}>{l}</span>
-                    <span style={styles.fieldValue}>{v || "-"}</span>
-                  </div>
-                ))}
-              </div>
+              {[
+                ["Student Name", formData.name],
+                ["Standard", formData.standard ? `STD ${formData.standard}` : "-"],
+                ["Section", formData.section || "A"],
+                ["Date of Birth", formData.dob?.format?.("DD MMM YYYY") || "-"],
+                ["Gender", formData.gender],
+                ["Academic Stream", getReadableStream(formData.academicStream, formData.academicStreamCustom, academicStreams)],
+                ["Father's Name", formData.fatherName],
+                ["Father's Phone", formData.fatherPhone],
+                ["Father's Aadhar", formData.fatherAadharNo],
+                ["Mother's Name", formData.motherName],
+                ["Mother's Phone", formData.motherPhone],
+                ["Mother's Aadhar", formData.motherAadharNo],
+                ["Transport Mode", formData.transportMode || "Self"],
+                ["RTE Applied", formData.rteApplied ? "YES" : "NO"],
+              ].map(([l, v], i) => (
+                <div key={i} style={styles.fieldRow}>
+                  <span style={styles.fieldLabel}>{l}</span>
+                  <span style={styles.fieldValue}>{v || "-"}</span>
+                </div>
+              ))}
             </div>
+          </div>
 
           <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "6px", marginBottom: "8px" }}>2. Residential & Contact Info</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "12px" }}>
@@ -3137,7 +3162,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
             </div>
           </div>
 
-          {formData.standard !== "LKG" && formData.standard !== "UKG" && (
+          {!isPreschool(formData.standard) && (
             <>
               <div style={{ marginTop: "4px" }}>
                 <h3 style={{ ...styles.sectionTitle, color: "#0d9488", borderBottom: "1px solid #ccfbf1", paddingBottom: "6px", marginBottom: "8px" }}>3. Academic & Institutional Information</h3>
@@ -3227,21 +3252,34 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
 
           <div style={{ flex: 1 }} />
 
-          <div style={{ paddingBottom: "20px" }}>
+          <div style={{ paddingTop: "20px" }}>
             <h3 style={styles.sectionTitle}>5. Institutional Declaration</h3>
-            <div style={{ padding: "20px 24px", border: "2px solid #0f172a", borderRadius: "20px", marginBottom: "30px" }}>
-              <p style={{ margin: 0, fontSize: "11px", color: "#475569", lineHeight: "1.8", textAlign: "justify" }}>
+            <div style={{ padding: "16px 20px", border: "1.5px solid #0f172a", borderRadius: "12px", marginBottom: "20px" }}>
+              <p style={{ margin: 0, fontSize: "10px", color: "#475569", lineHeight: "1.6", textAlign: "justify" }}>
                 I hereby declare that all particulars furnished in this admission form are true and correct to the best of my knowledge. I undertake to abide by the rules, regulations, and disciplinary code of conduct established by the institution. I understand that providing false information may result in the immediate cancellation of this admission.
               </p>
             </div>
 
-            <div style={{ ...styles.signatureSection, paddingTop: "10px", paddingBottom: "20px" }}>
+            <div style={{ ...styles.signatureSection }}>
               <div style={{ ...styles.sigBlock, width: "200px", textAlign: "left" }}>
-                <div style={{ height: "50px" }} />
+                <div style={{ height: "40px" }} />
                 <p style={{ ...styles.sigLine, textAlign: "left" }}>Parent / Guardian Signature</p>
               </div>
+
+              {normalizeAssetSrc(documentAssets.rubberStamp) && (
+                <div style={{ textAlign: "center" }}>
+                  <img
+                    src={normalizeAssetSrc(documentAssets.rubberStamp)}
+                    alt="Seal"
+                    crossOrigin="anonymous"
+                    style={{ width: '60px', height: '60px', objectFit: 'contain', opacity: 0.8 }}
+                  />
+                  <p style={{ margin: "2px 0 0", fontSize: "8px", fontWeight: "800", color: "#64748b", textTransform: "uppercase" }}>Seal</p>
+                </div>
+              )}
+
               <div style={{ ...styles.sigBlock, width: "200px", textAlign: "right" }}>
-                <div style={{ height: "50px", display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
+                <div style={{ height: "40px", display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
                   {normalizeAssetSrc(documentAssets.principalSignature) && (
                     <img
                       src={normalizeAssetSrc(documentAssets.principalSignature)}
@@ -3255,22 +3293,10 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
               </div>
             </div>
 
-            {normalizeAssetSrc(documentAssets.rubberStamp) && (
-              <div style={{ textAlign: "center", marginTop: "10px" }}>
-                <img
-                  src={normalizeAssetSrc(documentAssets.rubberStamp)}
-                  alt="Seal"
-                  crossOrigin="anonymous"
-                  style={{ width: '70px', height: '70px', objectFit: 'contain', opacity: 0.8 }}
-                />
-                <p style={{ margin: "4px 0 0", fontSize: "9px", fontWeight: "800", color: "#64748b", textTransform: "uppercase" }}>Institutional Seal</p>
-              </div>
-            )}
-          </div>
-
-          <div style={{ ...styles.footer, marginTop: "0px" }}>
-            <p style={styles.footerText}>System Generated Record • {dayjs().format("DD MMM YYYY, HH:mm")}</p>
-            <p style={{ ...styles.footerText, fontWeight: "800", color: "#0f172a" }}>Page 2 of 2</p>
+            <div style={styles.footer}>
+              <p style={styles.footerText}>System Generated Record • {dayjs().format("DD MMM YYYY, HH:mm")}</p>
+              <p style={{ ...styles.footerText, fontWeight: "800", color: "#0f172a" }}>Page 2 of 2</p>
+            </div>
           </div>
         </div>
       </div>
