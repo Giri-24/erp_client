@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Card,
   Table,
@@ -158,6 +158,8 @@ const PFESIPage = () => {
         department: item.department || item.staff?.department,
         basicSalary: item.basicSalary ?? item.staff?.salary,
         grossSalary: item.grossSalary ?? item.basicSalary ?? item.staff?.salary,
+        pfJoiningDate: item.staff?.pfJoiningDate,
+        joiningDate: item.staff?.joiningDate,
       }));
       setStaffPFESI(normalized);
     } catch {
@@ -312,6 +314,7 @@ const PFESIPage = () => {
       grossSalary: record.grossSalary,
       isStipend: record.isStipend || false,
       dailyRate: record.dailyRate,
+      pfJoiningDate: record.pfJoiningDate ? dayjs(record.pfJoiningDate) : null,
     });
     setEditModal(true);
   };
@@ -367,6 +370,7 @@ const PFESIPage = () => {
     { title: "PF No", dataIndex: "pfNumber", render: (v) => v || "-" },
     { title: "UAN", dataIndex: "uanNumber", render: (v) => v || "-" },
     { title: "ESI No", dataIndex: "esiNumber", render: (v) => v || "-" },
+    { title: "PF Joining", dataIndex: "pfJoiningDate", render: (v) => v ? dayjs(v).format("DD MMM YYYY") : "-" },
     {
       title: "Type",
       key: "type",
@@ -843,8 +847,11 @@ const PFESIPage = () => {
             <Form.Item name="isStipend" label="Stipend (No PF)" valuePropName="checked">
               <Switch />
             </Form.Item>
-            <Form.Item name="dailyRate" label="Daily Rate (₹) - Security/Sports">
-              <InputNumber min={0} style={{ width: 180 }} />
+            <Form.Item name="dailyRate" label="Daily Rate (₹)">
+              <InputNumber min={0} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="pfJoiningDate" label="PF Joining Date">
+              <DatePicker style={{ width: '100%' }} />
             </Form.Item>
           </Space>
         </Form>

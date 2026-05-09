@@ -6,6 +6,9 @@ export const DOC_REQUEST_TYPES = [
   { value: 'CONDUCT_CERTIFICATE', label: 'Conduct Certificate' },
   { value: 'STUDY_CERTIFICATE', label: 'Study Certificate' },
   { value: 'FEE_CERTIFICATE', label: 'Fee Certificate' },
+  { value: 'STAFF_RECOGNITION', label: 'Staff Recognition Certificate' },
+  { value: 'STAFF_EXPERIENCE', label: 'Experience Certificate' },
+  { value: 'STAFF_SALARY', label: 'Salary Certificate' },
   { value: 'OTHER', label: 'Other' },
 ];
 

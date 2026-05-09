@@ -874,6 +874,11 @@ const handleDownloadPayslipView = async () => {
       render: (v) => v ? <Tag color="gold">₹{v.toLocaleString()}</Tag> : "-",
     },
     {
+      title: "Extra All.",
+      dataIndex: "extraAllowance",
+      render: (v) => v ? <Tag color="orange">₹{v.toLocaleString()}</Tag> : "-",
+    },
+    {
       title: "CTC",
       dataIndex: "ctc",
       render: (v) => v ? `₹${v.toLocaleString()}` : "-",

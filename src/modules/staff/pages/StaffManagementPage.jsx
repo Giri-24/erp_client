@@ -233,7 +233,6 @@ const StaffManagementPage = () => {
       taluk: record.taluk || record.taluk || record.taluk || "",
       district: record.district || record.district || "",
       joiningDate: record.joiningDate ? dayjs(record.joiningDate) : null,
-      pfJoiningDate: record.pfJoiningDate ? dayjs(record.pfJoiningDate) : null,
       bankIfsc: record.bankIfsc || "",
       bankBranch: record.bankBranch || "",
     });
@@ -285,9 +284,6 @@ const StaffManagementPage = () => {
         ...(values.employeeId ? { employeeId: values.employeeId } : {}),
         joiningDate: values.joiningDate
           ? values.joiningDate.toISOString()
-          : null,
-        pfJoiningDate: values.pfJoiningDate
-          ? values.pfJoiningDate.toISOString()
           : null,
         taluk: values.taluk || "",
         district: values.district || "",
@@ -819,8 +815,8 @@ const StaffManagementPage = () => {
                 </Row>
                 <Row gutter={16}>
                   <Col span={12}>
-                    <Form.Item name="email" label={<span style={{ fontWeight: 700, fontSize: 12 }}>WORK EMAIL</span>} rules={[{ required: true, type: "email" }]}> 
-                      <Input size="large" prefix={<MailOutlined style={{ color: '#94a3b8' }} />} id="staff-email" name="email" autoComplete="email" />
+                    <Form.Item name="email" label={<span style={{ fontWeight: 700, fontSize: 12 }}>WORK EMAIL</span>} rules={[{ type: "email" }]}> 
+                      <Input size="large" prefix={<MailOutlined style={{ color: '#94a3b8' }} />} id="staff-email" name="email" autoComplete="email" placeholder="Optional" />
                     </Form.Item>
                   </Col>
                   <Col span={12}>
@@ -903,18 +899,25 @@ const StaffManagementPage = () => {
                   <WalletOutlined /> JOB DETAILS
                 </h4>
                 <Form.Item name="designation" label={<span style={{ fontWeight: 700, fontSize: 12 }}>JOB TITLE</span>} rules={[{ required: true }]}> 
-                  <Select size="large" id="staff-designation" name="designation" autoComplete="off">
-                    <Option value="Teacher">Teacher</Option>
-                    <Option value="HOD">HOD</Option>
+                  <Select size="large" id="staff-designation" name="designation" autoComplete="off" placeholder="Select Job Title">
+                    <Option value="Correspondent">Correspondent</Option>
+                    <Option value="Secretary">Secretary</Option>
                     <Option value="Principal">Principal</Option>
                     <Option value="Vice Principal">Vice Principal</Option>
+                    <Option value="Manager">Manager</Option>
+                    <Option value="Accountant">Accountant</Option>
                     <Option value="Clerk">Clerk</Option>
+                    <Option value="Receptionist">Receptionist</Option>
+                    <Option value="Office Assistant">Office Assistant</Option>
+                    <Option value="Teacher">Teacher</Option>
+                    <Option value="HOD">HOD</Option>
                     <Option value="Lab Assistant">Lab Assistant</Option>
                     <Option value="Librarian">Librarian</Option>
                     <Option value="Driver">Driver</Option>
                     <Option value="Conductor">Conductor</Option>
                     <Option value="Acting Driver">Acting Driver</Option>
                     <Option value="Peon">Peon</Option>
+                    <Option value="Security">Security</Option>
                     <Option value="Other">Other</Option>
                   </Select>
                 </Form.Item>

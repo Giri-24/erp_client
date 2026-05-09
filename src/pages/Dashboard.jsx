@@ -265,7 +265,6 @@ const Dashboard = () => {
         { key: "transport-acting-driver-salary", label: "Acting Driver Salary", icon: "request_quote", permission: canTransportRouteAccess },
       ],
     },
-    { key: "staff-management", label: "Staff", icon: "badge", permission: canStaffAccess },
     {
       key: "hr-group",
       label: "HR",
@@ -285,6 +284,7 @@ const Dashboard = () => {
         { key: "hr-increment", label: "Salary Increment", icon: "trending_up", permission: canHRPayroll && !isTeacherOrStaffSelf },
         { key: "hr-loan-management", label: "Loan Management", icon: "account_balance_wallet", permission: canHRPayroll && !isTeacherOrStaffSelf },
         { key: "hr-salary-abstract", label: "Salary Abstract", icon: "summarize", permission: canHRPayroll && !isTeacherOrStaffSelf },
+        { key: "staff-management", label: "Staff Management", icon: "badge", permission: canStaffAccess },
       ],
     },
     {
