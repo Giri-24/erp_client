@@ -417,10 +417,15 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
         setAvailableYears(normalizedYears);
 
         if (!editData) {
-          const latestAcademicYear = getLatestAcademicYearFromApi(normalizedYears);
-          if (latestAcademicYear) {
-            form.setFieldsValue({ academicYear: latestAcademicYear });
-            setFormData((prev) => ({ ...prev, academicYear: latestAcademicYear }));
+          // Prioritize 2026-2027 if available, else use latest
+          const prioritizedYear = "2026-2027";
+          const defaultYear = normalizedYears.includes(prioritizedYear)
+            ? prioritizedYear
+            : getLatestAcademicYearFromApi(normalizedYears);
+
+          if (defaultYear) {
+            form.setFieldsValue({ academicYear: defaultYear });
+            setFormData((prev) => ({ ...prev, academicYear: defaultYear }));
           }
         }
       } catch {
@@ -715,7 +720,7 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
         previousSchoolStandard: resolvedPreviousSchoolStandard,
         section: editData.section || undefined,
         academicYear: editData.academicYear || undefined,
-        vanNeeded: editData.transportMode === "Van" ? true : false,
+        vanNeeded: editData.transportMode === "School Van" || editData.transportMode === "Van" ? true : false,
 
         fatherName: editData.family?.fatherName,
         fatherPhone: editData.family?.fatherPhone,
@@ -1127,16 +1132,11 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  <Form.Item name="academicYear" label="Academic Year">
-                    <Input disabled placeholder="Auto-assigned from active academic year" />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item name="transportMode" label="Transport Mode" initialValue="Self">
+                  <Form.Item name="transportMode" label="Transport Mode" initialValue="Local">
                     <Select
                       options={[
-                        { value: 'Self', label: 'Self' },
-                        { value: 'Van', label: 'School Van' },
+                        { value: 'Local', label: 'Local' },
+                        { value: 'School Van', label: 'School Van' },
                       ]}
                     />
                   </Form.Item>
@@ -1147,6 +1147,11 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                       <Checkbox>RTE Applied Student</Checkbox>
                     </Form.Item>
                   </div>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="academicYear" label="Academic Year">
+                    <Input disabled placeholder="Auto-assigned from active academic year" />
+                  </Form.Item>
                 </Col>
               </Row>
             </div>
@@ -1760,7 +1765,16 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                 <Row gutter={16}>
                   <Col span={6}>
                     <Form.Item name="examName" label="Name of Examination" >
-                      <Select placeholder="Select/Type exam" showSearch allowClear={false}>
+                      <Select 
+                        placeholder="X/XI/Entrance" 
+                        showSearch 
+                        allowClear 
+                        onChange={(val) => {
+                          if (val === 'Entrance') {
+                            form.setFieldsValue({ boardExamType: 'N/A' });
+                          }
+                        }}
+                      >
                         <Select.Option value="10th">10th Standard</Select.Option>
                         <Select.Option value="11th">11th Standard</Select.Option>
                         <Select.Option value="Entrance">Entrance Exam</Select.Option>
@@ -1770,9 +1784,10 @@ const AdmissionStepper = ({ editData, clearEditData, onAfterUpdate }) => {
                   </Col>
                   <Col span={6}>
                     <Form.Item name="boardExamType" label="Board" initialValue="State Board">
-                      <Select>
+                      <Select allowClear>
                         <Select.Option value="State Board">State Board</Select.Option>
                         <Select.Option value="Other">Other</Select.Option>
+                        <Select.Option value="N/A">N/A</Select.Option>
                       </Select>
                     </Form.Item>
                   </Col>
