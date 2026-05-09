@@ -24,10 +24,10 @@ const STANDARDS = [
 
 const STANDARD_LABELS = {
   LKG: "LKG", UKG: "UKG",
-  STD_1: "Grade I", STD_2: "Grade II", STD_3: "Grade III",
-  STD_4: "Grade IV", STD_5: "Grade V", STD_6: "Grade VI",
-  STD_7: "Grade VII", STD_8: "Grade VIII", STD_9: "Grade IX",
-  STD_10: "Grade X", STD_11: "Grade XI", STD_12: "Grade XII",
+  STD_1: "1st standard", STD_2: "2nd standard", STD_3: "3rd standard",
+  STD_4: "4th standard", STD_5: "5th standard", STD_6: "6th standard",
+  STD_7: "7th standard", STD_8: "8th standard", STD_9: "9th standard",
+  STD_10: "10th standard", STD_11: "11th standard", STD_12: "12th standard",
 };
 
 const STANDARD_GROUPS = {
@@ -51,6 +51,10 @@ const emptyForm = {
   standard: "", academicYear: "", tuitionFee: 0, transportFee: 0,
   bookFee: 0, hostelFee: 0, otherFee: 0, numberOfTerms: 1, customItems: [], terms: [],
   kitItems: [],
+  specialClassFee: 0,
+  specialClassMonths: 0,
+  specialClassTransportFee: 0,
+  specialClassTransportMonths: 0,
 };
 
 // ── component ─────────────────────────────────────────────────────────────
@@ -95,7 +99,12 @@ const FeeStructurePage = () => {
 
   useEffect(() => {
     fetchData();
-    getAcademicYears().then((years) => setAcademicYears(years || [])).catch(() => {});
+    getAcademicYears().then((years) => {
+      setAcademicYears(years || []);
+      if (years && years.length > 0 && !form.academicYear) {
+        setField("academicYear", years[0]);
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -116,9 +125,12 @@ const FeeStructurePage = () => {
       hostelFee: record.hostelFee || 0,
       otherFee: record.otherFee || 0,
       numberOfTerms: record.numberOfTerms || 1,
+      specialClassFee: record.specialClassFee || 0,
+      specialClassMonths: record.specialClassMonths || 0,
+      specialClassTransportFee: record.specialClassTransportFee || 0,
+      specialClassTransportMonths: record.specialClassTransportMonths || 0,
       customItems: (record.customItems || []).map((c) => ({ name: c.name, amount: c.amount })),
       terms: (record.terms || []).map((t) => ({
-        
         termNumber: t.termNumber,
         termName: t.termName,
         amount: t.amount,
@@ -143,6 +155,8 @@ const FeeStructurePage = () => {
   const grossTotal = (f) =>
     (f.tuitionFee || 0) + (f.transportFee || 0) + (f.bookFee || 0) +
     (f.hostelFee || 0) + (f.otherFee || 0) +
+    ((f.specialClassFee || 0) * (f.specialClassMonths || 0)) +
+    ((f.specialClassTransportFee || 0) * (f.specialClassTransportMonths || 0)) +
     (f.customItems || []).reduce((s, c) => s + (Number(c.amount) || 0), 0);
 
   // ── submit ───────────────────────────────────────────────────────────────
@@ -255,7 +269,7 @@ const FeeStructurePage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-primary uppercase tracking-wider ml-1">
-                      Academic Standard *
+                      Standard *
                     </label>
                     <div className="relative">
                       <select
@@ -341,9 +355,9 @@ const FeeStructurePage = () => {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
                       { key: "tuitionFee", label: "Tuition Fee", primary: true },
-                      // { key: "transportFee", label: "Transport" },
-                      // { key: "hostelFee", label: "Hostel" },
-                      { key: "bookFee", label: "Books / Kit" },
+                      { key: "transportFee", label: "Transport" },
+                      { key: "hostelFee", label: "Hostel" },
+                      { key: "bookFee", label: "Store" },
                     ].map(({ key, label, primary }) => (
                       <div
                         key={key}
@@ -354,6 +368,7 @@ const FeeStructurePage = () => {
                           <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm font-bold">₹</span>
                           <InputNumber
   min={0}
+  disabled={(!canUpdate && editingId) || (!canCreate && !editingId)}
   value={form[key] || 0}
   onChange={(value) => setField(key, value || 0)}
   placeholder="0"
@@ -364,29 +379,73 @@ const FeeStructurePage = () => {
                     ))}
                   </div>
   
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* <div className="bg-white p-4 rounded-xl">
-                      <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">Other Fee</p>
-                      <div className="relative">
-                        <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm font-bold">₹</span>
-                        {/* <input
-                          type="number" min={0}
-                          value={form.otherFee || ""}
-                          onChange={(e) => setField("otherFee", Number(e.target.value) || 0)}
-                          className="w-full border-none p-0 pl-4 focus:ring-0 text-lg font-bold text-primary bg-transparent outline-none"
-                          placeholder="0"
-                        /> 
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="bg-white p-4 rounded-xl col-span-2">
+                      <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5 font-headline">Special Class</p>
+                      <div className="flex items-center gap-4">
+                        <div className="relative flex-1">
+                          <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm font-bold">₹</span>
+                          <InputNumber
+                            min={0}
+                            disabled={(!canUpdate && editingId) || (!canCreate && !editingId)}
+                            value={form.specialClassFee || 0}
+                            onChange={(v) => setField("specialClassFee", v || 0)}
+                            placeholder="Rate"
+                            className="w-full !border-none !bg-transparent text-lg font-bold text-primary focus:!shadow-none"
+                          />
+                        </div>
+                        <span className="text-on-surface-variant font-bold">×</span>
+                        <div className="relative w-28">
+                          <InputNumber
+                            min={0}
+                            value={form.specialClassMonths || 0}
+                            onChange={(v) => setField("specialClassMonths", v || 0)}
+                            placeholder="Months"
+                            className="w-full !border-none !bg-transparent text-lg font-bold text-primary focus:!shadow-none"
+                          />
+                          <span className="text-[10px] text-on-surface-variant absolute -top-4 right-0 uppercase font-bold">Months</span>
+                        </div>
                       </div>
-                    </div> */}
+                    </div>
                     <div className="bg-white p-4 rounded-xl">
-                      <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">No. of Terms</p>
-                      <input
-                        type="number" min={1} max={4}
+                      <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5 font-headline tracking-tighter">No. of Terms</p>
+                      <InputNumber
+                        min={1} max={4}
+                        disabled={(!canUpdate && editingId) || (!canCreate && !editingId)}
                         value={form.numberOfTerms}
-                        onChange={(e) => setField("numberOfTerms", Number(e.target.value) || 1)}
-                        className="w-full border-none p-0 focus:ring-0 text-lg font-bold text-primary bg-transparent outline-none"
-                        placeholder="1"
+                        onChange={(v) => setField("numberOfTerms", v || 1)}
+                        className="w-full !border-none !bg-transparent text-lg font-bold text-primary focus:!shadow-none"
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="bg-white p-4 rounded-xl">
+                      <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1.5 font-headline">Special Class Transport</p>
+                      <div className="flex items-center gap-4">
+                        <div className="relative flex-1">
+                          <span className="absolute left-0 top-0.5 text-on-surface-variant text-sm font-bold">₹</span>
+                          <InputNumber
+                            min={0}
+                            disabled={(!canUpdate && editingId) || (!canCreate && !editingId)}
+                            value={form.specialClassTransportFee || 0}
+                            onChange={(v) => setField("specialClassTransportFee", v || 0)}
+                            placeholder="Rate"
+                            className="w-full !border-none !bg-transparent text-lg font-bold text-primary focus:!shadow-none"
+                          />
+                        </div>
+                        <span className="text-on-surface-variant font-bold">×</span>
+                        <div className="relative w-28">
+                          <InputNumber
+                            min={0}
+                            value={form.specialClassTransportMonths || 0}
+                            onChange={(v) => setField("specialClassTransportMonths", v || 0)}
+                            placeholder="Months"
+                            className="w-full !border-none !bg-transparent text-lg font-bold text-primary focus:!shadow-none"
+                          />
+                          <span className="text-[10px] text-on-surface-variant absolute -top-4 right-0 uppercase font-bold">Months</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -749,88 +808,6 @@ const FeeStructurePage = () => {
           {/* ── CREATE / EDIT form ── */}
        
         </div>
-
-        {/* ── RIGHT sidebar (4 cols) ── */}
-        <div className="col-span-12 xl:col-span-4 space-y-6">
-
-          {/* Automated rules / insights card (dark) */}
-          <div className="bg-primary rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.15)] relative overflow-hidden">
-            <div className="absolute inset-0 pointer-events-none opacity-10"
-              style={{ background: "radial-gradient(ellipse at top right, #44ddc1 0%, transparent 70%)" }} />
-            <div className="relative z-10">
-              <h4 className="font-headline font-bold text-lg text-white mb-1">Automated Rules</h4>
-              <p className="text-primary-fixed/70 text-sm mb-5 leading-relaxed">
-                System applies auto-discounts for sibling and teacher wards across all structures.
-              </p>
-              <div className="space-y-2.5">
-                <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 flex items-center gap-3">
-                  <span className="material-symbols-outlined text-[#44ddc1]">verified</span>
-                  <span className="text-xs font-medium text-white">Auto-invoice enabled for current session</span>
-                </div>
-                <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 flex items-center gap-3">
-                  <span className="material-symbols-outlined text-[#44ddc1]">info</span>
-                  <span className="text-xs font-medium text-white">
-                    {structures.length} structure{structures.length !== 1 ? "s" : ""} configured
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Global discounts info */}
-          <div className="bg-white rounded-2xl p-6 shadow-[0_20px_40px_rgba(1,29,53,0.05)]">
-            <div className="flex justify-between items-center mb-5">
-              <h4 className="font-headline font-bold text-primary">Global Discounts</h4>
-              <div className="w-8 h-8 rounded-full bg-surface-container-low flex items-center justify-center text-primary">
-                <span className="material-symbols-outlined text-sm">info</span>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {[
-                { label: "Teacher's Ward", badge: "25% OFF", badgeColor: "bg-[#44ddc1]/20 text-[#001813]", desc: "Applicable for children of permanent staff members on tuition fee only." },
-                { label: "Sibling Discount", badge: "10% OFF", badgeColor: "bg-primary-fixed text-primary", desc: "Applied automatically to the younger sibling's annual fee structure." },
-                { label: "RTE / Community", badge: "Exempt", badgeColor: "bg-error-container text-error", desc: "Government mandate relief for eligible community students." },
-              ].map(({ label, badge, badgeColor, desc }) => (
-                <div key={label} className="p-4 rounded-xl bg-surface-container-low/50 border border-outline-variant/10">
-                  <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-sm font-bold text-primary">{label}</span>
-                    {/* <span className={`text-[10px] px-2 py-0.5 rounded font-black ${badgeColor}`}>{badge}</span> */}
-                  </div>
-                  <p className="text-[11px] text-on-surface-variant leading-tight">{desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* All structures list (compact) */}
-          {structures.length > 0 && (
-            <div className="bg-white rounded-2xl p-5 shadow-[0_20px_40px_rgba(1,29,53,0.04)]">
-              <h4 className="font-headline font-bold text-primary mb-4 text-sm flex items-center gap-2">
-                <span className="material-symbols-outlined text-sm">list_alt</span>
-                All Structures ({structures.length})
-              </h4>
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {structures.map((s) => {
-                  const grp = STANDARD_GROUPS[s.standard] || "Other";
-                  const colors = GROUP_COLORS[grp] || GROUP_COLORS.Primary;
-                  return (
-                    <div
-                      key={s.id}
-                      className={`flex justify-between items-center p-3 rounded-xl border-l-4 bg-surface-container-low/50 ${colors.border} hover:bg-surface-container-low transition-colors cursor-pointer`}
-                      onClick={() => setViewStructure(s)}
-                    >
-                      <div>
-                        <p className="text-xs font-bold text-primary">{STANDARD_LABELS[s.standard] || s.standard}</p>
-                        <p className="text-[10px] text-on-surface-variant">{s.academicYear}</p>
-                      </div>
-                      <span className="text-sm font-extrabold text-primary">{fmt(grossTotal(s))}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ── Detail Modal ── */}
@@ -859,9 +836,10 @@ const FeeStructurePage = () => {
               {[
                 { label: "Tuition Fee", val: viewStructure.tuitionFee },
                 { label: "Transport Fee", val: viewStructure.transportFee },
-                { label: "Book Fee", val: viewStructure.bookFee },
+                { label: "Store", val: viewStructure.bookFee },
                 { label: "Hostel Fee", val: viewStructure.hostelFee },
-                { label: "Other Fee", val: viewStructure.otherFee },
+                { label: "Special Class", val: (viewStructure.specialClassFee || 0) * (viewStructure.specialClassMonths || 0) },
+                { label: "Special Class Transport", val: (viewStructure.specialClassTransportFee || 0) * (viewStructure.specialClassTransportMonths || 0) },
               ].filter((row) => row.val > 0).map(({ label, val }) => (
                 <div key={label} className="flex justify-between text-sm">
                   <span className="text-on-surface-variant">{label}</span>
@@ -877,7 +855,7 @@ const FeeStructurePage = () => {
               {(viewStructure.kitItems || []).length > 0 && (
                 <>
                   <div className="pt-2 border-t border-surface-container-high">
-                    <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Kit Items (from POS)</p>
+                    <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Store Items (from POS)</p>
                   </div>
                   {viewStructure.kitItems.map((ki, i) => (
                     <div key={i} className="flex justify-between text-sm">

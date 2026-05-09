@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { message, Select, Modal, InputNumber, Radio } from "antd";
+import { message, Select, Modal, InputNumber, Radio, Switch } from "antd";
 import { useMemo } from "react";
 
 import {
@@ -27,21 +27,87 @@ const fmt = (v) =>
   "₹" + Number(v || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
 const ToggleSwitch = ({ checked, onChange, disabled }) => (
-  <button
-    type="button"
+  <Switch
+    checked={checked}
+    onChange={onChange}
     disabled={disabled}
-    onClick={() => !disabled && onChange(!checked)}
-    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-      checked ? "bg-primary" : "bg-surface-container-highest"
-    } ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
-  >
-    <span
-      className={`inline-block h-5 w-5 transform rounded-full bg-white border border-gray-200 shadow transition-transform ${
-        checked ? "translate-x-5" : "translate-x-0.5"
-      }`}
-    />
-  </button>
+    size="small"
+  />
 );
+
+const FeeInput = ({ label, value, onChange }) => (
+  <div className="flex flex-col gap-1.5">
+    <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none">
+      {label} <span className="text-on-surface-variant normal-case">₹</span>
+    </label>
+    <InputNumber
+      min={0}
+      value={value}
+      onChange={onChange}
+      className="w-full !bg-surface-container-high !border-none !rounded-xl !h-11 font-bold outline-none"
+      controls={false}
+    />
+  </div>
+);
+
+const DiscountRow = ({ label, sub, field, isChecked, valState, onToggle, onValueChange, eligible, reason, basisLabel, basisVal }) => {
+  const val = Number(valState.value) || 0;
+  const savings = valState.type === "PERCENTAGE" ? (basisVal * (val / 100)) : val;
+  
+  return (
+    <div className="flex flex-col gap-2 group p-4 bg-surface-container-low/50 rounded-xl border border-outline-variant/10">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="font-bold text-sm text-on-surface flex items-center gap-2">
+            {label}
+            {eligible && (
+              <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
+                Eligible
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-on-surface-variant leading-tight mt-1">
+            {eligible ? reason || sub : sub}
+          </div>
+        </div>
+        <ToggleSwitch
+          checked={isChecked}
+          onChange={onToggle}
+        />
+      </div>
+      {isChecked && (
+        <div className="flex flex-col gap-3 mt-3 pt-3 border-t border-outline-variant/10 animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <select
+              value={valState.type}
+              onChange={(e) => onValueChange({ ...valState, type: e.target.value })}
+              className="bg-surface-container-high border-none rounded-lg py-1.5 px-2 text-[11px] font-bold uppercase tracking-wide outline-none w-24 text-primary"
+            >
+              <option value="PERCENTAGE">% (Percent)</option>
+              <option value="FLAT">₹ (Flat)</option>
+            </select>
+            <InputNumber
+              min={0}
+              placeholder="Enter amount..."
+              value={valState.value}
+              onChange={(v) => onValueChange({ ...valState, value: v })}
+              className="flex-1 !bg-surface-container-high !border-none !rounded-lg !h-9 text-sm font-bold outline-none"
+              controls={false}
+            />
+          </div>
+          <div className="flex justify-between items-center px-1">
+            <span className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Applied on {basisLabel}: {fmt(basisVal)}</span>
+            {savings > 0 && (
+              <div className="text-[10px] font-bold text-[#001813] bg-[#44ddc1]/20 px-2.5 py-1 rounded items-center flex">
+                Saves {fmt(savings)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ── component ─────────────────────────────────────────────────────────────────
 const AssignFeePage = ({ initialStudentId, onMounted }) => {
@@ -64,6 +130,10 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
     bookFee: 0,
     hostelFee: 0,
     otherFee: 0,
+    specialClassFee: 0,
+    specialClassMonths: 0,
+    specialClassTransportFee: 0,
+    specialClassTransportMonths: 0,
   });
 
   // custom items
@@ -85,6 +155,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
 
   // manual discounts
   const [manualDiscounts, setManualDiscounts] = useState([]);
+  const [transportEnabled, setTransportEnabled] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const { hasPermission } = usePermissionHelpers();
@@ -142,25 +213,30 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
   // ── derived totals ────────────────────────────────────────────────────────
   const grossFee =
     (fees.tuitionFee || 0) +
-    (fees.transportFee || 0) +
+    (transportEnabled ? (fees.transportFee || 0) : 0) +
     (fees.bookFee || 0) +
     (fees.hostelFee || 0) +
     (fees.otherFee || 0) +
+    ((fees.specialClassFee || 0) * (fees.specialClassMonths || 0)) +
+    ((fees.specialClassTransportFee || 0) * (fees.specialClassTransportMonths || 0)) +
     customItems.reduce((s, c) => s + (Number(c.amount) || 0), 0);
 
   const autoDiscountAmount = (() => {
     if (!discountEligibility) return 0;
     let total = 0;
-    const calc = (field, eligible) => {
-      if (discountToggles[field] && eligible) {
-        const val = Number(discountValues[field].value) || 0;
-        return discountValues[field].type === "PERCENTAGE" ? grossFee * (val / 100) : val;
+    const calc = (field) => {
+      if (discountToggles[field]) {
+        const val = Number(discountValues[field].value) || (discountEligibility?.[field.replace('auto', '').charAt(0).toLowerCase() + field.replace('auto', '').slice(1)]?.percentage || 0);
+        let basis = grossFee;
+        if (field === "autoTeacherDiscount") basis = fees.tuitionFee || 0;
+        if (field === "autoSiblingDiscount") basis = transportEnabled ? (fees.transportFee || 0) : 0;
+        return discountValues[field].type === "PERCENTAGE" ? basis * (val / 100) : val;
       }
       return 0;
     };
-    total += calc("autoTeacherDiscount", discountEligibility.teacherDiscount?.eligible);
-    total += calc("autoSiblingDiscount", discountEligibility.siblingDiscount?.eligible);
-    total += calc("autoRteDiscount", discountEligibility.rteDiscount?.eligible);
+    total += calc("autoTeacherDiscount");
+    total += calc("autoSiblingDiscount");
+    total += calc("autoRteDiscount");
     return total;
   })();
 
@@ -187,9 +263,12 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
     try {
       const fee = await getTransportFee(studentId);
       setTransportFeePreview(fee);
-      if (fee?.totalFee > 0) setFees((prev) => ({ ...prev, transportFee: fee.totalFee }));
+      const hasTransport = fee?.totalFee > 0;
+      setTransportEnabled(hasTransport);
+      if (hasTransport) setFees((prev) => ({ ...prev, transportFee: fee.totalFee }));
     } catch {
       setTransportFeePreview(null);
+      setTransportEnabled(false);
     }
 
     try {
@@ -254,7 +333,12 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
           bookFee: structure.bookFee || 0,
           hostelFee: structure.hostelFee || 0,
           otherFee: structure.otherFee || 0,
+          specialClassFee: structure.specialClassFee || 0,
+          specialClassMonths: structure.specialClassMonths || 0,
+          specialClassTransportFee: structure.specialClassTransportFee || 0,
+          specialClassTransportMonths: structure.specialClassTransportMonths || 0,
         }));
+        if (!transportEnabled && structure.transportFee > 0) setTransportEnabled(true);
         setCustomItems(
           structure.customItems?.map((ci) => ({ name: ci.name, amount: ci.amount })) || []
         );
@@ -277,14 +361,14 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
         .filter((d) => d.type && d.value !== "" && d.value !== null)
         .map((d) => ({ ...d, value: Number(d.value) || 0 }));
         
-      if (discountToggles.autoTeacherDiscount && discountEligibility?.teacherDiscount?.eligible) {
-        finalDiscounts.push({ type: discountValues.autoTeacherDiscount.type, value: Number(discountValues.autoTeacherDiscount.value) || 0, reason: "Teacher Discount" });
+      if (discountToggles.autoTeacherDiscount) {
+        finalDiscounts.push({ type: discountValues.autoTeacherDiscount.type, value: Number(discountValues.autoTeacherDiscount.value) || discountEligibility?.teacherDiscount?.percentage || 0, reason: "Teacher Discount" });
       }
-      if (discountToggles.autoSiblingDiscount && discountEligibility?.siblingDiscount?.eligible) {
-        finalDiscounts.push({ type: discountValues.autoSiblingDiscount.type, value: Number(discountValues.autoSiblingDiscount.value) || 0, reason: "Sibling Discount" });
+      if (discountToggles.autoSiblingDiscount) {
+        finalDiscounts.push({ type: discountValues.autoSiblingDiscount.type, value: Number(discountValues.autoSiblingDiscount.value) || discountEligibility?.siblingDiscount?.percentage || 0, reason: "Sibling Discount" });
       }
-      if (discountToggles.autoRteDiscount && discountEligibility?.rteDiscount?.eligible) {
-        finalDiscounts.push({ type: discountValues.autoRteDiscount.type, value: Number(discountValues.autoRteDiscount.value) || 0, reason: "RTE / Community Discount" });
+      if (discountToggles.autoRteDiscount) {
+        finalDiscounts.push({ type: discountValues.autoRteDiscount.type, value: Number(discountValues.autoRteDiscount.value) || discountEligibility?.rteDiscount?.percentage || 0, reason: "RTE / Community Discount" });
       }
 
       // Pass terms from structure so backend creates them even when tuitionFee is explicit
@@ -299,6 +383,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
         studentId: selectedStudent.id,
         academicYear: selectedYear,
         ...fees,
+        transportFee: transportEnabled ? fees.transportFee : 0,
         customItems,
         terms: termsFromStructure.length > 0 ? termsFromStructure : undefined,
         autoTeacherDiscount: false, // disabled auto flags since we pass calculated manually
@@ -313,7 +398,17 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
       setStructurePreview(null);
       setDiscountEligibility(null);
       setTransportFeePreview(null);
-      setFees({ tuitionFee: 0, transportFee: 0, bookFee: 0, hostelFee: 0, otherFee: 0 });
+      setFees({
+        tuitionFee: 0,
+        transportFee: 0,
+        bookFee: 0,
+        hostelFee: 0,
+        otherFee: 0,
+        specialClassFee: 0,
+        specialClassMonths: 0,
+        specialClassTransportFee: 0,
+        specialClassTransportMonths: 0,
+      });
       setCustomItems([]);
       setManualDiscounts([]);
       setDiscountToggles({ autoTeacherDiscount: false, autoSiblingDiscount: false, autoRteDiscount: false });
@@ -403,10 +498,14 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
     }
   };
 
-  const STANDARDS_LIST = [
-    "LKG","UKG","STD_1","STD_2","STD_3","STD_4","STD_5",
-    "STD_6","STD_7","STD_8","STD_9","STD_10","STD_11","STD_12",
-  ];
+  const STANDARD_LABELS = {
+    LKG: "LKG", UKG: "UKG",
+    STD_1: "1st standard", STD_2: "2nd standard", STD_3: "3rd standard", STD_4: "4th standard", STD_5: "5th standard",
+    STD_6: "6th standard", STD_7: "7th standard", STD_8: "8th standard", STD_9: "9th standard", STD_10: "10th standard",
+    STD_11: "11th standard", STD_12: "12th standard"
+  };
+
+  const STANDARDS_LIST = Object.keys(STANDARD_LABELS);
 
   // Derive unique sections from students filtered by year + standard
   const availableSections = useMemo(() => {
@@ -426,78 +525,6 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
     return list;
   }, [students, selectedYear, filterStandard, filterSection]);
 
-  // ── fee input helper ──────────────────────────────────────────────────────
-  const FeeInput = ({ label, field }) => (
-    <div className="flex flex-col gap-1.5">
-      <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none">
-        {label} <span className="text-on-surface-variant normal-case">₹</span>
-      </label>
-      <input
-        type="number"
-        min={0}
-        value={fees[field]}
-        onChange={(e) => setFees((prev) => ({ ...prev, [field]: Number(e.target.value) || 0 }))}
-        className="w-full bg-surface-container-high border-none rounded-xl h-11 px-4 text-on-surface focus:bg-surface-container-highest focus:ring-2 focus:ring-primary/30 transition-all font-bold outline-none"
-      />
-    </div>
-  );
-
-  const DiscountRow = ({ label, sub, field, eligible, reason }) => {
-    const isChecked = discountToggles[field];
-    const valState = discountValues[field];
-    const val = Number(valState.value) || 0;
-    const savings = valState.type === "PERCENTAGE" ? (grossFee * (val / 100)) : val;
-    
-    return (
-      <div className="flex flex-col gap-2 group p-4 bg-surface-container-low/50 rounded-xl border border-outline-variant/10">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-bold text-sm text-on-surface flex items-center gap-2">
-              {label}
-              {eligible && (
-                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
-                  Eligible
-                </span>
-              )}
-            </div>
-            <div className="text-[11px] text-on-surface-variant leading-tight mt-1">
-              {eligible ? reason || sub : sub}
-            </div>
-          </div>
-          <ToggleSwitch
-            checked={isChecked}
-            onChange={(v) => setDiscountToggles((prev) => ({ ...prev, [field]: v }))}
-            disabled={!eligible}
-          />
-        </div>
-        {isChecked && eligible && (
-          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-outline-variant/10 animate-fadeIn">
-            <select
-              value={valState.type}
-              onChange={(e) => setDiscountValues(prev => ({ ...prev, [field]: { ...prev[field], type: e.target.value } }))}
-              className="bg-surface-container-high border-none rounded-lg py-1.5 px-2 text-[11px] font-bold uppercase tracking-wide outline-none w-24 text-primary"
-            >
-              <option value="PERCENTAGE">% (Percent)</option>
-              <option value="FLAT">₹ (Flat)</option>
-            </select>
-            <input
-              type="number"
-              min={0}
-              placeholder="Enter amount..."
-              value={valState.value}
-              onChange={(e) => setDiscountValues(prev => ({ ...prev, [field]: { ...prev[field], value: e.target.value } }))}
-              className="flex-1 bg-surface-container-high border-none rounded-lg py-1.5 px-3 text-sm font-bold outline-none focus:ring-1 focus:ring-primary/30 transition-all"
-            />
-            {savings > 0 && (
-              <div className="text-[10px] font-bold text-[#001813] bg-[#44ddc1]/20 px-2.5 py-2 rounded items-center flex">
-                Saves {fmt(savings)}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -537,7 +564,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
             <select value={bulkStandard} onChange={(e) => setBulkStandard(e.target.value)}
               className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none">
               <option value="">Select...</option>
-              {STANDARDS_LIST.map((s) => <option key={s} value={s}>{s.replace("STD_", "Std ")}</option>)}
+              {STANDARDS_LIST.map((s) => <option key={s} value={s}>{STANDARD_LABELS[s]}</option>)}
             </select>
           </div>
           <div>
@@ -604,7 +631,7 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                     className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest appearance-none transition-all outline-none"
                   >
                     <option value="">All Standards</option>
-                    {STANDARDS_LIST.map((s) => <option key={s} value={s}>{s.replace("STD_", "Std ")}</option>)}
+                    {STANDARDS_LIST.map((s) => <option key={s} value={s}>{STANDARD_LABELS[s]}</option>)}
                   </select>
                   <span className="material-symbols-outlined absolute right-3 top-3 pointer-events-none text-on-surface-variant text-base">
                     expand_more
@@ -689,10 +716,11 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                   {[
                     ["Tuition Fee", existingFee.tuitionFee],
                     ["Transport Fee", existingFee.transportFee],
-                    ["Book Fee", existingFee.bookFee],
+                    ["Store", existingFee.bookFee],
                     ["Hostel Fee", existingFee.hostelFee],
-                    ["Other Fee", existingFee.otherFee],
-                  ].map(([label, val]) => (
+                    ["Special Class", (existingFee.specialClassFee || 0) * (existingFee.specialClassMonths || 0)],
+                    ["Special Class Transport", (existingFee.specialClassTransportFee || 0) * (existingFee.specialClassTransportMonths || 0)],
+                  ].filter(([_, v]) => v > 0).map(([label, val]) => (
                     <div key={label} className="bg-surface-container-low rounded-xl p-3">
                       <div className="text-[10px] font-bold text-on-surface-variant uppercase">{label}</div>
                       <div className="text-lg font-bold text-on-surface">{fmt(val)}</div>
@@ -770,10 +798,14 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                       <div>
                         <label className="block text-[10px] font-bold uppercase mb-1">Amount</label>
                         <div className="relative">
-                          <span className="absolute left-3 top-3 text-on-surface-variant font-bold text-sm">₹</span>
-                          <input type="number" min={0} value={payAmount}
-                            onChange={(e) => setPayAmount(e.target.value)}
-                            className="w-full bg-surface-container-high border-none rounded-xl py-3 pl-7 pr-4 outline-none font-bold" />
+                          <InputNumber
+                            min={0}
+                            value={payAmount}
+                            onChange={(v) => setPayAmount(v)}
+                            className="w-full !bg-surface-container-high !border-none !rounded-xl !h-11 font-bold outline-none"
+                            prefix="₹"
+                            controls={false}
+                          />
                         </div>
                       </div>
                       <div>
@@ -872,10 +904,14 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                   {cancelModal.action === "refund" && (
                     <div>
                       <label className="block text-xs font-bold mb-1">Refund Amount</label>
-                      <input type="number" min={0} max={cancelModal.payment?.amount}
+                      <InputNumber
+                        min={0}
+                        max={cancelModal.payment?.amount}
                         value={cancelModal.refundAmount}
-                        onChange={(e) => setCancelModal((p) => ({ ...p, refundAmount: Number(e.target.value) }))}
-                        className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 outline-none font-bold" />
+                        onChange={(v) => setCancelModal((p) => ({ ...p, refundAmount: v || 0 }))}
+                        className="w-full !bg-surface-container-high !border-none !rounded-xl !h-11 font-bold outline-none"
+                        controls={false}
+                      />
                     </div>
                   )}
                   <div>
@@ -909,12 +945,75 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
-              <FeeInput label="Tuition Fee" field="tuitionFee" />
-              <FeeInput label="Transport Fee" field="transportFee" />
-              <FeeInput label="Book Fee" field="bookFee" />
-              <FeeInput label="Hostel Fee" field="hostelFee" />
-              <div className="md:col-span-2">
-                <FeeInput label="Other Fee / Lab Charges" field="otherFee" />
+              <FeeInput label="Tuition Fee" value={fees.tuitionFee} onChange={(v) => setFees(p => ({ ...p, tuitionFee: v || 0 }))} />
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-widest leading-none">
+                    Transport Fee <span className="text-on-surface-variant normal-case">₹</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold text-on-surface-variant uppercase">Applicable</span>
+                    <ToggleSwitch checked={transportEnabled} onChange={setTransportEnabled} />
+                  </div>
+                </div>
+                  <InputNumber
+                    min={0}
+                    disabled={!transportEnabled}
+                    value={transportEnabled ? fees.transportFee : 0}
+                    onChange={(v) => setFees((prev) => ({ ...prev, transportFee: v || 0 }))}
+                    className={`w-full !bg-surface-container-high !border-none !rounded-xl !h-11 text-on-surface transition-all font-bold outline-none ${!transportEnabled ? "opacity-40" : ""}`}
+                    controls={false}
+                  />
+              </div>
+              <FeeInput label="Store" value={fees.bookFee} onChange={(v) => setFees(p => ({ ...p, bookFee: v || 0 }))} />
+              <FeeInput label="Hostel Fee" value={fees.hostelFee} onChange={(v) => setFees(p => ({ ...p, hostelFee: v || 0 }))} />
+              <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest px-1">Special Class</label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-3 text-on-surface-variant text-sm font-bold">₹</span>
+                      <InputNumber
+                        min={0}
+                        value={fees.specialClassFee}
+                        onChange={(v) => setFees(p => ({ ...p, specialClassFee: v || 0 }))}
+                        className="w-full !bg-surface-container-high !border-none !rounded-xl !h-11 !px-4 !flex !items-center font-bold"
+                      />
+                    </div>
+                    <span className="font-bold text-on-surface-variant">×</span>
+                    <div className="w-20">
+                      <InputNumber
+                        min={0}
+                        value={fees.specialClassMonths}
+                        onChange={(v) => setFees(p => ({ ...p, specialClassMonths: v || 0 }))}
+                        className="w-full !bg-surface-container-high !border-none !rounded-xl !h-11 !flex !items-center font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest px-1">Special Class Transport</label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-3 text-on-surface-variant text-sm font-bold">₹</span>
+                      <InputNumber
+                        min={0}
+                        value={fees.specialClassTransportFee}
+                        onChange={(v) => setFees(p => ({ ...p, specialClassTransportFee: v || 0 }))}
+                        className="w-full !bg-surface-container-high !border-none !rounded-xl !h-11 !px-4 !flex !items-center font-bold"
+                      />
+                    </div>
+                    <span className="font-bold text-on-surface-variant">×</span>
+                    <div className="w-20">
+                      <InputNumber
+                        min={0}
+                        value={fees.specialClassTransportMonths}
+                        onChange={(v) => setFees(p => ({ ...p, specialClassTransportMonths: v || 0 }))}
+                        className="w-full !bg-surface-container-high !border-none !rounded-xl !h-11 !flex !items-center font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -938,18 +1037,18 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                       className="flex-1 bg-surface-container-high border-none rounded-xl py-3 px-4 text-on-surface focus:ring-2 focus:ring-primary/30 outline-none font-body text-sm"
                     />
                     <div className="relative w-40">
-                      <span className="absolute left-3 top-3.5 text-on-surface-variant font-bold text-sm">₹</span>
-                      <input
-                        type="number"
+                      <InputNumber
                         min={0}
                         placeholder="Amount"
                         value={ci.amount}
-                        onChange={(e) => {
+                        onChange={(v) => {
                           const next = [...customItems];
-                          next[idx] = { ...next[idx], amount: Number(e.target.value) || 0 };
+                          next[idx] = { ...next[idx], amount: v || 0 };
                           setCustomItems(next);
                         }}
-                        className="w-full bg-surface-container-high border-none rounded-xl py-3 pl-7 pr-4 text-on-surface focus:ring-2 focus:ring-primary/30 outline-none font-bold"
+                        className="w-full !bg-surface-container-high !border-none !rounded-xl !h-11 text-on-surface transition-all font-bold outline-none"
+                        prefix="₹"
+                        controls={false}
                       />
                     </div>
                     <button
@@ -978,28 +1077,43 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
               </h4>
               <div className="space-y-5">
                 <DiscountRow
-                  label="Teacher Discount"
+                  label="Staff Child Discount"
                   sub="Eligible staff dependents"
                   field="autoTeacherDiscount"
+                  isChecked={discountToggles.autoTeacherDiscount}
+                  valState={discountValues.autoTeacherDiscount}
+                  onToggle={(v) => setDiscountToggles(p => ({ ...p, autoTeacherDiscount: v }))}
+                  onValueChange={(v) => setDiscountValues(p => ({ ...p, autoTeacherDiscount: v }))}
                   eligible={discountEligibility?.teacherDiscount?.eligible}
-                  pct={discountEligibility?.teacherDiscount?.percentage}
                   reason={discountEligibility?.teacherDiscount?.reason}
+                  basisLabel="Tuition"
+                  basisVal={fees.tuitionFee || 0}
                 />
                 <DiscountRow
                   label="Sibling Discount"
                   sub="Applied via linked profiles"
                   field="autoSiblingDiscount"
+                  isChecked={discountToggles.autoSiblingDiscount}
+                  valState={discountValues.autoSiblingDiscount}
+                  onToggle={(v) => setDiscountToggles(p => ({ ...p, autoSiblingDiscount: v }))}
+                  onValueChange={(v) => setDiscountValues(p => ({ ...p, autoSiblingDiscount: v }))}
                   eligible={discountEligibility?.siblingDiscount?.eligible}
-                  pct={discountEligibility?.siblingDiscount?.percentage}
                   reason={discountEligibility?.siblingDiscount?.reason}
+                  basisLabel="Transport"
+                  basisVal={transportEnabled ? (fees.transportFee || 0) : 0}
                 />
                 <DiscountRow
                   label="RTE / Community"
                   sub="Government mandate relief"
                   field="autoRteDiscount"
+                  isChecked={discountToggles.autoRteDiscount}
+                  valState={discountValues.autoRteDiscount}
+                  onToggle={(v) => setDiscountToggles(p => ({ ...p, autoRteDiscount: v }))}
+                  onValueChange={(v) => setDiscountValues(p => ({ ...p, autoRteDiscount: v }))}
                   eligible={discountEligibility?.rteDiscount?.eligible}
-                  pct={discountEligibility?.rteDiscount?.percentage}
                   reason={discountEligibility?.rteDiscount?.reason}
+                  basisLabel="Gross Fee"
+                  basisVal={grossFee}
                 />
               </div>
 
@@ -1010,27 +1124,27 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                     Quick Flat Discount (₹)
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-on-surface-variant font-bold text-xs">₹</span>
-                    <input
-                      type="number"
+                    <InputNumber
+                      min={0}
                       placeholder="Enter custom reduction..."
-                      value={manualDiscounts.find((d) => d.reason === "QUICK_FLAT")?.value || ""}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                      value={manualDiscounts.find((d) => d.reason === "QUICK_FLAT")?.value || null}
+                      onChange={(v) => {
                         const existingIdx = manualDiscounts.findIndex((d) => d.reason === "QUICK_FLAT");
                         let next = [...manualDiscounts];
                         if (existingIdx > -1) {
-                          if (!val) {
+                          if (v === null || v === undefined) {
                             next = next.filter((_, i) => i !== existingIdx);
                           } else {
-                            next[existingIdx] = { ...next[existingIdx], type: "FLAT", value: val };
+                            next[existingIdx] = { ...next[existingIdx], type: "FLAT", value: v };
                           }
-                        } else if (val) {
-                          next.push({ type: "FLAT", value: val, reason: "QUICK_FLAT" });
+                        } else if (v !== null && v !== undefined) {
+                          next.push({ type: "FLAT", value: v, reason: "QUICK_FLAT" });
                         }
                         setManualDiscounts(next);
                       }}
-                      className="w-full bg-surface-container-high border-none rounded-xl py-2.5 pl-7 pr-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                      className="w-full !bg-surface-container-high !border-none !rounded-xl !h-10 !flex !items-center !pl-6 !pr-2 text-sm font-bold outline-none"
+                      prefix="₹"
+                      controls={false}
                     />
                   </div>
                 </div>
@@ -1054,20 +1168,19 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                         <option value="PERCENTAGE">Percentage (%)</option>
                       </select>
                       <div className="relative w-24">
-                        <span className="absolute left-2 top-2 text-[10px] font-bold text-on-surface-variant">
-                          {d.type === "PERCENTAGE" ? "%" : "₹"}
-                        </span>
-                        <input
-                          type="number"
+                        <InputNumber
+                          min={0}
                           placeholder="0"
                           value={d.value}
-                          onChange={(e) => {
+                          onChange={(v) => {
                             const realIdx = manualDiscounts.indexOf(d);
                             const next = [...manualDiscounts];
-                            next[realIdx] = { ...next[realIdx], value: e.target.value };
+                            next[realIdx] = { ...next[realIdx], value: v };
                             setManualDiscounts(next);
                           }}
-                          className="w-full bg-surface-container-high border-none rounded-lg py-2 pl-6 pr-2 text-sm font-bold outline-none"
+                          className="w-full !bg-surface-container-high !border-none !rounded-lg !h-8 !flex !items-center !pl-4 !pr-1 text-sm font-bold outline-none"
+                          prefix={d.type === "PERCENTAGE" ? "%" : "₹"}
+                          controls={false}
                         />
                       </div>
                       <button
@@ -1130,10 +1243,28 @@ const AssignFeePage = ({ initialStudentId, onMounted }) => {
                   <span>Gross Fee</span>
                   <span>{fmt(grossFee)}</span>
                 </div>
-                {totalDiscount > 0 && (
-                  <div className="flex justify-between text-sm text-[#44ddc1] font-bold">
-                    <span>Total Discount</span>
-                    <span>− {fmt(totalDiscount)}</span>
+                {manualDiscounts.filter(d => d.value).map((d, i) => (
+                  <div key={i} className="flex justify-between text-xs text-[#44ddc1] font-medium">
+                    <span>{d.reason || "Manual Discount"}</span>
+                    <span>− {fmt(d.type === "PERCENTAGE" ? (grossFee * (Number(d.value) / 100)) : Number(d.value))}</span>
+                  </div>
+                ))}
+                {discountEligibility?.teacherDiscount?.eligible && discountToggles.autoTeacherDiscount && (
+                  <div className="flex justify-between text-xs text-[#44ddc1] font-medium">
+                    <span>Teacher Discount</span>
+                    <span>− {fmt((fees.tuitionFee || 0) * (Number(discountValues.autoTeacherDiscount.value || discountEligibility.teacherDiscount.percentage) / 100))}</span>
+                  </div>
+                )}
+                {discountEligibility?.siblingDiscount?.eligible && discountToggles.autoSiblingDiscount && (
+                  <div className="flex justify-between text-xs text-[#44ddc1] font-medium">
+                    <span>Sibling Discount</span>
+                    <span>− {fmt((transportEnabled ? (fees.transportFee || 0) : 0) * (Number(discountValues.autoSiblingDiscount.value || discountEligibility.siblingDiscount.percentage) / 100))}</span>
+                  </div>
+                )}
+                {discountEligibility?.rteDiscount?.eligible && discountToggles.autoRteDiscount && (
+                  <div className="flex justify-between text-xs text-[#44ddc1] font-medium">
+                    <span>RTE / Community Discount</span>
+                    <span>− {fmt(grossFee * (Number(discountValues.autoRteDiscount.value || discountEligibility.rteDiscount.percentage) / 100))}</span>
                   </div>
                 )}
                 <div className="h-px bg-white/10 my-1" />

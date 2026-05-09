@@ -46,7 +46,7 @@ const FeesViewPage = () => {
   const [siblingFilter, setSiblingFilter] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize] = useState(50);
 
   // detail modal
   const [detailModal, setDetailModal] = useState(false);

@@ -29,6 +29,7 @@ const PAYMENT_MODES = [
 ];
 
 const RECEIPT_COMPONENT_LABELS = {
+  tuitionFee: "Tuition Fee",
   transportFee: "Transport Fee",
   bookFee: "Book Fee",
   hostelFee: "Hostel Fee",
@@ -129,6 +130,7 @@ const getCustomFeeItems = (feeLike) => {
 const getAvailableReceiptComponentOptions = (fee) => {
   if (!fee) return [];
   const opts = [];
+  if (Number(fee.tuitionFee || 0) > 0) opts.push("tuitionFee");
   if (Number(fee.transportFee || 0) > 0) opts.push("transportFee");
   if (Number(fee.bookFee || 0) > 0) opts.push("bookFee");
   if (Number(fee.hostelFee || 0) > 0) opts.push("hostelFee");
@@ -137,23 +139,48 @@ const getAvailableReceiptComponentOptions = (fee) => {
   return opts;
 };
 
+const getNetPaid = (p) => {
+  const s = (p.status || "SUCCESS").toUpperCase();
+  if (s === "CANCELLED") return 0;
+  if (s === "REFUNDED") return 0;
+  return Number(p.amount) - Number(p.refundAmount || 0);
+};
+
 const buildReceiptFeeRows = (payment) => {
   const selected = Array.isArray(payment?.receiptComponents)
     ? payment.receiptComponents
-    : ["transportFee", "bookFee", "hostelFee", "otherFee", "customItems"];
-  const rows = [{ key: "tuitionFee", label: "Tuition Fee", amount: Number(payment?.tuitionFee || 0) }];
-  if (selected.includes("transportFee") && Number(payment?.transportFee || 0) > 0)
-    rows.push({ key: "transportFee", label: "Transport Fee", amount: Number(payment.transportFee) });
-  if (selected.includes("bookFee") && Number(payment?.bookFee || 0) > 0)
-    rows.push({ key: "bookFee", label: "Book Fee", amount: Number(payment.bookFee) });
-  if (selected.includes("hostelFee") && Number(payment?.hostelFee || 0) > 0)
-    rows.push({ key: "hostelFee", label: "Hostel Fee", amount: Number(payment.hostelFee) });
-  if (selected.includes("otherFee") && Number(payment?.otherFee || 0) > 0)
-    rows.push({ key: "otherFee", label: "Other Fee", amount: Number(payment.otherFee) });
-  if (selected.includes("customItems"))
-    getCustomFeeItems(payment).forEach((ci) =>
-      rows.push({ key: `custom-${ci.id || ci.name}`, label: ci.name, amount: Number(ci.amount || 0) })
-    );
+    : ["tuitionFee", "transportFee", "bookFee", "hostelFee", "otherFee", "customItems"];
+  const rows = [];
+  const totalPaid = Number(payment.totalCollected || payment.amount || 0);
+
+  // Get all components that exist for this student and were selected for the receipt
+  const allComponents = [
+    { key: "tuitionFee", label: "Tuition Fee", val: Number(payment.tuitionFee || 0) },
+    { key: "transportFee", label: "Transport Fee", val: Number(payment.transportFee || 0) },
+    { key: "bookFee", label: "Book Fee", val: Number(payment.bookFee || 0) },
+    { key: "hostelFee", label: "Hostel Fee", val: Number(payment.hostelFee || 0) },
+    { key: "otherFee", label: "Other Fee", val: Number(payment.otherFee || 0) },
+    ...getCustomFeeItems(payment).map((ci) => ({ key: `custom-${ci.id || ci.name}`, label: ci.name, val: Number(ci.amount || 0) }))
+  ].filter((c) => (selected.includes(c.key) || (c.key.startsWith("custom-") && selected.includes("customItems"))) && c.val > 0);
+
+  if (allComponents.length === 0) {
+    return [{ key: "general", label: "Consolidated Fee", amount: totalPaid }];
+  }
+
+  // Distribute the actual paid amount proportionally among the selected components
+  const totalWeight = allComponents.reduce((s, c) => s + c.val, 0);
+  let remainingAmount = totalPaid;
+
+  allComponents.forEach((comp, idx) => {
+    if (idx === allComponents.length - 1) {
+      rows.push({ key: comp.key, label: comp.label, amount: remainingAmount });
+    } else {
+      const share = Math.round((comp.val / totalWeight) * totalPaid);
+      rows.push({ key: comp.key, label: comp.label, amount: share });
+      remainingAmount -= share;
+    }
+  });
+
   return rows;
 };
 
@@ -170,12 +197,16 @@ const formatAllocationSummary = (splitPayments = []) => {
 };
 
 const statusBadge = (status) => {
-  const s = (status || "SUCCESS").toUpperCase();
-  if (s === "REFUNDED")
-    return <span className="px-3 py-1 bg-error-container text-error rounded-full text-xs font-bold uppercase">Refunded</span>;
+  const s = String(status || "SUCCESS").toUpperCase();
+  if (s === "SUCCESS")
+    return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#e8f5e9] text-[#2e7d32] text-[10px] font-black uppercase tracking-tight">Paid</span>;
   if (s === "CANCELLED")
-    return <span className="px-3 py-1 bg-surface-container-high text-on-surface-variant rounded-full text-xs font-bold uppercase">Cancelled</span>;
-  return <span className="px-3 py-1 bg-[#44ddc1]/20 text-[#00201a] rounded-full text-xs font-bold uppercase">Success</span>;
+    return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-error-container text-error text-[10px] font-black uppercase tracking-tight">Cancelled</span>;
+  if (s === "REFUNDED")
+    return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant text-[10px] font-black uppercase tracking-tight">Refunded</span>;
+  if (s === "PARTIALLY_REFUNDED")
+    return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-tight">Partial Refund</span>;
+  return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#44ddc1]/20 text-[#00201a] text-[10px] font-black uppercase tracking-tight">Success</span>;
 };
 
 // ── Tab definitions ─────────────────────────────────────────────────────────
@@ -203,6 +234,7 @@ const CollectPaymentPage = ({ studentId }) => {
   const [loading, setLoading] = useState(false);
   const [academicYear, setAcademicYear] = useState("");
   const [academicYearOptions, setAcademicYearOptions] = useState([]);
+  const [allAdmissions, setAllAdmissions] = useState([]);
   const [printPayment, setPrintPayment] = useState(null);
   const [statusModal, setStatusModal] = useState({ open: false, action: "", payment: null, loading: false });
   const [linkModal, setLinkModal] = useState({ open: false, loading: false });
@@ -316,6 +348,10 @@ const CollectPaymentPage = ({ studentId }) => {
   useEffect(() => {
     fetchAcademicYears();
     fetchReceiptNo();
+    instance.get("/admissions").then((res) => {
+      const active = res.data.filter((s) => s.users?.isActive !== false);
+      setAllAdmissions(active);
+    });
     (async () => {
       try {
         const settings = await getAdminSettings();
@@ -353,8 +389,9 @@ const CollectPaymentPage = ({ studentId }) => {
     const termAmounts = splitEvenly(termBase, nTerms);
     const paidPerTerm = {};
     (fee.payments || payments || []).forEach((p) => {
-      if (p.status === "SUCCESS" && p.termNumber) {
-        paidPerTerm[p.termNumber] = (paidPerTerm[p.termNumber] || 0) + Number(p.amount);
+      const s = (p.status || "SUCCESS").toUpperCase();
+      if (p.termNumber && (s === "SUCCESS" || s === "PARTIALLY_REFUNDED")) {
+        paidPerTerm[p.termNumber] = (paidPerTerm[p.termNumber] || 0) + getNetPaid(p);
       }
     });
     const terms = Array.from({ length: nTerms }, (_, i) => {
@@ -464,7 +501,7 @@ const CollectPaymentPage = ({ studentId }) => {
             termNumber: t.termNumber,
             amount: "",
             termName: t.termName,
-            pending: Math.round(t.amount - (payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0)),
+            pending: Math.round(t.amount - (payments?.reduce((s, p) => s + (p.termNumber === t.termNumber ? getNetPaid(p) : 0), 0) || 0)),
           }))
       );
     }
@@ -510,11 +547,12 @@ const CollectPaymentPage = ({ studentId }) => {
           const enriched = computeTermComponents(selectedFee);
           const selTerm = enriched.find((t) => t.termNumber === termNumber);
           if (selTerm) {
-            const termPayments = payments?.filter((p) => p.termNumber === termNumber && p.status === "SUCCESS") || [];
+            const termPayments = payments?.filter((p) => p.termNumber === termNumber && (p.status === "SUCCESS" || p.status === "PARTIALLY_REFUNDED")) || [];
             const componentPaid = {};
             termPayments.forEach((p) => {
               if (p.paidComponents && typeof p.paidComponents === "object") {
                 Object.entries(p.paidComponents).forEach(([k, v]) => {
+                  // Note: Pro-rata refund on components is complex, here we just use the original allocation if not fully refunded
                   componentPaid[k] = (componentPaid[k] || 0) + Number(v);
                 });
               }
@@ -565,7 +603,7 @@ const CollectPaymentPage = ({ studentId }) => {
             .map((tn) => {
               const t = selectedFee.terms.find((x) => x.termNumber === tn);
               if (!t) return null;
-              const paid = payments?.filter((p) => p.termNumber === tn && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+              const paid = payments?.reduce((s, p) => s + (p.termNumber === tn ? getNetPaid(p) : 0), 0) || 0;
               const bal = Math.max(0, Math.round(t.amount - paid));
               if (bal <= 0) return null;
               return { termNumber: tn, amount: bal };
@@ -779,13 +817,30 @@ const CollectPaymentPage = ({ studentId }) => {
     )
   );
 
-  const filteredStudentFees = studentFees.filter((f) => {
-    const std = formatStandardLabel(f.student?.standard);
-    const sec = String(f.student?.section || "").trim();
-    const standardMatch = selectedStandardFilter === "ALL" || std === selectedStandardFilter;
-    const sectionMatch = selectedSectionFilter === "ALL" || sec === selectedSectionFilter;
-    return standardMatch && sectionMatch;
-  });
+  const filteredStudents = useMemo(() => {
+    // Start with all admissions that match the current filters
+    const filteredAdms = allAdmissions.filter((s) => {
+      const std = formatStandardLabel(s.standard);
+      const sec = String(s.section || "").trim();
+      const standardMatch = selectedStandardFilter === "ALL" || std === selectedStandardFilter;
+      const sectionMatch = selectedSectionFilter === "ALL" || sec === selectedSectionFilter;
+      return standardMatch && sectionMatch;
+    });
+
+    // Merge with existing fees for the selected year
+    return filteredAdms.map((adm) => {
+      const fee = studentFees.find((f) => f.student?.id === adm.id);
+      if (fee) return { ...fee, _type: "fee" };
+      return {
+        id: `pending-${adm.id}`,
+        student: adm,
+        pending: 0,
+        totalFee: 0,
+        _type: "admission",
+        academicYear,
+      };
+    });
+  }, [allAdmissions, studentFees, selectedStandardFilter, selectedSectionFilter, academicYear]);
 
   useEffect(() => {
     if (selectedSectionFilter !== "ALL" && !sectionFilterOptions.includes(selectedSectionFilter)) {
@@ -858,14 +913,25 @@ const CollectPaymentPage = ({ studentId }) => {
           <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Search Student</label>
           <div className="relative">
             <select
-              value={filteredStudentFees.some((f) => f.id === selectedFee?.id) ? selectedFee?.id : ""}
-              onChange={(e) => e.target.value && onSelectFee(e.target.value)}
+              value={selectedFee?.id || ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!val) return;
+                if (val.startsWith("pending-")) {
+                  const studentId = val.replace("pending-", "");
+                  const student = allAdmissions.find(s => s.id === studentId);
+                  message.info(`${student?.name} has no fees assigned for ${academicYear}. Go to Assign Fee page first.`);
+                  return;
+                }
+                onSelectFee(val);
+              }}
               className="w-full bg-surface-container-high border-none rounded-xl py-2.5 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none appearance-none"
             >
               <option value="">Select student...</option>
-              {filteredStudentFees.map((f) => (
+              {filteredStudents.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.student?.name} — {formatStandardLabel(f.student?.standard)}{f.student?.section ? ` - ${f.student.section}` : ""}
+                  {f._type === "admission" ? " (Fees Not Assigned)" : ""}
                 </option>
               ))}
             </select>
@@ -931,7 +997,7 @@ const CollectPaymentPage = ({ studentId }) => {
                 <>
                   <div className="flex gap-2 flex-wrap">
                     {selectedFee.terms.map((t) => {
-                      const paid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                      const paid = payments?.reduce((s, p) => s + (p.termNumber === t.termNumber ? getNetPaid(p) : 0), 0) || 0;
                       const balance = Math.round(t.amount - paid);
                       const isPaid = t.status === "PAID" || balance <= 0;
                       return (
@@ -966,7 +1032,7 @@ const CollectPaymentPage = ({ studentId }) => {
                     {/* Non-term fee buttons — one per fee type that exists in the structure */}
                     {(() => {
                       const nonTermCompPaid = {};
-                      payments?.filter((p) => !p.termNumber && p.status === "SUCCESS").forEach((p) => {
+                      payments?.filter((p) => !p.termNumber && (p.status === "SUCCESS" || p.status === "PARTIALLY_REFUNDED")).forEach((p) => {
                         if (p.paidComponents && typeof p.paidComponents === "object") {
                           Object.entries(p.paidComponents).forEach(([k, v]) => {
                             nonTermCompPaid[k] = (nonTermCompPaid[k] || 0) + Number(v);
@@ -1031,8 +1097,8 @@ const CollectPaymentPage = ({ studentId }) => {
                     const enriched = computeTermComponents(selectedFee);
                     const selTerm = enriched.find((t) => t.termNumber === termNumber);
                     if (!selTerm) return null;
-                    const termPayments = payments?.filter((p) => p.termNumber === termNumber && p.status === "SUCCESS") || [];
-                    const paid = termPayments.reduce((s, p) => s + p.amount, 0);
+                    const termPayments = payments?.filter((p) => p.termNumber === termNumber && (p.status === "SUCCESS" || p.status === "PARTIALLY_REFUNDED")) || [];
+                    const paid = termPayments.reduce((s, p) => s + getNetPaid(p), 0);
                     const bal = Math.round(selTerm.amount - paid);
                     const componentPaid = {};
                     termPayments.forEach((p) => {
@@ -1115,7 +1181,7 @@ const CollectPaymentPage = ({ studentId }) => {
                               {selectedFee.terms
                                 .filter((t) => t.termNumber !== termNumber)
                                 .map((t) => {
-                                  const tPaid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                                  const tPaid = payments?.reduce((s, p) => s + (p.termNumber === t.termNumber ? getNetPaid(p) : 0), 0) || 0;
                                   const tBal = Math.max(0, Math.round(t.amount - tPaid));
                                   if (tBal <= 0) return null;
                                   const active = extraTermNumbers.includes(t.termNumber);
@@ -1136,7 +1202,7 @@ const CollectPaymentPage = ({ studentId }) => {
                                           const extraSum = next.reduce((s, tn) => {
                                             const trm = selectedFee.terms.find((x) => x.termNumber === tn);
                                             if (!trm) return s;
-                                            const paidVal = payments?.filter((p) => p.termNumber === tn && p.status === "SUCCESS").reduce((ss, p) => ss + p.amount, 0) || 0;
+                                            const paidVal = payments?.reduce((ss, p) => ss + (p.termNumber === tn ? getNetPaid(p) : 0), 0) || 0;
                                             return s + Math.max(0, Math.round(trm.amount - paidVal));
                                           }, 0);
                                           setAmountFromSystem(Math.max(0, Math.round(selectedCompSum + extraSum)).toString());
@@ -1179,14 +1245,14 @@ const CollectPaymentPage = ({ studentId }) => {
                       {
                         title: "Amount to Pay", dataIndex: "termNumber",
                         render: (termNum) => (
-                          <input
-                            type="number"
+                          <InputNumber
                             min={0}
                             max={splitPayments.find(s => s.termNumber === termNum)?.pending}
                             value={splitPayments.find(s => s.termNumber === termNum)?.amount || ""}
-                            onChange={(e) => setSplitPayments(prev => prev.map(s => s.termNumber === termNum ? { ...s, amount: e.target.value } : s))}
+                            onChange={(v) => setSplitPayments(prev => prev.map(s => s.termNumber === termNum ? { ...s, amount: v } : s))}
                             placeholder="0"
-                            className="w-28 bg-surface-container-high border-none rounded-lg py-1.5 px-3 text-sm font-medium outline-none focus:bg-surface-container-highest"
+                            className="!w-28 !bg-surface-container-high !border-none !rounded-lg text-sm font-medium outline-none"
+                            controls={false}
                           />
                         )
                       },
@@ -1204,28 +1270,23 @@ const CollectPaymentPage = ({ studentId }) => {
               <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Receipt No</label>
               <input
                 type="text"
-                value={receiptNo}
-                onChange={(e) => setReceiptNo(e.target.value)}
-                className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                readOnly
+                value={receiptNo || "AUTO-GENERATED"}
+                placeholder="Auto-generated"
+                className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none opacity-70 cursor-not-allowed"
               />
             </div>
             {!splitMode && (
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Amount (₹)</label>
-                <input
+                <InputNumber
                   key={amountInputKey}
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  defaultValue={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  onBlur={(e) => {
-                    const sanitized = (e.target.value || "").replace(/[^0-9]/g, "");
-                    e.target.value = sanitized;
-                    setAmount(sanitized);
-                  }}
+                  min={0}
+                  value={amount}
+                  onChange={(v) => setAmount(v)}
                   placeholder="Enter amount"
-                  className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                  className="w-full !bg-surface-container-high !border-none !rounded-xl !h-[44px] text-sm font-medium outline-none"
+                  controls={false}
                 />
               </div>
             )}
@@ -1233,14 +1294,13 @@ const CollectPaymentPage = ({ studentId }) => {
             {!splitMode && (
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-primary/60 uppercase tracking-wider ml-1">Manual Discount (₹)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                <InputNumber
+                  min={0}
                   value={manualDiscount}
-                  onChange={(e) => setManualDiscount((e.target.value || "").replace(/[^0-9]/g, ""))}
+                  onChange={(v) => setManualDiscount(v)}
                   placeholder="0"
-                  className="w-full bg-surface-container-high border-none rounded-xl py-3 px-4 text-sm font-medium focus:bg-surface-container-highest transition-colors outline-none"
+                  className="w-full !bg-surface-container-high !border-none !rounded-xl !h-[44px] text-sm font-medium outline-none"
+                  controls={false}
                 />
               </div>
             )}
@@ -1366,12 +1426,21 @@ const CollectPaymentPage = ({ studentId }) => {
                   </div>
                 </React.Fragment>
               ))}
-              <div className="mt-6 bg-white/10 rounded-2xl p-5 backdrop-blur-md border border-white/10 text-center">
-                <p className="text-[10px] uppercase tracking-widest text-secondary-fixed mb-1 font-bold">Pending Balance</p>
+              <div className="mt-6 bg-white/10 rounded-2xl p-5 backdrop-blur-md border border-white/10 text-center relative">
+                <p className="text-[10px] uppercase tracking-widest text-secondary-fixed mb-1 font-bold">Pending (Selected Year)</p>
                 <p className={`text-4xl font-headline font-extrabold ${Number(selectedFee.pending || 0) > 0 ? "text-white" : "text-[#44ddc1]"}`}>
                   {fmt(selectedFee.pending)}
                 </p>
               </div>
+
+              {allYearsFees.some(f => Number(f.pending) > 0) && (
+                <div className="mt-2 bg-[#ff4d4f]/20 rounded-2xl p-4 border border-white/10 text-center">
+                  <p className="text-[10px] uppercase tracking-widest text-white/70 mb-1 font-bold">Total Outstanding (All Years)</p>
+                  <p className="text-2xl font-headline font-extrabold text-white">
+                    {fmt(Number(selectedFee.pending || 0) + allYearsFees.reduce((s, f) => s + Number(f.pending || 0), 0))}
+                  </p>
+                </div>
+              )}
 
               {/* Previous years fees */}
               {allYearsFees.length > 0 && (
@@ -1435,7 +1504,7 @@ const CollectPaymentPage = ({ studentId }) => {
           {selectedFee && <span className="text-sm font-normal text-on-surface-variant">— {selectedFee.student?.name}</span>}
         </h3>
         <div className="flex gap-2">
-          {["ALL", "SUCCESS", "REFUNDED", "CANCELLED"].map((f) => (
+          {["ALL", "SUCCESS", "PARTIALLY_REFUNDED", "REFUNDED", "CANCELLED"].map((f) => (
             <button
               key={f}
               type="button"
@@ -1445,7 +1514,7 @@ const CollectPaymentPage = ({ studentId }) => {
                 : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
                 }`}
             >
-              {f === "ALL" ? "All" : f.charAt(0) + f.slice(1).toLowerCase()}
+              {f === "ALL" ? "All" : f === "PARTIALLY_REFUNDED" ? "Partial Refund" : f.charAt(0) + f.slice(1).toLowerCase()}
             </button>
           ))}
         </div>
@@ -1475,7 +1544,10 @@ const CollectPaymentPage = ({ studentId }) => {
                   <td className="px-5 py-4 text-on-surface-variant">{p.receiptNo || "—"}</td>
                   <td className="px-5 py-4 text-on-surface-variant">{p.termNumber ? `Term ${p.termNumber}` : "General"}</td>
                   <td className="px-5 py-4 text-right">
-                    <div className="font-bold text-primary">{fmt(p.amount)}</div>
+                    <div className="font-bold text-primary">{fmt(Number(p.amount) - Number(p.refundAmount || 0))}</div>
+                    {Number(p.refundAmount || 0) > 0 && (
+                      <div className="text-[10px] text-error font-bold mt-0.5">Refunded: {fmt(p.refundAmount)}</div>
+                    )}
                     {p.paidComponents && Object.keys(p.paidComponents).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1 justify-end">
                         {Object.entries(p.paidComponents).map(([k, v]) => (
@@ -1593,7 +1665,7 @@ const CollectPaymentPage = ({ studentId }) => {
               </h3>
               <div className="space-y-3">
                 {selectedFee.terms.map((t) => {
-                  const paid = payments?.filter((p) => p.termNumber === t.termNumber && p.status === "SUCCESS").reduce((s, p) => s + p.amount, 0) || 0;
+                  const paid = payments?.reduce((s, p) => s + (p.termNumber === t.termNumber ? getNetPaid(p) : 0), 0) || 0;
                   const termAmt = Number(t.amount || 0);
                   const balance = Math.round(termAmt - paid);
                   const isPaid = t.status === "PAID" || balance <= 0;
@@ -1989,8 +2061,18 @@ const CollectPaymentPage = ({ studentId }) => {
       >
         <Form form={statusActionForm} layout="vertical">
           {statusModal.action === "refund" && (
-            <Form.Item name="refundAmount" label="Refund Amount" rules={[{ required: true, message: "Refund amount is required" }]} initialValue={statusModal.payment?.amount}>
-              <InputNumber min={1} max={Number(statusModal.payment?.amount || 1)} style={{ width: "100%" }} prefix="₹" />
+            <Form.Item
+              name="refundAmount"
+              label={`Refund Amount (Max: ${fmt(Number(statusModal.payment?.amount || 0) - Number(statusModal.payment?.refundAmount || 0))})`}
+              rules={[{ required: true, message: "Refund amount is required" }]}
+              initialValue={Number(statusModal.payment?.amount || 0) - Number(statusModal.payment?.refundAmount || 0)}
+            >
+              <InputNumber
+                min={1}
+                max={Number(statusModal.payment?.amount || 0) - Number(statusModal.payment?.refundAmount || 0)}
+                style={{ width: "100%" }}
+                prefix="₹"
+              />
             </Form.Item>
           )}
           <Form.Item name="reason" label="Reason" rules={[{ required: true, message: "Please provide a reason" }]}>

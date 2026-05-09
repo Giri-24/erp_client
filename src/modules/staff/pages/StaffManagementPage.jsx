@@ -824,8 +824,22 @@ const StaffManagementPage = () => {
                     </Form.Item>
                   </Col>
                   <Col span={12}>
-                    <Form.Item name="phone" label={<span style={{ fontWeight: 700, fontSize: 12 }}>CONTACT NUMBER</span>}>
-                      <Input size="large" prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />} id="staff-phone" name="phone" autoComplete="tel" />
+                    <Form.Item
+                      name="phone"
+                      label={<span style={{ fontWeight: 700, fontSize: 12 }}>CONTACT NUMBER</span>}
+                      rules={[
+                        { pattern: /^\d{10}$/, message: "Phone must be exactly 10 digits" }
+                      ]}
+                      getValueFromEvent={(e) => e.target.value.replace(/\D/g, '').slice(0, 10)}
+                    >
+                      <Input
+                        size="large"
+                        prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />}
+                        id="staff-phone"
+                        name="phone"
+                        autoComplete="tel"
+                        maxLength={10}
+                      />
                     </Form.Item>
                   </Col>
                 </Row>

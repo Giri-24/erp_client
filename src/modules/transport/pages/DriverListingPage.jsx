@@ -435,8 +435,16 @@ const DetailRow = ({ icon, label, value }) => (
             <Form.Item name="name" label="Driver Name" rules={[{ required: true, message: "Name is required" }]}>
               <Input placeholder="Full name" />
             </Form.Item>
-            <Form.Item name="phone" label="Phone Number" rules={[{ required: true, message: "Phone is required" }]}>
-              <Input placeholder="10-digit mobile" />
+            <Form.Item
+              name="phone"
+              label="Phone Number"
+              rules={[
+                { required: true, message: "Phone is required" },
+                { pattern: /^\d{10}$/, message: "Phone must be exactly 10 digits" }
+              ]}
+              getValueFromEvent={(e) => e.target.value.replace(/\D/g, '').slice(0, 10)}
+            >
+              <Input placeholder="10-digit mobile" maxLength={10} />
             </Form.Item>
             <Form.Item name="email" label="Email">
               <Input placeholder="driver@email.com" />

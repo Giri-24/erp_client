@@ -9,7 +9,6 @@ import {
   message,
   Space,
   Card,
-  Typography,
   Tag,
   Descriptions,
   Row,
@@ -17,13 +16,10 @@ import {
   DatePicker,
   Checkbox,
   Divider,
-  Radio,
-  Modal,
   Alert,
 } from "antd";
 import {
   UserOutlined,
-  HomeOutlined,
   TeamOutlined,
   BookOutlined,
   FileTextOutlined,
@@ -42,7 +38,6 @@ import { createAdmission, updateAdmission, getNextAdmissionNo, getAcademicStream
 import { getAcademicYears } from "../modules/fees/fees.service";
 import { getAdminSettings } from "../modules/settings/settings.service";
 import dayjs from "dayjs";
-const { Title, Text } = Typography;
 
 const isPreschool = (standard) => {
   if (!standard) return false;

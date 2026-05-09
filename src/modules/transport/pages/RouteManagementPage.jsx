@@ -45,6 +45,7 @@ const RouteManagementPage = () => {
   // inline create form state (left panel)
   const [inlineForm, setInlineForm] = useState({
     routeName: "", routeNo: "", baseFee: "", splClassFee: "", description: "", conductorName: "", conductorPhone: "",
+    numberOfTerms: 1,
   });
   const [inlineStops, setInlineStops] = useState([]);
   const [editingRouteId, setEditingRouteId] = useState(null);
@@ -68,7 +69,7 @@ const RouteManagementPage = () => {
 
   // ── inline form helpers ──────────────────────────────────────────────────
   const resetInlineForm = () => {
-    setInlineForm({ routeName: "", routeNo: "", baseFee: "", splClassFee: "", description: "" });
+    setInlineForm({ routeName: "", routeNo: "", baseFee: "", splClassFee: "", description: "", numberOfTerms: 1 });
     setInlineStops([]);
     setEditingRouteId(null);
   };
@@ -90,6 +91,7 @@ const RouteManagementPage = () => {
       description: route.description || "",
       conductorName: route.conductorName || "",
       conductorPhone: route.conductorPhone || "",
+      numberOfTerms: route.numberOfTerms || 1,
     });
     setInlineStops(
       [...(route.stops || [])].sort((a, b) => a.stopOrder - b.stopOrder).map((s) => ({
@@ -149,6 +151,7 @@ const RouteManagementPage = () => {
         description: inlineForm.description,
         conductorName: inlineForm.conductorName || undefined,
         conductorPhone: inlineForm.conductorPhone || undefined,
+        numberOfTerms: Number(inlineForm.numberOfTerms || 1),
         stops: inlineStops.map((s, i) => ({
           ...s,
           stopOrder: i + 1,
@@ -251,7 +254,10 @@ const RouteManagementPage = () => {
                     <input
                       type={type || "text"}
                       value={inlineForm[field]}
-                      onChange={(e) => setInlineForm((p) => ({ ...p, [field]: e.target.value }))}
+                      onChange={(e) => {
+                        const val = field === "conductorPhone" ? e.target.value.replace(/\D/g, '').slice(0, 10) : e.target.value;
+                        setInlineForm((p) => ({ ...p, [field]: val }));
+                      }}
                       placeholder={placeholder}
                       maxLength={field === "conductorPhone" ? 10 : undefined}
                       onKeyPress={(e) => {
@@ -263,6 +269,25 @@ const RouteManagementPage = () => {
                     />
                   </div>
                 ))}
+                
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-on-surface-variant/80 uppercase tracking-widest px-1">No. of Terms</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min={1} max={10}
+                      value={inlineForm.numberOfTerms}
+                      onChange={(e) => setInlineForm((p) => ({ ...p, numberOfTerms: e.target.value }))}
+                      className="w-full bg-surface-container-high border-none focus:ring-2 focus:ring-primary/20 p-4 rounded-xl text-primary font-medium text-sm outline-none transition-all"
+                    />
+                    {inlineForm.baseFee > 0 && inlineForm.numberOfTerms > 0 && (
+                      <div className="shrink-0 bg-primary/5 px-4 py-2 rounded-xl border border-primary/10">
+                        <p className="text-[9px] font-black text-primary uppercase tracking-tighter">Per Term</p>
+                        <p className="text-sm font-bold text-primary">{fmt(Math.round(inlineForm.baseFee / inlineForm.numberOfTerms))}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <div className="md:col-span-2 space-y-1.5">
                   <label className="text-[10px] font-bold text-on-surface-variant/80 uppercase tracking-widest px-1">Route Description</label>
                   <textarea
@@ -456,9 +481,9 @@ const RouteManagementPage = () => {
                         </p>
                         <h4 className="font-headline font-bold text-primary leading-tight truncate">{route.routeName}</h4>
                         <p className="text-[10px] text-on-surface-variant mt-0.5">
-                          {route.stops?.length || 0} Stop{(route.stops?.length || 0) !== 1 ? "s" : ""}
-                          {" · "}{fmt(route.baseFee)} base fee
-                          {route.splClassFee > 0 ? ` · +${fmt(route.splClassFee)} surcharge` : ""}
+                           {route.stops?.length || 0} Stop{(route.stops?.length || 0) !== 1 ? "s" : ""}
+                           {" · "}{fmt(route.baseFee)} fee ({route.numberOfTerms || 1} term{ (route.numberOfTerms || 1) !== 1 ? 's' : '' })
+                           {route.splClassFee > 0 ? ` · +${fmt(route.splClassFee)} surcharge` : ""}
                         </p>
                       </div>
                       <div className="flex gap-1 flex-shrink-0 ml-3">
@@ -575,6 +600,7 @@ const RouteManagementPage = () => {
                 { label: "Route Name", val: selectedRoute.routeName },
                 { label: "Route No", val: selectedRoute.routeNo || "—" },
                 { label: "Base Fee", val: fmt(selectedRoute.baseFee) },
+                { label: "No. of Terms", val: selectedRoute.numberOfTerms || 1 },
                 { label: "Spl Class Fee", val: selectedRoute.splClassFee > 0 ? fmt(selectedRoute.splClassFee) : "—" },
                 { label: "Total Stops", val: selectedRoute.stops?.length || 0 },
                 { label: "Students", val: selectedRoute.students?.length || 0 },
