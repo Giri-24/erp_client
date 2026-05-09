@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Form, Input, Button, message, Typography } from 'antd'
 import { LockOutlined, MailOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +11,13 @@ const { Title, Text } = Typography
 const Login = () => {
   const navigate = useNavigate()
   const { refresh } = usePermissions()
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [navigate])
 
   const onFinish = async (values) => {
     try {

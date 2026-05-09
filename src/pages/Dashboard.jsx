@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import { Avatar, Dropdown, Modal } from "antd";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   UserOutlined,
   LogoutOutlined,
@@ -104,7 +104,13 @@ const TRANSPORT_MANAGER_KEYS = new Set([
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [selectedKey, setSelectedKey] = useState("dashboard");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedKey = searchParams.get("page") || "dashboard";
+  
+  const setSelectedKey = (key) => {
+    setSearchParams({ page: key });
+  };
+
   const [editData, setEditData] = useState(null);
   const [feeStudentId, setFeeStudentId] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
